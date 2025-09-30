@@ -1,0 +1,62 @@
+{
+    "param_grid_LR": [
+        {
+            "penalty": ["l1"],
+            "dual": [false],
+            "tol": [ 0.0001, 0.001, 0.01],
+            "C": [ 0.007, 0.01, 0.03],
+            "fit_intercept": [ true, false],
+            "solver": ["saga"],
+            "l1_ratio": [null]
+        },
+        {
+            "penalty": ["l2"],
+            "dual": [false],
+            "tol": [ 0.0001, 0.001, 0.01],
+            "C": [ 0.007, 0.01, 0.03],
+            "fit_intercept": [ true, false],
+            "solver": [ "lbfgs", "newton-cholesky", "newton-cg", "sag"],
+            "l1_ratio": [null]
+        },
+        {
+            "penalty": ["elasticnet"],
+            "dual": [false],
+            "tol": [ 0.0001, 0.001, 0.01],
+            "C": [ 0.007, 0.01, 0.03],
+            "fit_intercept": [ true, false],
+            "solver": ["saga"],
+            "l1_ratio": [ 0, 0.2, 0.8, 1]
+        }
+    ],
+    "param_grid_RF": [
+        {
+            "n_estimators": [100, 150],
+            "criterion": ["gini", "entropy"],
+            "max_depth": [3, 4, 5],
+            "min_samples_split": [20, 30, 40],
+            "min_samples_leaf": [20, 30, 40],
+            "max_features": ["sqrt"],
+            "max_leaf_nodes": [10, 15],
+            "bootstrap": [true],
+            "oob_score": [true],
+            "ccp_alpha": [0.001, 0.005, 0.008],
+            "random_state": [10]
+        }
+    ],
+    "param_grid_XGB": {
+        "booster": ["gbtree"],
+        "eta": [0.001, 0.005, 0.01, 0.02],
+        "gamma": [0.1, 0.3, 0.5, 0.7, 1],
+        "max_depth": [3, 4, 5, 6, 7],
+        "min_child_weight": [1, 2, 4, 5, 6, 7],
+        "subsample": [0.7, 0.8, 0.85, 0.9],
+        "colsample_bytree": [0.7, 0.8, 0.9, 0.95],
+        "lambda": [1, 5, 10, 15, 20],
+        "alpha": [0, 0.1, 0.5, 1, 5],
+        "grow_policy": ["lossguide", "depthwise"],
+        "max_leaves": [24, 32, 48, 64, 128],
+        "learning_rate": [0.001, 0.005, 0.01, 0.02],
+        "n_estimators": [400, 500, 600, 700, 800],
+        "random_state": [10]
+    }
+}
