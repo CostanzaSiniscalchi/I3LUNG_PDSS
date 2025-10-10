@@ -1,8 +1,10 @@
 *
 
 !.gitignore
+!*/
+!mlef_pipeline/
 !rwd_features.json
-!mlef_tool.ipynb
+!mlef_pipeline/mlef_tool.ipynb
 !classification_config.json
 !data_curation.py
 !enums.py
@@ -11,3 +13,4 @@
 !split.json
 !submodel_features.json
 !test.ipynb
+!features.json
