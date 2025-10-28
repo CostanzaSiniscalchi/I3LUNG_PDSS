@@ -191,8 +191,6 @@ class DataLoader:
                 outcome = (outcome >= 6).astype(int)
             case Outcome.OS_24:
                 outcome = (outcome >= 24).astype(int)
-            case Outcome.OS_SURV:
-                outcome = outcome  # Keep as is for survival analysis
             case _:
                 raise ValueError(f"Unsupported outcome: {outcome_name}")
 

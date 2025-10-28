@@ -1,0 +1,91 @@
+{
+    "param_grid_COXNET": {
+        "n_alphas": [200],
+        "l1_ratio": [0.9],
+        "max_iter": [1000000],
+        "fit_baseline_model": [true]
+    },
+    "param_grid_COXPH": {
+        "alpha":[0.0001, 0.001, 0.01],
+        "ties": ["breslow", "efron"],
+        "n_iter": [100, 500, 1000],
+        "tol": [1e-6, 1e-7, 1e-8]
+    },
+    "param_grid_SURV_TREE": {
+        "splitter": ["best", "random"],
+        "max_depth": [3, 5, 7, 10],
+        "min_samples_split": [2, 5, 10],
+        "min_samples_leaf": [1, 2, 5],
+        "min_weight_fraction_leaf": [0.0, 0.1, 0.2],
+        "max_features": ["sqrt", "log2"],
+        "max_leaf_nodes": [5, 10, 20, 35],
+        "low_memory": [false],
+        "random_state": [10]
+    },
+    "param_grid_RSF": {
+        "n_estimators": [20, 30, 50],
+        "max_depth": [3, 5, 7, 10],
+        "min_samples_split": [5, 10, 20, 30],
+        "min_samples_leaf": [1, 3, 10, 15],
+        "min_weight_fraction_leaf": [0.0, 0.05, 0.1, 0.2],
+        "max_features": ["log2", "sqrt"],
+        "max_leaf_nodes": [10, 25, 40],
+        "bootstrap": [true],
+        "oob_score": [false, true],
+        "n_jobs": [-1],
+        "warm_start": [false],
+        "max_samples": [0.5, 0.8],
+        "low_memory": [false],
+        "random_state": [10]
+    },
+    "param_grid_FK_SVM": {
+        "alpha": [0.0001, 0.001, 0.01, 0.1, 1.0],
+        "rank_ratio": [0.0, 0.5, 1.0],
+        "kernel": ["linear", "rbf", "poly"],
+        "gamma": [0.1, 1.0],
+        "degree": [2, 3, 4],
+        "max_iter": [100],
+        "tol": [0.001, 0.01, 0.1],
+        "optimizer": ["avltree", "rbtree"]
+    },
+    "param_grid_GB_SURV": {
+        "loss": ["coxph"],
+        "learning_rate": [0.1, 0.5, 1.0],
+        "n_estimators": [100, 200, 300],
+        "subsample": [0.5, 0.8, 1.0],
+        "criterion": ["friedman_mse", "squared_error"],
+        "min_samples_split": [2, 5, 10],
+        "min_samples_leaf": [1, 2, 5],
+        "min_weight_fraction_leaf": [0.0, 0.1, 0.2],
+        "max_depth": [3, 5, 7, 10],
+        "min_impurity_decrease": [0.0, 0.1, 0.2],
+        "max_features": ["sqrt", "log2"],
+        "max_leaf_nodes": [5, 10, 20, 35],
+        "validation_fraction": [0.1, 0.2, 0.3],
+        "n_iter_no_change": [5, 10, 20],
+        "tol": [1e-4, 1e-5, 1e-6],
+        "dropout_rate": [0.0, 0.1, 0.2],
+        "random_state": [10]
+    },
+    "param_grid_CW_GB_SURV": {
+        "loss": ["coxph"],
+        "learning_rate": [0.1, 0.5, 1.0],
+        "n_estimators": [100, 200, 300],
+        "subsample": [0.5, 0.8, 1.0],
+        "dropout_rate": [0.0, 0.1, 0.2]
+    },
+    "param_grid_EST": {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [3, 5],
+        "min_samples_split": [8, 10, 15],
+        "min_samples_leaf": [2, 5, 10],
+        "min_weight_fraction_leaf": [0.1, 0.2, 0.3],
+        "max_features": ["sqrt", "log2"],
+        "max_leaf_nodes": [5, 10, 15],
+        "bootstrap": [true],
+        "oob_score": [false, true],
+        "n_jobs": [-1],
+        "max_samples": [0.5, 0.8]
+    },
+    "param_grid_COX_BASE": {}
+}

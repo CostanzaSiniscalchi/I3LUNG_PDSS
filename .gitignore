@@ -12,5 +12,7 @@
 !i3l_statistics.py
 !split.json
 !submodel_features.json
-!test.ipynb
+!classification.ipynb
+!survival.ipynb
+!survival_config.json
 !features.json

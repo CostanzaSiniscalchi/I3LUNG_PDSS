@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.feature_selection import SelectFromModel
 from sklearn.linear_model import Lasso
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import BaseCrossValidator
+from sklearn.model_selection import BaseCrossValidator, KFold
 from sklearn.utils import compute_sample_weight
 from skopt import BayesSearchCV
 from i3l_statistics import Statistics
@@ -61,6 +61,58 @@ class ML:
         selected_features = selected_features['FEATURE'].to_list()
         
         return selected_features
+    
+
+    @staticmethod
+    def coxnet_selection(self, X_train: pd.DataFrame, y_train: pd.DataFrame, cv, folds=None, target_features=15, uncertainty=5):
+        if X_train.shape[1] < target_features - uncertainty:
+            return X_train.columns
+        
+        if isinstance(cv, int):
+            kf = KFold(n_splits=cv, shuffle=True, random_state=10)
+            cv = lambda: kf.split(X_train, y_train)
+        
+        statistics = Statistics()
+        config = json.load(open('survival_config.json'))
+        
+        l1_ratio = 0.1
+        alpha_min = 1e-4
+        alpha_max = 1e0
+        max_iter = 20
+        
+        cox_params = config['param_grid_COXNET']
+        
+        for _ in range(max_iter):
+            alpha = (alpha_min + alpha_max) / 2
+            
+            cox_params.update({
+                'alphas': [[alpha]],
+                'l1_ratio': [l1_ratio]
+            })
+            
+            gcv = self.grid_search(X_train, y_train, CoxnetSurvivalAnalysis(), cox_params, cv(), folds)
+            best_model = gcv.best_estimator_
+            
+            coefficients = [el for coef_list in best_model.coef_ for el in coef_list]
+            feature_df = pd.DataFrame({
+                'FEATURE': X_train.columns,
+                'COEFFICIENT': coefficients
+            })
+            feature_df = feature_df[feature_df['COEFFICIENT'] != 0]
+            n_features = len(feature_df)
+            
+            if target_features < n_features < target_features + uncertainty:
+                break
+            
+            if n_features < target_features:
+                alpha_max = alpha
+            
+            if n_features > target_features + uncertainty:
+                alpha_min = alpha
+        
+        selected_features = statistics.elbow_selection(feature_df, target_features - uncertainty, target_features + uncertainty)
+        
+        return selected_features['FEATURE'].values
     
 
     def _get_model(self, model: str):
@@ -167,9 +219,6 @@ class ML:
         if select_features:
             selected_features = self.lasso_selection(X, y['OS MONTHS'], target_features=15, tolerance=10)
             X = X[selected_features]
-        
-        with open('survival_config.json', 'r') as f:
-            param_grids = json.load(f)
 
         cph.fit(dataset, duration_col='TIME', event_col='EVENT')
 
