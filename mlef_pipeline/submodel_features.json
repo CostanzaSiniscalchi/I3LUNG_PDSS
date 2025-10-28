@@ -1,15 +1,15 @@
 [
-    "DEATH_EVENT",
-    "PROGRESSION_EVENT",
-    "THERAPY_END_EVENT",
-    "BEST_RESPONSE",
-    "IO_IOCT",
-    "NSCLC_HISTOLOGY_SQUAMOUS",
-    "IO_LINE",
+    "DEATH EVENT",
+    "PROGRESSION EVENT",
+    "THERAPY END EVENT",
+    "BEST RESPONSE",
+    "IO IOCT",
+    "HISTOLOGY SQUAMOUS",
+    "IO LINE",
     "ORR",
     "DCR",
     "CBR",
-    "PFS_MONTHS",
-    "OS_MONTHS",
-    "TTF_MONTHS"
+    "PFS MONTHS",
+    "OS MONTHS",
+    "TTF MONTHS"
 ]

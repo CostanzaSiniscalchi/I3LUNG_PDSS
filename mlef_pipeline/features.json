@@ -1,36 +1,36 @@
 {
     "RWD": [
-        "GENDER_M",
-        "CF03_ECOG_BASAL",
-        "LAB22_LDH_BASAL",
+        "SEX",
+        "ECOG PS",
+        "LDH",
         "NLR",
-        "C94_SMOKING_CURRENT",
-        "C94_SMOKING_FORMER",
-        "C94_SMOKING_NEVER",
-        "PDL1_CATHEGORY",
-        "SITE_METS_IO_START_PARENCHYMAL BRAIN",
-        "SITE_METS_IO_START_LIVER",
-        "SITE_METS_IO_START_BONE"
+        "SMOKING CURRENT",
+        "SMOKING FORMER",
+        "SMOKING NEVER",
+        "PDL1 CATEGORY",
+        "PARENCHYMAL BRAIN METS AT IO START",
+        "LIVER METS AT IO START",
+        "BONE METS AT IO START"
     ],
     "GEN": [
         "DRIVER",
-        "I30_KRAS",
-        "I55_P53",
-        "STK11_GENERAL"
+        "KRAS",
+        "P53",
+        "STK11"
     ],
     "additional": [
-        "DEATH_EVENT_OC", 
-        "PROGRESSION_EVENT_OC", 
-        "THERAPY_END_EVENT_OC", 
-        "BEST_RESPONSE", 
-        "IO_IOCT", 
-        "NSCLC_HISTOLOGY_SQUAMOUS", 
-        "LINE_IO_COHORT3",
+        "DEATH EVENT", 
+        "PROGRESSION EVENT", 
+        "THERAPY END EVENT", 
+        "BEST RESPONSE", 
+        "IO LINE", 
+        "IO IOCT",
+        "HISTOLOGY SQUAMOUS", 
         "ORR", 
         "DCR", 
         "CBR", 
-        "PFS_MONTHS", 
-        "OS_MONTHS", 
-        "TTF_MONTHS"
+        "PFS MONTHS", 
+        "OS MONTHS", 
+        "TTF MONTHS"
     ]
 }

@@ -16,14 +16,14 @@ from enums import *
 class DataLoader:
 
     data_path = {
-        Mode.RWD: 'data/rwd.csv',
-        Mode.DP: 'data/digital_pathology.csv',
-        Mode.FMRAD: 'data/fmrad.csv',
-        Mode.PYRAD: 'data/pyradiomics.csv',
-        Mode.GEN: 'data/genomics.csv'
+        Mode.RWD: '../data/rwd.csv',
+        Mode.DP: '../data/digital_pathology.csv',
+        Mode.FMRAD: '../data/fmrad.csv',
+        Mode.PYRAD: '../data/pyradiomics.csv',
+        Mode.GEN: '../data/genomics.csv'
     }
-    outcomes_path = 'data/outcomes.csv'
-    
+    outcomes_path = '../data/outcomes.csv'
+
 
     def _get_data(self, modes: list[Mode]):
         mode_data = {}
@@ -32,7 +32,6 @@ class DataLoader:
             if mode in self.data_path:
                 path = self.data_path[mode]
                 mode_data[mode] = pd.read_csv(path)
-                print(f"Loaded {mode.value} data with shape: {mode_data[mode].shape}")
             else:
                 raise ValueError(f"Unsupported mode: {mode}")
             
@@ -76,27 +75,32 @@ class DataLoader:
         return merged
     
 
-    def _get_subanalysis_data(self, df: pd.DataFrame, subanalysis: str) -> pd.DataFrame:
+    def _get_subanalysis_data(self, df: pd.DataFrame, cohort: int, subanalysis: str, subanalysis_features: pd.DataFrame) -> pd.DataFrame:
         match subanalysis:
             case Subanalysis.CLASSIC:
-                return df
+                pass
             case Subanalysis.IO_ONLY:
-                return df[df['IO_IOCT'] == 0]
+                subanalysis_features = subanalysis_features[subanalysis_features['IO IOCT'] == 0]
             case Subanalysis.IO_CT:
-                return df[df['IO_IOCT'] == 1]
+                subanalysis_features = subanalysis_features[subanalysis_features['IO IOCT'] == 1]
             case Subanalysis.LOW_PDL1:
-                return df[(df['PDL1_CATHEGORY'] == 0) | (df['PDL1_CATHEGORY'] == 1)]
+                subanalysis_features = subanalysis_features[(subanalysis_features['PDL1 CATEGORY'] == 0) | (subanalysis_features['PDL1 CATEGORY'] == 1)]
             case Subanalysis.HIGH_PDL1:
-                return  df[df['PDL1_CATHEGORY'] == 2]
+                subanalysis_features = subanalysis_features[subanalysis_features['PDL1 CATEGORY'] == 2]
             case Subanalysis.SQUAMOUS:
-                return df[df['NSCLC_HISTOLOGY_SQUAMOUS'] == 1]
+                subanalysis_features = subanalysis_features[subanalysis_features['HISTOLOGY SQUAMOUS'] == 1]
             case Subanalysis.ADENOCARCINOMA:
-                return df[df['NSCLC_HISTOLOGY_ADENOCARCINOMA'] == 1]
+                subanalysis_features = subanalysis_features[subanalysis_features['HISTOLOGY ADENOCARCINOMA'] == 1]
             case _:
                 raise ValueError(f"Unsupported subanalysis: {subanalysis}")
+        
+        if cohort == 2:
+            subanalysis_features = subanalysis_features[subanalysis_features['IO LINE'] == 2]
+        
+        return df[df['Subject'].isin(subanalysis_features['Subject'])]
     
 
-    def create_dataset(self, modes: list[Mode], outcome: str, subanalysis: str) -> pd.DataFrame:
+    def create_dataset(self, modes: list[Mode], outcome: str, cohort: int=23, subanalysis: str=Subanalysis.CLASSIC) -> pd.DataFrame:
         mode_data = self._get_data(modes)
         dataset = self._early_fusion(mode_data, outcome)
 
@@ -109,7 +113,12 @@ class DataLoader:
             how='inner'
         ).dropna(subset=[outcome])
 
-        dataset = self._get_subanalysis_data(dataset, subanalysis)
+        if Mode.RWD in modes:
+            rwd = mode_data[Mode.RWD].copy()
+        else: 
+            rwd = pd.read_csv(self.data_path[Mode.RWD])
+        
+        dataset = self._get_subanalysis_data(dataset, cohort, subanalysis, rwd)
         
         return dataset
         
@@ -182,6 +191,8 @@ class DataLoader:
                 outcome = (outcome >= 6).astype(int)
             case Outcome.OS_24:
                 outcome = (outcome >= 24).astype(int)
+            case Outcome.OS_SURV:
+                outcome = outcome  # Keep as is for survival analysis
             case _:
                 raise ValueError(f"Unsupported outcome: {outcome_name}")
 

@@ -1,4 +1,5 @@
 import json
+from lifelines import CoxPHFitter
 import numpy as np
 from sklearn.feature_selection import SelectFromModel
 from sklearn.linear_model import Lasso
@@ -9,6 +10,9 @@ from skopt import BayesSearchCV
 from i3l_statistics import Statistics
 import pandas as pd
 from enums import *
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
+warnings.filterwarnings('ignore', category=FutureWarning, module='sklearn')
 
 
 class ML:
@@ -101,7 +105,7 @@ class ML:
         return opt.best_estimator_
             
 
-    def train_model(self, X: pd.DataFrame, y: pd.Series, model_name: Model, cv: BaseCrossValidator, select_features: bool=True):
+    def train_classification_model(self, X: pd.DataFrame, y: pd.Series, model_name: Model, cv: BaseCrossValidator, select_features: bool=True):
         """
         Train a machine learning model with optional feature selection and hyperparameter tuning.
 
@@ -139,3 +143,34 @@ class ML:
 
         return best_clf
     
+
+    def train_survival_model(self, dataset: pd.DataFrame, model_name: Model, cv: BaseCrossValidator, select_features: bool=True):
+        """
+        Train a survival analysis model with optional feature selection and hyperparameter tuning.
+
+        Parameters:
+        X (pd.DataFrame): Feature set.
+        y (pd.DataFrame): Target variable with survival time and event indicator.
+        model (str): Model type.
+        cv: Cross-validation strategy.
+        select_features (bool): Whether to perform feature selection using Lasso.
+        Returns:
+        The trained model.
+        """
+
+        match model_name:
+            case Model.COX:
+                cph = CoxPHFitter(penalizer=0.5)
+            case _:
+                raise ValueError(f"Unsupported survival model: {model_name}")
+
+        if select_features:
+            selected_features = self.lasso_selection(X, y['OS MONTHS'], target_features=15, tolerance=10)
+            X = X[selected_features]
+        
+        with open('survival_config.json', 'r') as f:
+            param_grids = json.load(f)
+
+        cph.fit(dataset, duration_col='TIME', event_col='EVENT')
+
+        return cph

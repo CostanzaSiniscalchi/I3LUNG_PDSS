@@ -10,6 +10,7 @@ class Mode(Enum):
 class Outcome(Enum):
     OS_6 = 'OS_6'
     OS_24 = 'OS_24'
+    OS_SURV = 'OS'
 
 class Subanalysis(Enum):
     CLASSIC = 'CLASSIC'
@@ -24,3 +25,4 @@ class Model(Enum):
     LR = 'LR'
     RF = 'RF'
     XGB = 'XGB'
+    COX = 'COX'
