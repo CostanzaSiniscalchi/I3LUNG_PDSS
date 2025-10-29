@@ -10,12 +10,13 @@ class Mode(Enum):
 class Outcome(Enum):
     OS_6 = 'OS_6'
     OS_24 = 'OS_24'
-    OS_SURV = 'OS'
+    DCR = 'DCR'
 
 class Subanalysis(Enum):
-    CLASSIC = 'CLASSIC'
+    C23 = 'C23'
+    C2 = 'C2'
     IO_ONLY = 'IO_ONLY'
-    IO_CT = 'IOCT'
+    IO_CHT = 'IOCHT'
     LOW_PDL1 = 'LOW_PDL1'
     HIGH_PDL1 = 'HIGH_PDL1'
     SQUAMOUS = 'SQUAMOUS'
@@ -24,5 +25,3 @@ class Subanalysis(Enum):
 class Model(Enum):
     LR = 'LR'
     RF = 'RF'
-    XGB = 'XGB'
-    COX = 'COX'

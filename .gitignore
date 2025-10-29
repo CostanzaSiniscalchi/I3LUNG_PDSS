@@ -2,9 +2,8 @@
 
 !.gitignore
 !*/
-!mlef_pipeline/
+!mlef_pipeline/*
 !rwd_features.json
-!mlef_pipeline/mlef_tool.ipynb
 !classification_config.json
 !data_curation.py
 !enums.py

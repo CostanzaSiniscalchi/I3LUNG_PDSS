@@ -75,14 +75,16 @@ class DataLoader:
         return merged
     
 
-    def _get_subanalysis_data(self, df: pd.DataFrame, cohort: int, subanalysis: str, subanalysis_features: pd.DataFrame) -> pd.DataFrame:
+    def _get_subanalysis_data(self, df: pd.DataFrame, subanalysis: str, subanalysis_features: pd.DataFrame) -> pd.DataFrame:
         match subanalysis:
-            case Subanalysis.CLASSIC:
+            case Subanalysis.C23:
                 pass
+            case Subanalysis.C2:
+                subanalysis_features = subanalysis_features[subanalysis_features['LINE_IO_COHORT3'] == 1]
             case Subanalysis.IO_ONLY:
-                subanalysis_features = subanalysis_features[subanalysis_features['IO IOCT'] == 0]
-            case Subanalysis.IO_CT:
-                subanalysis_features = subanalysis_features[subanalysis_features['IO IOCT'] == 1]
+                subanalysis_features = subanalysis_features[subanalysis_features['IO IOCHT'] == 0]
+            case Subanalysis.IO_CHT:
+                subanalysis_features = subanalysis_features[subanalysis_features['IO IOCHT'] == 1]
             case Subanalysis.LOW_PDL1:
                 subanalysis_features = subanalysis_features[(subanalysis_features['PDL1 CATEGORY'] == 0) | (subanalysis_features['PDL1 CATEGORY'] == 1)]
             case Subanalysis.HIGH_PDL1:
@@ -94,17 +96,14 @@ class DataLoader:
             case _:
                 raise ValueError(f"Unsupported subanalysis: {subanalysis}")
         
-        if cohort == 2:
-            subanalysis_features = subanalysis_features[subanalysis_features['IO LINE'] == 2]
-        
         return df[df['Subject'].isin(subanalysis_features['Subject'])]
     
 
-    def create_dataset(self, modes: list[Mode], outcome: str, cohort: int=23, subanalysis: str=Subanalysis.CLASSIC) -> pd.DataFrame:
+    def create_dataset(self, modes: list[Mode], outcome: str, subanalysis: str=Subanalysis.C23) -> pd.DataFrame:
         mode_data = self._get_data(modes)
         dataset = self._early_fusion(mode_data, outcome)
 
-        outcomes = pd.read_csv(self.outcomes_path)
+        outcomes = pd.read_csv(self.outcomes_path) #add OS_& and OS_24
         
         dataset = pd.merge(
             left=dataset,
@@ -118,7 +117,7 @@ class DataLoader:
         else: 
             rwd = pd.read_csv(self.data_path[Mode.RWD])
         
-        dataset = self._get_subanalysis_data(dataset, cohort, subanalysis, rwd)
+        dataset = self._get_subanalysis_data(dataset, subanalysis, rwd)
         
         return dataset
         
