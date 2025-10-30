@@ -1,0 +1,21 @@
+scripts/unified/train.py
+└── pipeline()                             # Main launcher
+    └── run_training()                     # [train/run_training.py]
+        └── prepare_dataset()              # [train/prepare_dataset.py]
+             └── Prepares bags for current modality combo (called once per config)
+        └── build_base_path()              # [train/utils/paths_utils.py]
+             └── Builds base output path for current config
+        └── build_full_path()              # [train/utils/paths_utils.py]
+             └── Builds full experiment path (fold, seed, group)
+        └── train_val()                    # [train/training_loop.py]
+             └── Core training logic:
+                 - loads data
+                 - builds model
+                 - trains and validates
+                 - saves predictions and weights
+        └── compute_scores()               # [metrics/compute_scores.py]
+             └── Computes train/test metrics for classification/survival
+        └── compute_weighted_average()     # [metrics/calculate_average.py]
+             └── Aggregates scores across folds/seeds
+    └── handle_standard_upload()          # [uploading/upload_results.py]
+         └── Uploads results to Neptune + Excel

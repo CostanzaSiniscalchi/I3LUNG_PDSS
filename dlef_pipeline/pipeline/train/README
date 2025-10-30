@@ -1,0 +1,7 @@
+train/
+├── run_training.py              # main script cycle across configs
+├── config_utils.py              # To parse the config YAML, set the task, hyperparams, etc.
+├── dataset_utils.py             # fold logic, filters, dataset
+├── training_loop.py             # `train_val()`  
+├── prepare_dataset.py           # `prepare_dataset()`
+├── build_utils.py               # `build_experiment_path()`  
