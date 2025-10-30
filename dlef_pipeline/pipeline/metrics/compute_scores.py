@@ -96,7 +96,12 @@ def find_deepest_valid_folder(folder_path):
 def process_predictions(folder_path, task):
     """Processa i file delle predizioni e salva gli score."""
     test_file = os.path.join(folder_path, "predictions.parquet")
-    train_file = os.path.join(folder_path, "predictions_train.parquet")
+    
+    # If we're in an eval subfolder, look for train predictions in parent directory
+    if "eval" in folder_path:
+        train_file = os.path.join(os.path.dirname(os.path.dirname(folder_path)), "predictions_train.parquet")
+    else:
+        train_file = os.path.join(folder_path, "predictions_train.parquet")
 
     if task == "classification":
         if os.path.exists(test_file):
