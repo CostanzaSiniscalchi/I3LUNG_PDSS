@@ -1,19 +1,43 @@
 # MLEF Model Training Guide
 
-This guide explains how to use the `train_mlef.py` script to train MLEF (Multi-Level Early Fusion) models.
+This guide explains how to use the `train_mlef.py` script to train MLEF (Machine Learning Early Fusion) models.
 
 ## Overview
 
-The script trains machine learning models for different data modality combinations and saves results in a structured folder format compatible with your analysis pipeline.
+The script trains MLEF models for different data modality combinations and saves results in a structured folder format compatible with your analysis pipeline.
+
+add what does it mean abbr
 
 ## Quick Start
 
 ### Basic Usage
 
-Train all default modalities for OS_6 outcome with C23 subanalysis:
+Train all default modalities for OS_6 outcome with C23 subanalysis (main analysis):
 ```bash
 python train_mlef.py --outcome OS_6 --subanalysis C23
 ```
+
+## Command-Line Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--outcome` | str | `OS_6` | Target outcome: `OS_6` or `OS_24` or `DCR` |
+| `--subanalysis` | str | `C23` | Subgroup: `C23`, `C2`, `IO_ONLY`, `IO_CHT`, `LOW_PDL1`, `HIGH_PDL1`, `SQUAMOUS`, `ADENOCARCINOMA` |
+| `--modalities` | list | all | Modalities to train: `RWD`, `RWD_DP`, `RWD_FMRAD`, `RWD_PYRAD`, `RWD_DP_FMRAD`, `RWD_DP_PYRAD` |
+| `--model` | str | `LR` | Model type: `LR` (Logistic Regression), `RF` (Random Forest) |
+| `--no-feature-selection` | flag | False | Disable automatic feature selection |
+| `--output-dir` | str | `.` | Base output directory |
+
+## Default Modality Combinations
+
+When no `--modalities` argument is provided, the script trains these combinations in order:
+
+1. **RWD** - Real-world data only (clinical features)
+2. **RWD_DP** - RWD + Digital Pathology
+3. **RWD_FMRAD** - RWD + First-order radiomic features
+4. **RWD_PYRAD** - RWD + PyRadiomics features
+5. **RWD_DP_FMRAD** - RWD + DP + First-order radiomic features
+6. **RWD_DP_PYRAD** - RWD + DP + PyRadiomics features
 
 ### Common Examples
 
@@ -42,17 +66,6 @@ python train_mlef.py --outcome OS_6 --subanalysis IO_ONLY
 python train_mlef.py --outcome OS_6 --subanalysis C23 --no-feature-selection
 ```
 
-## Command-Line Arguments
-
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--outcome` | str | `OS_6` | Target outcome: `OS_6` or `OS_24` or `DCR` |
-| `--subanalysis` | str | `C23` | Subgroup: `C23`, `C2`, `IO_ONLY`, `IO_CHT`, `LOW_PDL1`, `HIGH_PDL1`, `SQUAMOUS`, `ADENOCARCINOMA` |
-| `--modalities` | list | all | Modalities to train: `RWD`, `RWD_DP`, `RWD_FMRAD`, `RWD_PYRAD`, `RWD_DP_FMRAD`, `RWD_DP_PYRAD` |
-| `--model` | str | `LR` | Model type: `LR` (Logistic Regression), `RF` (Random Forest), `XGB` (XGBoost) |
-| `--no-feature-selection` | flag | False | Disable automatic feature selection |
-| `--output-dir` | str | `.` | Base output directory |
-
 ## Output Structure
 
 The script creates the following folder structure:
@@ -65,7 +78,7 @@ MLEF/
       train_set.xlsx            # Training data (with FOLD column)
       test_set.xlsx             # Test data
       exval_set.xlsx            # External validation data (if available)
-      prediction_CV.xlsx        # CV predictions (Subject, y_pred, y_true)
+      prediction_CV.xlsx        # CV predictions (Subject, y_pred, y_true) add
       results.xlsx              # Performance metrics (CV, TEST, EXVAL AUCs)
     
     RWD_DP/
@@ -98,17 +111,6 @@ MLEF/
     training_summary.xlsx       # Summary of all training runs
 ```
 
-## Default Modality Combinations
-
-When no `--modalities` argument is provided, the script trains these combinations in order:
-
-1. **RWD** - Real-world data only (clinical features)
-2. **RWD_DP** - RWD + Digital Pathology
-3. **RWD_FMRAD** - RWD + First-order radiomic features
-4. **RWD_PYRAD** - RWD + PyRadiomics features
-5. **RWD_DP_FMRAD** - RWD + DP + First-order radiomic features
-6. **RWD_DP_PYRAD** - RWD + DP + PyRadiomics features
-
 ## Output Files Description
 
 ### Model Files
@@ -133,7 +135,7 @@ When no `--modalities` argument is provided, the script trains these combination
 For each multimodal combination (e.g., RWD_DP), the script also trains an **RWD-matched model** saved in the `rwd-only/` subfolder. This baseline model:
 - Uses only RWD features
 - Trains on the **same subjects** that have all modalities available
-- Enables fair comparison between multimodal and RWD-only performance
+- Enables fair comparison between multimodal and RWD-only performance on the same dataset
 
 The RWD modality itself doesn't have a `rwd-only/` subfolder (it would be redundant).
 
@@ -143,7 +145,6 @@ For each modality combination, the script performs:
 
 1. **Data Loading** - Loads and merges modalities via early fusion
 2. **Data Splitting** - Uses predefined train/test/external splits from `split.json`
-3. **Feature Preparation** - Removes submodel features specified in `submodel_features.json`
 4. **Imputation** - Fills missing values using iterative imputation
 5. **Normalization** - Log-transforms skewed features and standardizes
 6. **Feature Selection** - LASSO-based selection targeting 15±10 features (optional)
@@ -154,7 +155,7 @@ For each modality combination, the script performs:
 ## Cross-Validation Strategy
 
 The script uses **Leave-One-Center-Out Cross-Validation (LOCO-CV)**:
-- Splits by patient center (INT, GHD, MH, SZMC, VHIO, UOC)
+- Splits by patient center (INT, GHD, MH, SZMC, VHIO)
 - Each fold holds out one center for validation
 - Ensures robustness across different data sources
 - Class balancing via sample weights in each fold
@@ -181,11 +182,6 @@ The script supports three model types:
 - Hyperparameters: n_estimators, max_depth, min_samples_split, etc.
 - Out-of-bag scoring enabled
 
-### XGBoost (XGB)
-- Bayesian search over gradient boosting parameters
-- Hyperparameters: eta, gamma, max_depth, lambda, alpha, etc.
-- Advanced tree growing policies
-
 All models use:
 - Balanced class weights
 - Cross-validation scoring weighted by fold size
@@ -201,7 +197,7 @@ The script requires:
 - scipy
 - joblib
 - scikit-optimize
-- xgboost (if using XGB model)
+
 
 Data files needed in `mlef_pipeline/`:
 - `split.json` - Train/test split definitions
@@ -209,32 +205,12 @@ Data files needed in `mlef_pipeline/`:
 
 Data files needed in `../data/` (relative to mlef_pipeline):
 - `rwd.csv` - Real-world data
-- `digital_pathology.csv` - Digital pathology features
-- `fmrad.csv` - First-order radiomic features
-- `pyradiomics.csv` - PyRadiomics features
+- `digital_pathology.csv` - Digital pathology features extracted ..
+- `fmrad.csv` - Foundation model radiomic features
+- `pyradiomics.csv` - PyRadiomics perturbation..features
 - `outcomes.csv` - Outcome labels
 
-## Troubleshooting
 
-### "FileNotFoundError: split.json"
-Make sure you're running the script from the project root directory where `mlef_pipeline/split.json` exists.
-
-### "ValueError: No subjects with all modalities"
-Check that your data files contain overlapping subjects. The RWD-matched model requires subjects present in all requested modalities.
-
-### "Training failed with error"
-Check the error traceback. Common issues:
-- Missing data files
-- Incompatible feature names between modalities
-- Insufficient samples in cross-validation folds
-- Memory issues with large datasets
-
-### Low CV AUC
-Consider:
-- Checking data quality and missingness
-- Trying different model types (RF or XGB)
-- Adjusting feature selection parameters in `i3l_ml.py`
-- Verifying outcome definition is correct
 
 ## Advanced Usage
 
@@ -251,24 +227,6 @@ DEFAULT_MODALITIES = [
     [Mode.RWD, Mode.DP, Mode.FMRAD, Mode.PYRAD],  # All modalities
 ]
 ```
-
-### Batch Training
-
-Train multiple outcomes sequentially:
-
-```bash
-python train_mlef.py --outcome OS_6 --subanalysis C23
-python train_mlef.py --outcome OS_24 --subanalysis C23
-```
-
-Or create a batch script (Windows):
-```batch
-@echo off
-python train_mlef.py --outcome OS_6 --subanalysis C23
-python train_mlef.py --outcome OS_24 --subanalysis C23
-python train_mlef.py --outcome OS_6 --subanalysis IO_ONLY
-```
-
 ### Integration with Visualization
 
 After training, use the `plot_auc_from_folder` function from `graphs_i3lung.ipynb` to visualize results:
@@ -294,17 +252,7 @@ plot_auc_from_folder(
 - External validation set (UOC) is automatically detected and evaluated if present
 - The script is safe to interrupt - just restart to continue with remaining modalities
 
-## Support
-
-For issues or questions:
-1. Check the error message and traceback
-2. Verify all required files exist
-3. Ensure data quality (no completely empty modalities)
-4. Review the code documentation in `train_mlef.py`
 
 ## Citation
 
-If using this pipeline, please cite the I3LUNG study and relevant packages:
-- scikit-learn
-- scikit-optimize
-- XGBoost (if used)
+

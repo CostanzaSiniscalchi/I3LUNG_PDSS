@@ -123,9 +123,6 @@ class ML:
             case Model.RF:
                 from sklearn.ensemble import RandomForestClassifier
                 return RandomForestClassifier(random_state=10, n_jobs=-1)
-            case Model.XGB:
-                from xgboost import XGBClassifier
-                return XGBClassifier(random_state=10, n_jobs=-1)
             case _:
                 raise ValueError(f"Unsupported model: {model}")
     

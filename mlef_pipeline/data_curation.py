@@ -32,6 +32,14 @@ class DataLoader:
             if mode in self.data_path:
                 path = self.data_path[mode]
                 mode_data[mode] = pd.read_csv(path)
+                if mode == Mode.RWD:
+                    with open ('features.json', 'r') as f:
+                        selected_features = json.load(f)['RWD']
+                    mode_data[mode] = mode_data[mode][['Subject'] + selected_features]
+                elif mode == Mode.GEN:
+                    with open ('features.json', 'r') as f:
+                        selected_features = json.load(f)['GEN']
+                    mode_data[mode] = mode_data[mode][['Subject'] + selected_features]
             else:
                 raise ValueError(f"Unsupported mode: {mode}")
             
@@ -103,7 +111,7 @@ class DataLoader:
         mode_data = self._get_data(modes)
         dataset = self._early_fusion(mode_data, outcome)
 
-        outcomes = pd.read_csv(self.outcomes_path) #add OS_& and OS_24
+        outcomes = pd.read_csv(self.outcomes_path) #add OS_6 and OS_24
         
         dataset = pd.merge(
             left=dataset,
@@ -188,8 +196,11 @@ class DataLoader:
         match outcome_name:
             case Outcome.OS_6:
                 outcome = (outcome >= 6).astype(int)
+
             case Outcome.OS_24:
                 outcome = (outcome >= 24).astype(int)
+            case Outcome.DCR:
+                outcome = outcome
             case _:
                 raise ValueError(f"Unsupported outcome: {outcome_name}")
 

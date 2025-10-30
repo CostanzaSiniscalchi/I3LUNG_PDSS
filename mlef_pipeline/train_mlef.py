@@ -64,9 +64,9 @@ def get_modality_folder_name(modes: List[Mode]) -> str:
     return '_'.join(sorted([m.value for m in modes]))
 
 
-def create_output_dirs(base_path: Path, subanalysis: str, modality_folder: str) -> Path:
+def create_output_dirs(base_path: Path, subanalysis: str, modality_folder: str, outcome: str) -> Path:
     """Create output directory structure and return the modality path."""
-    output_dir = base_path / 'MLEF' / subanalysis / modality_folder
+    output_dir = base_path / 'MLEF' / outcome / subanalysis / modality_folder
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Create RWD-matched subdirectory (for non-RWD modalities)
@@ -173,13 +173,13 @@ def train_and_evaluate_modality(
     
     # Create output directory
     modality_folder = get_modality_folder_name(modes)
-    output_dir = create_output_dirs(base_path, subanalysis.value, modality_folder)
+    output_dir = create_output_dirs(base_path, subanalysis.value, modality_folder, outcome.value)
     
     # 1. Load and prepare data
     print("1. Loading data...")
     dataset = dl.create_dataset(
         modes=modes,
-        outcome='OS MONTHS',
+        outcome=outcome.value,
         subanalysis=subanalysis
     )
     
@@ -194,17 +194,15 @@ def train_and_evaluate_modality(
     
     # 3. Separate features and target
     print("3. Preparing features and target...")
-    X_train, y_train_raw = train_set.drop(columns=['OS MONTHS']), train_set['OS MONTHS']
-    X_test, y_test_raw = test_set.drop(columns=['OS MONTHS']), test_set['OS MONTHS']
-    X_ext, y_ext_raw = ext_set.drop(columns=['OS MONTHS']), ext_set['OS MONTHS']
+    X_train, y_train = train_set.drop(columns=[outcome.value]), train_set[outcome.value]
+    X_test, y_test = test_set.drop(columns=[outcome.value]), test_set[outcome.value]
+    X_ext, y_ext = ext_set.drop(columns=[outcome.value]), ext_set[outcome.value]
     
     # Convert outcome to binary if needed
-    y_train = dl.get_outcome(y_train_raw, outcome)
-    y_test = dl.get_outcome(y_test_raw, outcome)
-    y_ext = dl.get_outcome(y_ext_raw, outcome) if not ext_set.empty else pd.Series()
+    # y_train = dl.get_outcome(y_train_raw, outcome)
+    # y_test = dl.get_outcome(y_test_raw, outcome)
+    # y_ext = dl.get_outcome(y_ext_raw, outcome) if not ext_set.empty else pd.Series()
     
-    # 4. Remove submodel features
-    print("4. Removing submodel features...")
     with open('submodel_features.json', 'r') as f:
         submodel_features = json.load(f)
         submodel_features = [f for f in submodel_features if f in X_train.columns]
@@ -213,14 +211,14 @@ def train_and_evaluate_modality(
     X_test = X_test.drop(columns=submodel_features, errors='ignore')
     X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
     
-    # 5. Imputation
-    print("5. Imputing missing values...")
+    # 4. Imputation
+    print("4. Imputing missing values...")
     X_train_imputed, imputer = dl.impute_df(X_train)
     X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
     X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer) if not X_ext.empty else (X_ext, None)
     
-    # 6. Normalization
-    print("6. Normalizing features...")
+    # 5. Normalization
+    print("5. Normalizing features...")
     X_train_scaled, scaler, to_standard_normalize, to_log_normalize = dl.normalize(X_train_imputed)
     X_test_scaled, _, _, _ = dl.normalize(
         X_test_imputed, scaler=scaler, 
@@ -236,16 +234,16 @@ def train_and_evaluate_modality(
     else:
         X_ext_scaled = X_ext
     
-    # 7. Setup cross-validation
-    print("7. Setting up cross-validation...")
+    # 6. Setup cross-validation
+    print("6. Setting up cross-validation...")
     train_folds = dl.get_loco_folds(pd.Series(train_set.index))
     cv = SafeGroupKFold(n_splits=len(train_folds.unique()))
     
     def get_cv_splits():
         return list(cv.split(X_train_scaled, y_train, groups=train_folds))
     
-    # 8. Train model
-    print(f"8. Training {model_type.value} model...")
+    # 7. Train model
+    print(f"7. Training {model_type.value} model...")
     model = ml.train_classification_model(
         X=X_train_scaled,
         y=y_train,
@@ -262,17 +260,17 @@ def train_and_evaluate_modality(
     X_test_final = X_test_scaled[selected_features]
     X_ext_final = X_ext_scaled[selected_features] if not X_ext_scaled.empty else X_ext_scaled
     
-    # 9. Compute cross-validation predictions
-    print("9. Computing CV predictions...")
+    # 8. Compute cross-validation predictions
+    print("8. Computing CV predictions...")
     y_pred_cv, cv_auc, cv_auc_std = compute_cv_predictions(
         model, X_train_final, y_train, get_cv_splits(), train_folds
     )
     
-    # 10. Make predictions on all sets
-    print("10. Making predictions on test and external sets...")
+    # 9. Make predictions on all sets
+    print("9. Making predictions on test and external sets...")
     # Refit on full training set for final predictions
-    sample_weight = compute_sample_weight(class_weight='balanced', y=y_train)
-    model.fit(X_train_final, y_train, sample_weight=sample_weight)
+    # sample_weight = compute_sample_weight(class_weight='balanced', y=y_train)
+    # model.fit(X_train_final, y_train, sample_weight=sample_weight)
     
     y_pred_test = model.predict_proba(X_test_final)[:, 1]
     test_auc, test_ci = stats.auc_roc_ci(y_test, y_pred_test, alpha=0.95)
@@ -286,36 +284,46 @@ def train_and_evaluate_modality(
         y_pred_ext = np.array([])
         ext_auc, ext_auc_std = np.nan, np.nan
     
-    # 11. Save model
-    print("11. Saving model...")
+    # 10. Save model
+    print("10. Saving model...")
     model_path = output_dir / f'model_{model_type.value}.pkl'
     joblib.dump(model, model_path)
     print(f"  ✓ Model saved to {model_path}")
-    
-    # 12. Save datasets (with outcome)
-    print("12. Saving datasets...")
-    train_set_with_outcome = train_set.copy()
+
+    # 11. Save datasets (with outcome)
+    print("11. Saving datasets...")
+    # train_set_with_outcome = train_set.copy()
+    # train_set_with_outcome[outcome.value] = y_train
+    # test_set_with_outcome = test_set.copy()
+    # test_set_with_outcome[outcome.value] = y_test
+    # ext_set_with_outcome = ext_set.copy()
+    # if not ext_set.empty:
+    #     ext_set_with_outcome[outcome.value] = y_ext
+    train_set_with_outcome = X_train_scaled.copy()
+    train_set_with_outcome['Subject'] = train_set.index
     train_set_with_outcome[outcome.value] = y_train
-    test_set_with_outcome = test_set.copy()
+    test_set_with_outcome = X_test_scaled.copy()
+    test_set_with_outcome['Subject'] = test_set.index
     test_set_with_outcome[outcome.value] = y_test
-    ext_set_with_outcome = ext_set.copy()
+    ext_set_with_outcome = X_ext_scaled.copy()
+    ext_set_with_outcome['Subject'] = ext_set.index
     if not ext_set.empty:
         ext_set_with_outcome[outcome.value] = y_ext
     
     save_datasets(output_dir, train_set_with_outcome, test_set_with_outcome, 
                   ext_set_with_outcome, train_folds)
     
-    # 13. Save CV predictions
-    print("13. Saving CV predictions...")
+    # 12. Save CV predictions
+    print("12. Saving CV predictions...")
     cv_predictions = pd.DataFrame({
         'Subject': X_train_final.index,
         'y_pred': y_pred_cv,
         'y_true': y_train
     })
     cv_predictions.to_excel(output_dir / 'prediction_CV.xlsx', index=False)
-    
-    # 14. Save results
-    print("14. Saving results...")
+
+    # 13. Save results
+    print("13. Saving results...")
     results = pd.DataFrame({
         'SET': ['CV', 'TEST', 'EXVAL'],
         'AUC': [
@@ -378,7 +386,7 @@ def train_rwd_matched_model(
     # Load data for the full modality
     full_dataset = dl.create_dataset(
         modes=modes,
-        outcome='OS MONTHS',
+        outcome=outcome.value,
         subanalysis=subanalysis
     )
     
@@ -396,26 +404,26 @@ def train_rwd_matched_model(
     print(f"  Using {len(matched_subjects)} matched subjects")
     
     # Create output directory
-    output_dir = base_path / 'MLEF' / subanalysis.value / modality_folder / 'rwd-only'
+    output_dir = base_path / 'MLEF' / outcome.value / subanalysis.value / modality_folder / 'rwd-only'
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Follow same pipeline as main training
-    with open('mlef_pipeline/split.json', 'r') as f:
+    with open('split.json', 'r') as f:
         split = json.load(f)
     
     train_set = rwd_dataset[rwd_dataset['Subject'].isin(split['TRAIN_SET'])].set_index('Subject')
     test_set = rwd_dataset[rwd_dataset['Subject'].isin(split['TEST_SET'])].set_index('Subject')
     ext_set = rwd_dataset[rwd_dataset['Subject'].str.startswith('UOC')].set_index('Subject')
-    
-    X_train, y_train_raw = train_set.drop(columns=['OS MONTHS']), train_set['OS MONTHS']
-    X_test, y_test_raw = test_set.drop(columns=['OS MONTHS']), test_set['OS MONTHS']
-    X_ext, y_ext_raw = ext_set.drop(columns=['OS MONTHS']), ext_set['OS MONTHS']
-    
+
+    X_train, y_train_raw = train_set.drop(columns=[outcome.value]), train_set[outcome.value]
+    X_test, y_test_raw = test_set.drop(columns=[outcome.value]), test_set[outcome.value]
+    X_ext, y_ext_raw = ext_set.drop(columns=[outcome.value]), ext_set[outcome.value]
+
     y_train = dl.get_outcome(y_train_raw, outcome)
     y_test = dl.get_outcome(y_test_raw, outcome)
     y_ext = dl.get_outcome(y_ext_raw, outcome) if not ext_set.empty else pd.Series()
     
-    with open('mlef_pipeline/submodel_features.json', 'r') as f:
+    with open('submodel_features.json', 'r') as f:
         submodel_features = json.load(f)
         submodel_features = [f for f in submodel_features if f in X_train.columns]
     
@@ -479,11 +487,14 @@ def train_rwd_matched_model(
     # Save everything
     joblib.dump(model, output_dir / f'model_{model_type.value}.pkl')
     
-    train_set_with_outcome = train_set.copy()
+    train_set_with_outcome = X_train_scaled.copy()
+    train_set_with_outcome['Subject'] = train_set.index
     train_set_with_outcome[outcome.value] = y_train
-    test_set_with_outcome = test_set.copy()
+    test_set_with_outcome = X_test_scaled.copy()
+    test_set_with_outcome['Subject'] = test_set.index
     test_set_with_outcome[outcome.value] = y_test
-    ext_set_with_outcome = ext_set.copy()
+    ext_set_with_outcome = X_ext_scaled.copy()
+    ext_set_with_outcome['Subject'] = ext_set.index
     if not ext_set.empty:
         ext_set_with_outcome[outcome.value] = y_ext
     
