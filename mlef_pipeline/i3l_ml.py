@@ -4,12 +4,14 @@ import numpy as np
 from sklearn.feature_selection import SelectFromModel
 from sklearn.linear_model import Lasso
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import BaseCrossValidator, KFold
+from sklearn.model_selection import BaseCrossValidator, KFold, GridSearchCV
 from sklearn.utils import compute_sample_weight
 from skopt import BayesSearchCV
 from i3l_statistics import Statistics
 import pandas as pd
 from enums import *
+from sksurv.linear_model import CoxnetSurvivalAnalysis
+from sksurv.metrics import concordance_index_censored
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
 warnings.filterwarnings('ignore', category=FutureWarning, module='sklearn')
@@ -64,7 +66,7 @@ class ML:
     
 
     @staticmethod
-    def coxnet_selection(self, X_train: pd.DataFrame, y_train: pd.DataFrame, cv, folds=None, target_features=15, uncertainty=5):
+    def coxnet_selection(X_train: pd.DataFrame, y_train: pd.DataFrame, cv, folds=None, target_features=15, uncertainty=5):
         if X_train.shape[1] < target_features - uncertainty:
             return X_train.columns
         
@@ -73,7 +75,7 @@ class ML:
             cv = lambda: kf.split(X_train, y_train)
         
         statistics = Statistics()
-        config = json.load(open('survival_config.json'))
+        config = json.load(open('mlef_pipeline/survival_config.json'))
         
         l1_ratio = 0.1
         alpha_min = 1e-4
@@ -90,7 +92,7 @@ class ML:
                 'l1_ratio': [l1_ratio]
             })
             
-            gcv = self.grid_search(X_train, y_train, CoxnetSurvivalAnalysis(), cox_params, cv(), folds)
+            gcv = ML.grid_search(X_train, y_train, CoxnetSurvivalAnalysis(), cox_params, cv(), folds)
             best_model = gcv.best_estimator_
             
             coefficients = [el for coef_list in best_model.coef_ for el in coef_list]
@@ -112,7 +114,7 @@ class ML:
         
         selected_features = statistics.elbow_selection(feature_df, target_features - uncertainty, target_features + uncertainty)
         
-        return selected_features['FEATURE'].values
+        return list(selected_features['FEATURE'].values)
     
 
     def _get_model(self, model: str):
@@ -220,3 +222,35 @@ class ML:
         cph.fit(dataset, duration_col='TIME', event_col='EVENT')
 
         return cph
+    
+
+    @staticmethod
+    def make_weighted_cindex_scorer(N):
+        
+        def weighted_cindex(estimator, X_val, y_val):
+            events = y_val["EVENT"]
+            times = y_val["TIME"]
+            n = len(events)
+            
+            if n < 2 or events.sum() == 0 or np.unique(times).size < 2:
+                return 0.5
+            
+            y_pred = estimator.predict(X_val)
+            fold_cindex = concordance_index_censored(y_val['EVENT'], y_val['TIME'], y_pred)[0]
+            return fold_cindex * (len(y_val) / N)
+        
+        return weighted_cindex
+
+
+    @staticmethod
+    def grid_search(X, y, model, params, cv, folds=None):
+        return GridSearchCV(
+            model,
+            param_grid=params,
+            cv=cv,
+            error_score=0.5,
+            n_jobs=4,
+            verbose=0,
+            scoring=ML.make_weighted_cindex_scorer(X.shape[0])
+        ).fit(X, y, groups=folds)
+    
