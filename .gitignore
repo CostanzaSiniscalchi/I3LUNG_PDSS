@@ -18,6 +18,7 @@
 !graphs_classification.ipynb
 !graphs_i3lung.ipynb
 !DeLong_test.py
+!helper.py
 # py cache
 __pycache__/
 *.pyc
