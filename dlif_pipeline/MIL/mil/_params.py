@@ -136,6 +136,7 @@ class TrainerConfig:
         events: Optional[str] = None,
         outdir: str = 'mil',
         attention_heatmaps: bool = False,
+        save_attention: bool = False,
         uq: bool = False,
         aggregation_level: Optional[str] = None,
         params: Optional[dict] = None,
@@ -200,6 +201,7 @@ class TrainerConfig:
         return run_eval(
             model,
             attention_heatmaps=attention_heatmaps,
+            save_attention=save_attention,
             uq=uq,
             **heatmap_kwargs,
             **eval_kwargs
@@ -434,6 +436,8 @@ class TrainerConfig:
                 and the model will be saved.
             attention_heatmaps (bool): Generate attention heatmaps for slides.
                 Not available for multi-modal MIL models. Defaults to False.
+            save_attention (bool): Save attention scores as .npz files.
+                Defaults to False.
             interpolation (str, optional): Interpolation strategy for smoothing
                 attention heatmaps. Defaults to 'bicubic'.
             cmap (str, optional): Matplotlib colormap for heatmap. Can be any

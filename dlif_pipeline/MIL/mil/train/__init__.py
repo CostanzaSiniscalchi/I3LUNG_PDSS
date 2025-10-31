@@ -53,6 +53,8 @@ def train_mil(
             and the model will be saved.
         attention_heatmaps (bool): Generate attention heatmaps for slides.
             Not available for multi-modal MIL models. Defaults to False.
+        save_attention (bool): Save attention scores as .npz files.
+            Defaults to False.
         interpolation (str, optional): Interpolation strategy for smoothing
             attention heatmaps. Defaults to 'bicubic'.
         cmap (str, optional): Matplotlib colormap for heatmap. Can be any
@@ -207,6 +209,7 @@ def _train_multimodal_mixed_mil(
     *,
     outdir: str = 'mil',
     attention_heatmaps: bool = False,
+    save_attention: bool = False,
     uq: bool = False,
     events: Optional[str] = None,
     device: Optional[str] = None,
@@ -235,6 +238,8 @@ def _train_multimodal_mixed_mil(
             ``fit_one_cycle=True``.
         epochs (int): Maximum epochs.
         attention_heatmaps (bool): Generate attention heatmaps for slides.
+            Defaults to False.
+        save_attention (bool): Save attention scores as .npz files.
             Defaults to False.
         interpolation (str, optional): Interpolation strategy for smoothing
             attention heatmaps. Defaults to 'bicubic'.
@@ -316,7 +321,7 @@ def _train_multimodal_mixed_mil(
     config.run_metrics(df, level='slide', outdir=outdir)
 
     # Export attention to numpy arrays
-    if attention and outdir:
+    if attention and outdir and save_attention:
         utils._export_attention(
             join(outdir, 'attention'),
             attention,

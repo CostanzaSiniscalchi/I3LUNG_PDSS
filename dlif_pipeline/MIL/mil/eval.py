@@ -30,6 +30,7 @@ def eval_mil(
     events: Optional[str] = None,
     outdir: str = 'mil',
     attention_heatmaps: bool = False,
+    save_attention: bool = False,
     uq: bool = False,
     aggregation_level: Optional[str] = None,
     **heatmap_kwargs
@@ -58,6 +59,8 @@ def eval_mil(
         outdir (str): Path at which to save results.
         attention_heatmaps (bool): Generate attention heatmaps for slides.
             Not available for multi-modal MIL models. Defaults to False.
+        save_attention (bool): Save attention scores as .npz files.
+            Defaults to False.
         interpolation (str, optional): Interpolation strategy for smoothing
             attention heatmaps. Defaults to 'bicubic'.
         aggregation_level (str, optional): Aggregation level for predictions.
@@ -91,6 +94,7 @@ def eval_mil(
         events=events,
         outdir=outdir,
         attention_heatmaps=attention_heatmaps,
+        save_attention=save_attention,
         uq=uq,
         params=params,
         aggregation_level=aggregation_level,
@@ -297,6 +301,7 @@ def run_eval(
     events: Optional[str] = None,
     outdir: str = 'mil',
     attention_heatmaps: bool = False,
+    save_attention: bool = False,
     uq: bool = False,
     params: Optional[dict] = None,
     aggregation_level: Optional[str] = None,
@@ -317,6 +322,8 @@ def run_eval(
     Keyword arguments:
         outdir (str): Path at which to save results.
         attention_heatmaps (bool): Generate attention heatmaps for slides.
+            Defaults to False.
+        save_attention (bool): Save attention scores as .npz files.
             Defaults to False.
         interpolation (str, optional): Interpolation strategy for smoothing
             attention heatmaps. Defaults to 'bicubic'.
@@ -367,7 +374,7 @@ def run_eval(
     config.run_metrics(metrics_df, level='slide', outdir=model_dir)
 
     # Export attention
-    if outdir and y_att:
+    if outdir and y_att and save_attention:
         if 'slide' in df.columns:
             slides_or_patients = df.slide.values
         elif 'patient' in df.columns:

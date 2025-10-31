@@ -46,7 +46,7 @@ def build_path_from_config(config, base_dir):
     # Compute ROOT the same way as run_training.py does:
     # ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
     # From pipeline/metrics/compute_metrics_from_config.py, go up 4 levels to get to csiniscalchi
-    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
     task = config.get('task')  # 'classification' or 'survival'
     training_type = config.get('training_type')  # 'cross_validation', 'standard', 'evaluation'
     data_type = config.get('data-type', 'hypothesis_driven')
@@ -65,7 +65,9 @@ def build_path_from_config(config, base_dir):
     if config.get("FILTER_CHEMO_IMMUNO") is not None:
         prefix_parts.append(f"chemoio_{config['FILTER_CHEMO_IMMUNO']}")
     if config.get("USE_COHORT2_FILTER"):
-        prefix_parts.append("cohort2")
+        prefix_parts.append("C2")
+    else:
+        prefix_parts.append("C23")
     if config.get("FILTER_INT"):
         prefix_parts.append(f"int")
     if config.get("FILTER_GHD"):
@@ -84,8 +86,8 @@ def build_path_from_config(config, base_dir):
         prefix_parts.append("all_mods")
 
     # If only "results", no filter active -> add "main_analysis"
-    if len(prefix_parts) == 1:
-        prefix_parts.append("main_analysis")
+    # if len(prefix_parts) == 1:
+    #     prefix_parts.append("main_analysis")
 
     return {
         'task': task,

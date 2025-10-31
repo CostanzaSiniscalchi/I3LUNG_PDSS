@@ -27,7 +27,7 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
     if not excluded_mods:
         print("[INFO] Using all modalities.")
         if isinstance(train_data, list):
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
             train_data_resolved = [os.path.normpath(os.path.join(project_root, td)) for td in train_data]
             dfs = [pd.read_parquet(td) for td in train_data_resolved]
             df = pd.concat(dfs, ignore_index=True)
@@ -48,7 +48,7 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
         if 'radfm' in mods:
             mod_mapping['radfm'] = 'mod2'  # same column name, different source
 
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
         if isinstance(train_data, list):
             train_data_path = [os.path.join(project_root, td.lstrip('../')) for td in train_data]
         else:

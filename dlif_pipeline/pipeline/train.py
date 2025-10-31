@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
                 mod_string = "_".join([k for k, v in mods.items() if v])
                 bag_path = f"bags_{mod_string}"
-                bag_path_abs = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../bags/', bag_path))
+                bag_path_abs = os.path.abspath(os.path.join(os.path.dirname(__file__), '../bags/', bag_path))
                 prepare_dataset(train_data, config.get("annotation_file"), mods, bag_path_abs)
 
             print("dataset prepared")

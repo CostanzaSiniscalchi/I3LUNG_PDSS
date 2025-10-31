@@ -10,7 +10,7 @@ import json
 from metrics.compute_scores import compute_scores
 from metrics.calculate_average import compute_weighted_average
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 
 def run_training(config, mods):
     """
@@ -38,7 +38,9 @@ def run_training(config, mods):
         prefix_parts.append(f"chemoio_{config['FILTER_CHEMO_IMMUNO']}")
     if config.get("USE_COHORT2_FILTER"):
         print("in run training")
-        prefix_parts.append("cohort2")
+        prefix_parts.append("C2")
+    else:
+        prefix_parts.append("C23")
 
     # intracenters analysis
     if config.get("FILTER_INT"):
@@ -60,8 +62,8 @@ def run_training(config, mods):
     if config.get("FILTER_ALL_MODS"):
         prefix_parts.append("all_mods")
 
-    if len(prefix_parts) == 1:  # Solo "results", nessun filtro attivo
-        prefix_parts.append("main_analysis")
+    # if len(prefix_parts) == 1:  # Solo "results", nessun filtro attivo
+    #     prefix_parts.append("main_analysis")
 
     path_prefix = os.path.join(*prefix_parts)
 
