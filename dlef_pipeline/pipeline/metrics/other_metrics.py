@@ -94,78 +94,79 @@ def compute_weighted_metrics(metrics_list, weights):
 
 # ------------------------------------------------------------------------------
 
-for outcome in outcomes:
-    base_path = os.path.join(sub1, sub2, path_pre, outcome, path_suf)
+if __name__ == "__main__":
+    for outcome in outcomes:
+        base_path = os.path.join(sub1, sub2, path_pre, outcome, path_suf)
 
-    # Find all subdirectories ending with 'seed_0'
-    seed_directories = []
-    for root, dirs, files in os.walk(base_path):
-        for dir_name in dirs:
-            if dir_name == 'seed_0':
-                seed_directories.append(os.path.join(root, dir_name))
+        # Find all subdirectories ending with 'seed_0'
+        seed_directories = []
+        for root, dirs, files in os.walk(base_path):
+            for dir_name in dirs:
+                if dir_name == 'seed_0':
+                    seed_directories.append(os.path.join(root, dir_name))
 
-    # Process each seed directory
-    for path in seed_directories:
-        print(f"Processing: {path}")
-        
-        # Check if path does not contain folder called eval (cross-validation case)
-        if not os.path.isdir(os.path.join(path, 'eval')):
-            # Cross-validation: compute weighted average across folds
-            folders = [f.name for f in os.scandir(path) if f.is_dir()]
-            
-            fold_metrics = []
-            fold_weights = []
-            
-            for folder in folders:
-                predictions_file = os.path.join(path, folder, 'predictions.parquet')
+        # Process each seed directory
+        for path in seed_directories:
+            print(f"Processing: {path}")
+
+            # Check if path does not contain folder called eval (cross-validation case)
+            if not os.path.isdir(os.path.join(path, 'eval')):
+                # Cross-validation: compute weighted average across folds
+                folders = [f.name for f in os.scandir(path) if f.is_dir()]
+
+                fold_metrics = []
+                fold_weights = []
+
+                for folder in folders:
+                    predictions_file = os.path.join(path, folder, 'predictions.parquet')
+                    if os.path.exists(predictions_file):
+                        # Read predictions
+                        predictions = pd.read_parquet(predictions_file)
+
+                        # Compute softmax predictions
+                        predictions['pred'] = np.exp(predictions['y_pred1']) / (np.exp(predictions['y_pred0']) + np.exp(predictions['y_pred1']))
+
+                        # Compute metrics for this fold
+                        metrics = compute_classification_metrics(predictions['y_true'], predictions['pred'])
+                        fold_metrics.append(metrics)
+                        fold_weights.append(len(predictions))
+
+                        # Create eval directory structure for compatibility
+                        os.makedirs(os.path.join(path, folder, 'eval', '00000-mb_attention_mil'), exist_ok=True)
+
+                # Compute weighted average metrics
+                final_metrics = compute_weighted_metrics(fold_metrics, fold_weights)
+
+            elif os.path.isdir(os.path.join(path, 'eval')):
+                # Standard training: use final result directly
+                eval_path = os.path.join(path, 'eval')
+                latest_mb_dir = find_latest_mb_attention_dir(eval_path)
+                predictions_file = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
                 if os.path.exists(predictions_file):
                     # Read predictions
                     predictions = pd.read_parquet(predictions_file)
-                    
+
                     # Compute softmax predictions
                     predictions['pred'] = np.exp(predictions['y_pred1']) / (np.exp(predictions['y_pred0']) + np.exp(predictions['y_pred1']))
-                    
-                    # Compute metrics for this fold
-                    metrics = compute_classification_metrics(predictions['y_true'], predictions['pred'])
-                    fold_metrics.append(metrics)
-                    fold_weights.append(len(predictions))
-                    
-                    # Create eval directory structure for compatibility
-                    os.makedirs(os.path.join(path, folder, 'eval', '00000-mb_attention_mil'), exist_ok=True)
-            
-            # Compute weighted average metrics
-            final_metrics = compute_weighted_metrics(fold_metrics, fold_weights)
-            
-        elif os.path.isdir(os.path.join(path, 'eval')):
-            # Standard training: use final result directly
-            eval_path = os.path.join(path, 'eval')
-            latest_mb_dir = find_latest_mb_attention_dir(eval_path)
-            predictions_file = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
-            if os.path.exists(predictions_file):
-                # Read predictions
-                predictions = pd.read_parquet(predictions_file)
-                
-                # Compute softmax predictions
-                predictions['pred'] = np.exp(predictions['y_pred1']) / (np.exp(predictions['y_pred0']) + np.exp(predictions['y_pred1']))
-                
-                # Compute metrics
-                final_metrics = compute_classification_metrics(predictions['y_true'], predictions['pred'])
+
+                    # Compute metrics
+                    final_metrics = compute_classification_metrics(predictions['y_true'], predictions['pred'])
+                else:
+                    print(f"Predictions file not found: {predictions_file}")
+                    continue
             else:
-                print(f"Predictions file not found: {predictions_file}")
+                print(f"No valid structure found in {path}")
                 continue
-        else:
-            print(f"No valid structure found in {path}")
-            continue
-        
-        # Save results
-        output_file = os.path.join(path, 'eval_classification_metrics.csv')
-        with open(output_file, 'w') as f:
-            f.write('f1,specificity,sensitivity\n')
-            f.write(f'{final_metrics["f1"]:.6f},{final_metrics["specificity"]:.6f},{final_metrics["sensitivity"]:.6f}\n')
-        
-        print(f"Completed processing for {path}:")
-        print(f"  F1 = {final_metrics['f1']:.4f}")
-        print(f"  Specificity = {final_metrics['specificity']:.4f}")
-        print(f"  Sensitivity = {final_metrics['sensitivity']:.4f}")
-        print(f"  Results saved to: {output_file}")
+
+            # Save results
+            output_file = os.path.join(path, 'eval_classification_metrics.csv')
+            with open(output_file, 'w') as f:
+                f.write('f1,specificity,sensitivity\n')
+                f.write(f'{final_metrics["f1"]:.6f},{final_metrics["specificity"]:.6f},{final_metrics["sensitivity"]:.6f}\n')
+
+            print(f"Completed processing for {path}:")
+            print(f"  F1 = {final_metrics['f1']:.4f}")
+            print(f"  Specificity = {final_metrics['specificity']:.4f}")
+            print(f"  Sensitivity = {final_metrics['sensitivity']:.4f}")
+            print(f"  Results saved to: {output_file}")
 

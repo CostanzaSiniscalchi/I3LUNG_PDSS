@@ -11,12 +11,6 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parents[4]  # Risali a Mil2/
 RESULTS_DIR = BASE_DIR / "results"
 
-training_type = 'cross_validation'
-sub1 = RESULTS_DIR
-sub2 = 'cohort2'
-path_pre = 'mil' # new_path
-path_suf = f'classification/{training_type}/hypothesis_driven/pyrad-noimp'
-outcomes = ['os_months_24']
 # ------------------------------------------------------------------------------
 
 def find_latest_mb_attention_dir(eval_path):
@@ -132,57 +126,66 @@ def fastDeLong_no_weights(predictions_sorted_transposed, label_1_count):
 
 # ------------------------------------------------------------------------------
 
-for outcome in outcomes:
-    base_path = os.path.join(sub1, sub2, path_pre, outcome, path_suf)
-    print(f"Processing outcome: {outcome} in path: {base_path}")
+if __name__ == "__main__":
+    
+    training_type = 'cross_validation'
+    sub1 = RESULTS_DIR
+    sub2 = 'cohort2'
+    path_pre = 'mil' # new_path
+    path_suf = f'classification/{training_type}/hypothesis_driven/pyrad-noimp'
+    outcomes = ['os_months_24']
 
-    # Find all subdirectories ending with 'seed_0'
-    seed_directories = []
-    for root, dirs, files in os.walk(base_path):
-        print(f"Checking directory: {root}")
-        print(f"Subdirectories: {dirs}")
-        print(f"Files: {files}")
-        for dir_name in dirs:
-            if dir_name == 'seed_0':
-                seed_directories.append(os.path.join(root, dir_name))
+    for outcome in outcomes:
+        base_path = os.path.join(sub1, sub2, path_pre, outcome, path_suf)
+        print(f"Processing outcome: {outcome} in path: {base_path}")
 
-    # Process each seed directory
-    for path in seed_directories:
-        print(f"Processing: {path}")
-        
-        # if path does not contain folder called eval # folds
-        if not os.path.isdir(os.path.join(path, 'eval')):
-            # list of all folders in path
-            folders = [f.name for f in os.scandir(path) if f.is_dir()]
-            # empty dataframe
-            predictions = pd.DataFrame(columns=['slide', 'y_true', 'y_pred0', 'y_pred1'])
-            # add to each folder path /eval/<latest>-mb_attention_mil/predictions.parquet
-            for folder in folders:
-                eval_folder_path = os.path.join(path, folder, 'eval')
-                latest_mb_dir = find_latest_mb_attention_dir(eval_folder_path)
-                pred_path = os.path.join(eval_folder_path, latest_mb_dir, 'predictions.parquet')
-                if not os.path.exists(pred_path):
-                    raise FileNotFoundError(f"Eval path does not exist: {pred_path}")
+        # Find all subdirectories ending with 'seed_0'
+        seed_directories = []
+        for root, dirs, files in os.walk(base_path):
+            print(f"Checking directory: {root}")
+            print(f"Subdirectories: {dirs}")
+            print(f"Files: {files}")
+            for dir_name in dirs:
+                if dir_name == 'seed_0':
+                    seed_directories.append(os.path.join(root, dir_name))
+
+        # Process each seed directory
+        for path in seed_directories:
+            print(f"Processing: {path}")
+            
+            # if path does not contain folder called eval # folds
+            if not os.path.isdir(os.path.join(path, 'eval')):
+                # list of all folders in path
+                folders = [f.name for f in os.scandir(path) if f.is_dir()]
+                # empty dataframe
+                predictions = pd.DataFrame(columns=['slide', 'y_true', 'y_pred0', 'y_pred1'])
+                # add to each folder path /eval/<latest>-mb_attention_mil/predictions.parquet
+                for folder in folders:
+                    eval_folder_path = os.path.join(path, folder, 'eval')
+                    latest_mb_dir = find_latest_mb_attention_dir(eval_folder_path)
+                    pred_path = os.path.join(eval_folder_path, latest_mb_dir, 'predictions.parquet')
+                    if not os.path.exists(pred_path):
+                        raise FileNotFoundError(f"Eval path does not exist: {pred_path}")
+                    # read predictions.parquet
+                    print(f"Reading predictions from {pred_path}")
+                    predictions_folder = pd.read_parquet(pred_path)
+                    # concatenate predictions to dataframe
+                    predictions = pd.concat([predictions, predictions_folder])
+            elif os.path.isdir(os.path.join(path, 'eval')):
                 # read predictions.parquet
-                print(f"Reading predictions from {pred_path}")
-                predictions_folder = pd.read_parquet(pred_path)
-                # concatenate predictions to dataframe
-                predictions = pd.concat([predictions, predictions_folder])
-        elif os.path.isdir(os.path.join(path, 'eval')):
-            # read predictions.parquet
-            eval_path = os.path.join(path, 'eval')
-            latest_mb_dir = find_latest_mb_attention_dir(eval_path)
-            pred_file_path = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
-            print(f"Reading predictions from {pred_file_path}")
-            predictions = pd.read_parquet(pred_file_path)
+                eval_path = os.path.join(path, 'eval')
+                latest_mb_dir = find_latest_mb_attention_dir(eval_path)
+                pred_file_path = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
+                print(f"Reading predictions from {pred_file_path}")
+                predictions = pd.read_parquet(pred_file_path)
 
-        # add column called pred which is the softmax of pred0 and pred1
-        predictions['pred'] = np.exp(predictions['y_pred1']) / (np.exp(predictions['y_pred0']) + np.exp(predictions['y_pred1']))
-        # run auc_roc_ci
-        auc, ci = auc_roc_ci(predictions['y_true'], predictions['pred'], 0.95)
-        # save into path + eval.csv
-        with open(os.path.join(path, 'eval_auc_ci.csv'), 'w') as f:
-            f.write('auc, ci_lower, ci_upper\n')
-            f.write(f'{auc}, {ci[0]}, {ci[1]}\n')
-        
-        print(f"Completed processing for {path}: AUC = {auc:.4f}, CI = [{ci[0]:.4f}, {ci[1]:.4f}]")
+            # add column called pred which is the softmax of pred0 and pred1
+            predictions['pred'] = np.exp(predictions['y_pred1']) / (np.exp(predictions['y_pred0']) + np.exp(predictions['y_pred1']))
+            # run auc_roc_ci
+            auc, ci = auc_roc_ci(predictions['y_true'], predictions['pred'], 0.95)
+            # save into path + eval.csv
+            with open(os.path.join(path, 'eval_auc_ci.csv'), 'w') as f:
+                f.write('auc, ci_lower, ci_upper\n')
+                f.write(f'{auc}, {ci[0]}, {ci[1]}\n')
+            
+            print(f"Completed processing for {path}: AUC = {auc:.4f}, CI = [{ci[0]:.4f}, {ci[1]:.4f}]")

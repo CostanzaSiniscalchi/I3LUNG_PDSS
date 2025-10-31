@@ -113,145 +113,146 @@ def compute_cindex_ci(c_index_values, fold_sizes, alpha=0.05):
 
 # ------------------------------------------------------------------------------
 
-for outcome in outcomes:
-    base_path = os.path.join(sub1, sub2, path_pre, outcome, path_suf)
-    print(f"Processing outcome: {outcome}")
-    print(f"Base path: {base_path}")
+if __name__ == "__main__":
+    for outcome in outcomes:
+        base_path = os.path.join(sub1, sub2, path_pre, outcome, path_suf)
+        print(f"Processing outcome: {outcome}")
+        print(f"Base path: {base_path}")
 
 
-    # Find all subdirectories ending with 'seed_0'
-    seed_directories = []
-    for root, dirs, files in os.walk(base_path):
-        for dir_name in dirs:
-            if dir_name == 'seed_0':
-                seed_directories.append(os.path.join(root, dir_name))
+        # Find all subdirectories ending with 'seed_0'
+        seed_directories = []
+        for root, dirs, files in os.walk(base_path):
+            for dir_name in dirs:
+                if dir_name == 'seed_0':
+                    seed_directories.append(os.path.join(root, dir_name))
 
-    # Process each seed directory
-    for seed_path in seed_directories:
-        print(f"Processing: {seed_path}")
+        # Process each seed directory
+        for seed_path in seed_directories:
+            print(f"Processing: {seed_path}")
         
-        if training_type == 'standard':
-            # For standard training, eval data is directly in the folder
-            if os.path.isdir(os.path.join(seed_path, 'eval')):
-                # Read predictions from eval directory
-                eval_path = os.path.join(seed_path, 'eval')
-                latest_mb_dir = find_latest_mb_attention_dir(eval_path)
-                predictions_file = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
+            if training_type == 'standard':
+                # For standard training, eval data is directly in the folder
+                if os.path.isdir(os.path.join(seed_path, 'eval')):
+                    # Read predictions from eval directory
+                    eval_path = os.path.join(seed_path, 'eval')
+                    latest_mb_dir = find_latest_mb_attention_dir(eval_path)
+                    predictions_file = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
                 
-                if os.path.exists(predictions_file):
-                    try:
-                        # Read predictions
-                        predictions = pd.read_parquet(predictions_file)
+                    if os.path.exists(predictions_file):
+                        try:
+                            # Read predictions
+                            predictions = pd.read_parquet(predictions_file)
                         
-                        # Check required columns exist in predictions
-                        required_cols = ['y_true0', 'y_true1', 'y_pred0']
-                        if not all(col in predictions.columns for col in required_cols):
-                            raise ValueError(f"Required columns {required_cols} not found in predictions file")
+                            # Check required columns exist in predictions
+                            required_cols = ['y_true0', 'y_true1', 'y_pred0']
+                            if not all(col in predictions.columns for col in required_cols):
+                                raise ValueError(f"Required columns {required_cols} not found in predictions file")
                         
-                        # Extract data directly from predictions file
-                        # y_true0 = OS_MONTHS (survival time)
-                        # y_true1 = death event
-                        # y_pred0 = prediction score
-                        time = predictions['y_true0'].values.astype(float)
-                        event = predictions['y_true1'].values.astype(bool)
-                        risk_score = -predictions['y_pred0'].values.astype(float)  # Negative for proper interpretation
+                            # Extract data directly from predictions file
+                            # y_true0 = OS_MONTHS (survival time)
+                            # y_true1 = death event
+                            # y_pred0 = prediction score
+                            time = predictions['y_true0'].values.astype(float)
+                            event = predictions['y_true1'].values.astype(bool)
+                            risk_score = -predictions['y_pred0'].values.astype(float)  # Negative for proper interpretation
                         
-                        # Remove any NaN values
-                        valid_mask = ~(np.isnan(event) | np.isnan(time) | np.isnan(risk_score))
-                        event = event[valid_mask]
-                        time = time[valid_mask]
-                        risk_score = risk_score[valid_mask]
+                            # Remove any NaN values
+                            valid_mask = ~(np.isnan(event) | np.isnan(time) | np.isnan(risk_score))
+                            event = event[valid_mask]
+                            time = time[valid_mask]
+                            risk_score = risk_score[valid_mask]
                         
-                        if len(event) == 0:
-                            raise ValueError("No valid samples remaining after removing NaN values")
+                            if len(event) == 0:
+                                raise ValueError("No valid samples remaining after removing NaN values")
                         
-                        # Compute C-index with bootstrap CI
-                        result = compute_c_index_and_ci(event, time, risk_score)
+                            # Compute C-index with bootstrap CI
+                            result = compute_c_index_and_ci(event, time, risk_score)
                         
-                        # Save results
-                        output_file = os.path.join(seed_path, 'eval_cindex_ci.csv')
-                        with open(output_file, 'w') as f:
-                            f.write('cindex_mean,ci_lower,ci_upper,n_samples,method\n')
-                            f.write(f'{result["c_index"]},{result["ci"][0]},{result["ci"][1]},{len(event)},bootstrap\n')
+                            # Save results
+                            output_file = os.path.join(seed_path, 'eval_cindex_ci.csv')
+                            with open(output_file, 'w') as f:
+                                f.write('cindex_mean,ci_lower,ci_upper,n_samples,method\n')
+                                f.write(f'{result["c_index"]},{result["ci"][0]},{result["ci"][1]},{len(event)},bootstrap\n')
                         
-                        print(f"Completed processing for {seed_path}:")
-                        print(f"  C-Index = {result['c_index']:.4f}")
-                        print(f"  95% CI = [{result['ci'][0]:.4f}, {result['ci'][1]:.4f}]")
-                        print(f"  Number of samples = {len(event)}")
-                        print(f"  Results saved to: {output_file}")
+                            print(f"Completed processing for {seed_path}:")
+                            print(f"  C-Index = {result['c_index']:.4f}")
+                            print(f"  95% CI = [{result['ci'][0]:.4f}, {result['ci'][1]:.4f}]")
+                            print(f"  Number of samples = {len(event)}")
+                            print(f"  Results saved to: {output_file}")
                         
-                    except Exception as e:
-                        print(f"Error processing {predictions_file}: {str(e)}")
-                        raise
+                        except Exception as e:
+                            print(f"Error processing {predictions_file}: {str(e)}")
+                            raise
+                    else:
+                        print(f"Predictions file not found: {predictions_file}")
                 else:
-                    print(f"Predictions file not found: {predictions_file}")
-            else:
-                print(f"Eval directory not found in {seed_path}")
+                    print(f"Eval directory not found in {seed_path}")
         
-        else:
-            # For cross_validation training, process fold-based structure
-            c_index_values = []
-            fold_sizes = []
-            fold_paths = []
+            else:
+                # For cross_validation training, process fold-based structure
+                c_index_values = []
+                fold_sizes = []
+                fold_paths = []
             
-            # Look for fold directories
-            if os.path.isdir(seed_path):
-                for item in os.listdir(seed_path):
-                    item_path = os.path.join(seed_path, item)
-                    if os.path.isdir(item_path) and item.startswith('fold_'):
-                        eval_path = os.path.join(item_path, 'eval')
-                        latest_mb_dir = find_latest_mb_attention_dir(eval_path)
-                        scores_file = os.path.join(eval_path, latest_mb_dir, 'scores_test.csv')
+                # Look for fold directories
+                if os.path.isdir(seed_path):
+                    for item in os.listdir(seed_path):
+                        item_path = os.path.join(seed_path, item)
+                        if os.path.isdir(item_path) and item.startswith('fold_'):
+                            eval_path = os.path.join(item_path, 'eval')
+                            latest_mb_dir = find_latest_mb_attention_dir(eval_path)
+                            scores_file = os.path.join(eval_path, latest_mb_dir, 'scores_test.csv')
                         
-                        if os.path.exists(scores_file):
-                            try:
-                                # Read the scores CSV file
-                                scores_df = pd.read_csv(scores_file)
+                            if os.path.exists(scores_file):
+                                try:
+                                    # Read the scores CSV file
+                                    scores_df = pd.read_csv(scores_file)
                                 
-                                if len(scores_df) == 0:
-                                    raise ValueError(f"Empty scores file: {scores_file}")
+                                    if len(scores_df) == 0:
+                                        raise ValueError(f"Empty scores file: {scores_file}")
                                 
-                                # Extract C_INDEX_TEST and N_TEST
-                                c_index_test = scores_df['C_INDEX_TEST'].iloc[0]
-                                n_test = scores_df['N_TEST'].iloc[0]
+                                    # Extract C_INDEX_TEST and N_TEST
+                                    c_index_test = scores_df['C_INDEX_TEST'].iloc[0]
+                                    n_test = scores_df['N_TEST'].iloc[0]
                                 
-                                # Check for missing C_INDEX_TEST
-                                if pd.isna(c_index_test) or c_index_test == '':
-                                    raise ValueError(f"Missing C_INDEX_TEST in {scores_file}")
+                                    # Check for missing C_INDEX_TEST
+                                    if pd.isna(c_index_test) or c_index_test == '':
+                                        raise ValueError(f"Missing C_INDEX_TEST in {scores_file}")
                                 
-                                # Check for missing N_TEST
-                                if pd.isna(n_test) or n_test == '':
-                                    raise ValueError(f"Missing N_TEST in {scores_file}")
+                                    # Check for missing N_TEST
+                                    if pd.isna(n_test) or n_test == '':
+                                        raise ValueError(f"Missing N_TEST in {scores_file}")
                                 
-                                c_index_values.append(float(c_index_test))
-                                fold_sizes.append(int(n_test))
-                                fold_paths.append(item_path)
+                                    c_index_values.append(float(c_index_test))
+                                    fold_sizes.append(int(n_test))
+                                    fold_paths.append(item_path)
                                 
-                            except Exception as e:
-                                print(f"Error processing {scores_file}: {str(e)}")
-                                raise
+                                except Exception as e:
+                                    print(f"Error processing {scores_file}: {str(e)}")
+                                    raise
             
-            if len(c_index_values) == 0:
-                print(f"No valid fold data found in {seed_path}")
-                continue
+                if len(c_index_values) == 0:
+                    print(f"No valid fold data found in {seed_path}")
+                    continue
             
-            try:
-                # Compute C-index confidence interval using weighted average
-                score_mean, ci_lower, ci_upper = compute_cindex_ci(c_index_values, fold_sizes)
+                try:
+                    # Compute C-index confidence interval using weighted average
+                    score_mean, ci_lower, ci_upper = compute_cindex_ci(c_index_values, fold_sizes)
                 
-                # Save results
-                output_file = os.path.join(seed_path, 'eval_cindex_ci.csv')
-                with open(output_file, 'w') as f:
-                    f.write('cindex_mean,ci_lower,ci_upper,n_folds,total_test_samples,method\n')
-                    f.write(f'{score_mean},{ci_lower},{ci_upper},{len(c_index_values)},{sum(fold_sizes)},weighted_average\n')
+                    # Save results
+                    output_file = os.path.join(seed_path, 'eval_cindex_ci.csv')
+                    with open(output_file, 'w') as f:
+                        f.write('cindex_mean,ci_lower,ci_upper,n_folds,total_test_samples,method\n')
+                        f.write(f'{score_mean},{ci_lower},{ci_upper},{len(c_index_values)},{sum(fold_sizes)},weighted_average\n')
                 
-                print(f"Completed processing for {seed_path}:")
-                print(f"  C-Index Mean = {score_mean:.4f}")
-                print(f"  95% CI = [{ci_lower:.4f}, {ci_upper:.4f}]")
-                print(f"  Number of folds = {len(c_index_values)}")
-                print(f"  Total test samples = {sum(fold_sizes)}")
-                print(f"  Results saved to: {output_file}")
+                    print(f"Completed processing for {seed_path}:")
+                    print(f"  C-Index Mean = {score_mean:.4f}")
+                    print(f"  95% CI = [{ci_lower:.4f}, {ci_upper:.4f}]")
+                    print(f"  Number of folds = {len(c_index_values)}")
+                    print(f"  Total test samples = {sum(fold_sizes)}")
+                    print(f"  Results saved to: {output_file}")
                 
-            except Exception as e:
-                print(f"Error computing CI for {seed_path}: {str(e)}")
-                raise
+                except Exception as e:
+                    print(f"Error computing CI for {seed_path}: {str(e)}")
+                    raise
