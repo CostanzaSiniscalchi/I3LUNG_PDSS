@@ -150,7 +150,7 @@ class DataLoader:
             )
             imputer = imputer.fit(df)
         
-        imputed_df = pd.DataFrame(imputer.transform(df), columns=df.columns, index=df.index)
+        imputed_df = pd.DataFrame(imputer.transform(df), columns=df.columns) #, index=df.index
         
         for col in categorical_features:
             min_value = df[col].min()
@@ -160,6 +160,12 @@ class DataLoader:
         
         return imputed_df, imputer
     
+    def convert_to_float(self, df: pd.DataFrame) -> pd.DataFrame:
+        for column in df.columns:
+            if df[column].dtype == 'object':
+                df[column] = pd.to_numeric(df[column], errors='coerce').astype('float64')
+        
+        return df
 
     def normalize(self, df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normalize: list[str]=None, to_log_normalize: list[str]=None) -> Tuple[pd.DataFrame, StandardScaler, list[str]]:
         features_names = list(df.columns)
@@ -190,21 +196,6 @@ class DataLoader:
         print(f'{len(to_standard_normalize)} features standardized')
         
         return df, scaler, to_standard_normalize, to_log_normalize
-    
-
-    def get_outcome(self, outcome: pd.Series, outcome_name: Outcome):
-        match outcome_name:
-            case Outcome.OS_6:
-                outcome = (outcome >= 6).astype(int)
-
-            case Outcome.OS_24:
-                outcome = (outcome >= 24).astype(int)
-            case Outcome.DCR:
-                outcome = outcome
-            case _:
-                raise ValueError(f"Unsupported outcome: {outcome_name}")
-
-        return outcome
     
 
 class SafeGroupKFold(GroupKFold):
