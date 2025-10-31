@@ -130,6 +130,29 @@ python pipeline/train.py \
   --base_dir ./results
 ```
 
+### Calculate Metrics
+
+```bash
+python pipeline/metrics/compute_metrics_from_config.py \
+  --config configs/00-config-classification-cv.yaml \
+  --base_dir ./results
+python pipeline/metrics/compute_metrics_from_config.py \
+  --config configs/01-config-classification-standard.yaml \
+  --base_dir ./results
+```
+
+### Create Plots
+
+```
+bash
+python pipeline/plotting/plot_from_config.py \
+  --config configs/00-config-classification-cv.yaml \
+  --base_dir ./results
+python pipeline/plotting/plot_from_config.p \
+  --config configs/01-config-classification-standard.yaml \
+  --base_dir ./results
+```
+
 ## Output Structure
 
 Training outputs are organized hierarchically in the results directory:

@@ -38,11 +38,15 @@ def build_path_from_config(config, base_dir):
 
     Args:
         config: Loaded YAML config
-        base_dir: Root directory (same as train.py --base_dir)
+        base_dir: Base directory (accepted for compatibility but ROOT is computed from script location)
 
     Returns:
         Path structure components
     """
+    # Compute ROOT the same way as run_training.py does:
+    # ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
+    # From pipeline/metrics/compute_metrics_from_config.py, go up 4 levels to get to csiniscalchi
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
     task = config.get('task')  # 'classification' or 'survival'
     training_type = config.get('training_type')  # 'cross_validation', 'standard', 'evaluation'
     data_type = config.get('data-type', 'hypothesis_driven')
@@ -91,7 +95,7 @@ def build_path_from_config(config, base_dir):
         'imp': imp,
         'outcomes': outcomes,
         'mod_string': mod_string,
-        'base_dir': base_dir,
+        'base_dir': root_dir,
         'prefix_parts': prefix_parts
     }
 
