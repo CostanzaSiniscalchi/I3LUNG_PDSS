@@ -112,12 +112,11 @@ def find_result_directories(path_info):
     result_dirs = []
 
     for outcome in path_info['outcomes']:
-        # Build path: base_dir/prefix_parts/mil/OUTCOME/task/training_type/data_type/source-imp/mod_string
+        # Build path: base_dir/prefix_parts/OUTCOME/task/training_type/data_type/source-imp/mod_string
         # This matches the path construction in train/run_training.py
         base_path = os.path.join(
             path_info['base_dir'],
             *path_info['prefix_parts'],
-            'mil',
             outcome,
             path_info['task'],
             path_info['training_type'],

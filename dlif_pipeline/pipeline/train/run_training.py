@@ -101,12 +101,31 @@ def run_training(config, mods):
     '''
     if training_type == "hyperparameter_tuning":
         base_path = build_base_path(config, mods)
-        hyperparam_path = os.path.join(ROOT, path_prefix, "mil", base_path, "hyperparam")
-        final_model_path = os.path.join(ROOT, path_prefix, "mil", base_path, "final_model")
+        hyperparam_path = os.path.join(ROOT, path_prefix, base_path, "hyperparam")
+        final_model_path = os.path.join(ROOT, path_prefix, base_path, "final_model")
 
         final_results = []
 
         for seed in seeds:
+            # Check if training has already been run for this seed in final_model
+            final_seed_path = os.path.join(final_model_path, f"seed_{seed}")
+            if os.path.exists(final_seed_path):
+                # Look for eval directory with existing runs
+                eval_dir = os.path.join(final_seed_path, "eval")
+                if os.path.exists(eval_dir):
+                    import re
+                    existing_runs = [d for d in os.listdir(eval_dir)
+                                   if os.path.isdir(os.path.join(eval_dir, d)) and
+                                   re.match(r'^\d{5}-', d)]
+                    if existing_runs:
+                        raise RuntimeError(
+                            f"\nA model for seed {seed} already exists at: {final_seed_path}\n"
+                            f"Found existing run directories: {', '.join(existing_runs)}\n\n"
+                            f"If you want to retrain, please manually delete the existing directory first:\n"
+                            f"  rm -rf {final_seed_path}\n\n"
+                            f"Or use a different seed value in your config."
+                        )
+
             for fold in folds:    
                           
                  run_grid_search_cv(
@@ -196,12 +215,32 @@ def run_training(config, mods):
         '''
     else:
         experiment_paths = []
-        base_path = os.path.join(ROOT, path_prefix, "mil", build_base_path(config, mods))
+        base_path = os.path.join(ROOT, path_prefix, build_base_path(config, mods))
         print("PREFIX PARTS:", prefix_parts)
 
         for seed in seeds:
             # Handle the base seed path
             base_seed_path = os.path.join(base_path, f"seed_{seed}")
+
+            # Check if training has already been run for this seed
+            # by looking for any existing model directories (00000-*, 00001-*, etc.)
+            if os.path.exists(base_seed_path):
+                # Look for eval directory with existing runs
+                eval_dir = os.path.join(base_seed_path, "eval")
+                if os.path.exists(eval_dir):
+                    import re
+                    existing_runs = [d for d in os.listdir(eval_dir)
+                                   if os.path.isdir(os.path.join(eval_dir, d)) and
+                                   re.match(r'^\d{5}-', d)]
+                    if existing_runs:
+                        raise RuntimeError(
+                            f"\nA model for seed {seed} already exists at: {base_seed_path}\n"
+                            f"Found existing run directories: {', '.join(existing_runs)}\n\n"
+                            f"If you want to retrain, please manually delete the existing directory first:\n"
+                            f"  rm -rf {base_seed_path}\n\n"
+                            f"Or use a different seed value in your config."
+                        )
+
             experiment_paths.append(base_seed_path)
 
             for fold in folds:

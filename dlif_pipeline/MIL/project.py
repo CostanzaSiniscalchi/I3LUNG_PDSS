@@ -296,7 +296,7 @@ class Project:
         """ 
         from .mil import train_mil 
         if outdir is None: 
-            outdir = join(self.root, 'mil') 
+            outdir = self.root
  
         return train_mil( 
             config, 
