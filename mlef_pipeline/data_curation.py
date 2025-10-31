@@ -175,7 +175,7 @@ class DataLoader:
             )
             imputer = imputer.fit(df)
         
-        imputed_df = pd.DataFrame(imputer.transform(df), columns=df.columns) #, index=df.index
+        imputed_df = pd.DataFrame(imputer.transform(df), columns=df.columns, index=df.index)
         
         for col in categorical_features:
             min_value = df[col].min()
@@ -226,6 +226,6 @@ class DataLoader:
 class SafeGroupKFold(GroupKFold):
     def split(self, X, y, groups):
         for train_idx, val_idx in super().split(X, y, groups):
-            y_val = y[val_idx]
+            y_val = y.iloc[val_idx]
             if len(np.unique(y_val)) > 1:
                 yield train_idx, val_idx

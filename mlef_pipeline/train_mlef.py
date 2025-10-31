@@ -213,20 +213,11 @@ def train_and_evaluate_modality(
     X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
     # 4. Imputation
     print("4. Imputing missing values...")
-    train_index = X_train.index
-    test_index = X_test.index
-    ext_index = X_ext.index
 
     X_train_imputed, imputer = dl.impute_df(X_train)
     X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer)
     X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
-    
 
-    X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
-    X_test_imputed = X_test_imputed.set_index(test_index)
-    X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer) if not X_ext.empty else (X_ext, None)
-    X_ext_imputed = X_ext_imputed.set_index(ext_index)
-    
     # 5. Normalization
     print("5. Normalizing features...")
     X_train_scaled, scaler, to_standard_normalize, to_log_normalize = dl.normalize(X_train_imputed)
