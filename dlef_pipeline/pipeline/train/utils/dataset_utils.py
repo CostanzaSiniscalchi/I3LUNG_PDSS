@@ -86,7 +86,7 @@ def get_datasets(P, training_type, config, fold, folds, outcome,
         # ─── : apply PDL1_GROUP filter if set to "low" or "high" ──────────
     adeno_flag = config.get("ADENO", None)
     if adeno_flag in {"0.0", "1.0"} and "NSCLC_HISTOLOGY_ADENOCARCINOMA" in annotations_df:
-        print(f"🔖 Filtering NSCLC_HISTOLOGY_ADENOCARCINOMA == {adeno_flag}")
+        print(f" Filtering NSCLC_HISTOLOGY_ADENOCARCINOMA == {adeno_flag}")
         train_filter["NSCLC_HISTOLOGY_ADENOCARCINOMA"] = [adeno_flag]
         val_filter["NSCLC_HISTOLOGY_ADENOCARCINOMA"]   = [adeno_flag]
     

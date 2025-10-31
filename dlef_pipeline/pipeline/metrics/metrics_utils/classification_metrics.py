@@ -27,4 +27,4 @@ def calculate_classification_metrics(df, filename):
     scores["N"] = len(df)
 
     pd.DataFrame([scores]).to_csv(filename, index=False)
-    print(f"✅ Saved classification scores to {filename} (N={scores['N']})")
+    print(f" Saved classification scores to {filename} (N={scores['N']})")

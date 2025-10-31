@@ -75,7 +75,7 @@ def pick_best_hyperparams(base_results_path, config):
                     0.95
                 )
                 score = auc
-                print(f"📊 {combo_folder} → AUC: {score:.4f} (CI: [{ci[0]:.4f}, {ci[1]:.4f}])")
+                print(f" {combo_folder} → AUC: {score:.4f} (CI: [{ci[0]:.4f}, {ci[1]:.4f}])")
                 
             else:  # survival
                 time = combined_predictions['y_true0'].values.astype(float)
@@ -83,7 +83,6 @@ def pick_best_hyperparams(base_results_path, config):
                 risk_score = -combined_predictions['y_pred0'].values.astype(float)
                 
                 valid_mask = ~(np.isnan(event) | np.isnan(time) | np.isnan(risk_score))
-                print(f"[DEBUG] Valid samples: {valid_mask.sum()}/{len(valid_mask)}")
                 
                 result = compute_c_index_and_ci(
                     event[valid_mask], 
@@ -98,7 +97,6 @@ def pick_best_hyperparams(base_results_path, config):
             if score > best_score:
                 best_score = score
                 best_combo = combo_folder
-                print(f"[DEBUG]  New best combo!")
                 
         except Exception as e:
             print(f" Error computing metric for {combo_folder}: {e}")
@@ -122,8 +120,6 @@ def pick_best_hyperparams(base_results_path, config):
         hyperparams["reconstruction_weight"] = float(f"{val[0]}.{val[1:]}")
     if "n_l" in best_combo:
         hyperparams["n_layers"] = int(re.search(r"n_l(\d+)", best_combo).group(1))
-    
-    print(f"[DEBUG] Extracted hyperparams: {hyperparams}")
     return hyperparams
 
 
@@ -143,14 +139,11 @@ def pick_best_final_model(final_model_path, task):
     best_path = None
 
     print(f"\n Searching best final model in: {final_model_path}")
-    print(f"[DEBUG] Task: {task}")
 
     # STEP 1: iterates over each seed_X folder
     for folder in os.listdir(final_model_path):
-        print(f"\n[DEBUG] Checking folder: {folder}")
         
         if not folder.startswith("seed_"):
-            print(f"[DEBUG] Skipping {folder}")
             continue
 
         seed_root = os.path.join(final_model_path, folder)
@@ -165,7 +158,6 @@ def pick_best_final_model(final_model_path, task):
 
             
             if os.path.isdir(eval_path):
-                print(f"[DEBUG]   Standard training - reading from eval/")
                 latest_mb_dir = find_latest_mb_attention_dir(eval_path)
                 pred_path = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
                 eval_dir_for_return = os.path.join(eval_path, latest_mb_dir)
@@ -173,7 +165,6 @@ def pick_best_final_model(final_model_path, task):
                 if os.path.exists(pred_path):
                     pred_df = pd.read_parquet(pred_path)
                     all_predictions.append(pred_df)
-                    print(f"[DEBUG]   Loaded {len(pred_df)} predictions")
                 else:
                     print(f" No predictions in {pred_path}")
                     continue
@@ -186,7 +177,6 @@ def pick_best_final_model(final_model_path, task):
             
             # STEP 5: concatenate all predictions
             combined_predictions = pd.concat(all_predictions, ignore_index=True)
-            print(f"[DEBUG] Total predictions for {folder}: {len(combined_predictions)}")
             
             # STEP 6: calculate AUC or C-INDEX on all predictions together
             if task == "classification":
@@ -208,7 +198,6 @@ def pick_best_final_model(final_model_path, task):
                 risk_score = -combined_predictions['y_pred0'].values.astype(float)
                 
                 valid_mask = ~(np.isnan(event) | np.isnan(time) | np.isnan(risk_score))
-                print(f"[DEBUG] Valid samples: {valid_mask.sum()}/{len(valid_mask)}")
                 
                 result = compute_c_index_and_ci(
                     event[valid_mask], 
@@ -225,7 +214,6 @@ def pick_best_final_model(final_model_path, task):
                 best_score = score
                 best_seed = folder
                 best_path = eval_dir_for_return
-                print(f"[DEBUG] New best seed!")
                 
         except Exception as e:
             print(f"Failed to process {seed_root}: {e}")
@@ -238,7 +226,6 @@ def pick_best_final_model(final_model_path, task):
         raise RuntimeError("No valid final model found!")
 
     print(f"\n Best final model: {best_seed} with {metric_name} = {best_score:.4f}")
-    print(f"[DEBUG] Best path: {best_path}")
     
     return {
         "seed": best_seed,

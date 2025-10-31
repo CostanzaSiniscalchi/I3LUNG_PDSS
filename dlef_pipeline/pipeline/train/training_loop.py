@@ -39,7 +39,7 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
     
     # 3. Handle evaluation-only mode
     if training_type == "evaluation":
-        print(f"🔍 Evaluation mode: skipping training, only evaluating on ext_val")
+        print(f" Evaluation mode: skipping training, only evaluating on ext_val")
         
         # Select hyperparameters for config building
         combo = config.get("hyper_combo", config.get("hyperparameters_default", {}))
@@ -63,7 +63,7 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
         config_mil.mixed_bags = True
 
         # Evaluation on external validation set
-        print(f"📊 Evaluating on external validation set (ext_val)")
+        print(f" Evaluating on external validation set (ext_val)")
         standard_results_path = results_path.replace("/evaluation/", "/standard/")
         best_checkpoint = os.path.join(standard_results_path)
         

@@ -33,8 +33,6 @@ def get_folds(training_type, config=None):
     If a 'folds' section exists in config and contains training_type, it overrides the defaults.
     """
 
-    print(f"[DEBUG] Called get_folds() with training_type='{training_type}' and config={config!r}")
-
     # 1) Look for a 'folds' mapping in the provided config
     if config is not None:
         folds_from_config = config.get("folds", {})
@@ -57,11 +55,8 @@ def get_folds(training_type, config=None):
         "standard": ['ALL'],
         "evaluation": ['ALL']  # Evaluation mode doesn't actually use folds, but needs to be defined
     }
-    print(f"[DEBUG] default_folds keys = {list(default_folds.keys())!r}")
 
     if training_type not in default_folds:
         print(f"[ERROR] Unknown training_type: '{training_type}'. Raising ValueError.")
         raise ValueError(f"Unknown training_type: {training_type}")
-
-    print(f"[DEBUG] Returning default_folds['{training_type}'] = {default_folds[training_type]!r}")
     return default_folds[training_type]

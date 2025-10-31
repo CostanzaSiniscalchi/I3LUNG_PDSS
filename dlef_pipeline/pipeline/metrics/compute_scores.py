@@ -21,16 +21,16 @@ def compute_scores(base_path, task, dry_run=True):
     base path given be like: hparam_*/seed_*/
     it only looks inside eval
     """
-    print(f"🚀 Starting compute_scores in: {base_path}")
+    print(f" Starting compute_scores in: {base_path}")
     SKIP_FOLDERS = ["attention", "models"]
     processed = 0
 
     for root, dirs, _ in os.walk(base_path, topdown=True):
         if any(os.path.basename(root) == skip for skip in SKIP_FOLDERS):
-            # print(f"⛔ Skipped system folder: {root}")
+            # print(f" Skipped system folder: {root}")
             continue
         if "eval" not in root:
-            # print(f"⏭️ Skipped (no 'eval' in path): {root}")
+            # print(f"⏭ Skipped (no 'eval' in path): {root}")
             continue
 
         if folder_has_required_content(root):
@@ -39,7 +39,7 @@ def compute_scores(base_path, task, dry_run=True):
                 process_predictions(root, task)
                 processed += 1
             except Exception as e:
-                print(f"⚠️ Error processing {root}: {e}")
+                print(f" Error processing {root}: {e}")
         elif not dry_run:
             if root != base_path:
                 print(f" Deleting invalid folder: {root}")
@@ -69,28 +69,28 @@ def folder_has_required_content(folder_path):
     png_files = glob.glob(os.path.join(folder_path, "*.png"))
     print(f" PNG count: {len(png_files)}")
     if not (0 <= len(png_files) <= 6):
-        print(f"❌ PNG file count invalid in: {folder_path}")
+        print(f" PNG file count invalid in: {folder_path}")
         return False
 
     parquet_files = glob.glob(os.path.join(folder_path, "*.parquet"))
     print(f" Parquet count: {len(parquet_files)}")
     if not parquet_files:
-        print(f"❌ No parquet files found in: {folder_path}")
+        print(f" No parquet files found in: {folder_path}")
         return False
 
-    print(f"✅ Folder is valid: {folder_path}")
+    print(f" Folder is valid: {folder_path}")
     return True
 
 
 def find_deepest_valid_folder(folder_path):
     """Recursively search in the deepest valid directory."""
-    print(f"\n🔎 Searching deepest valid folder in: {folder_path}")
+    print(f"\n Searching deepest valid folder in: {folder_path}")
     for root, dirs, files in os.walk(folder_path, topdown=True):
         print(f"🔍 Inspecting: {root}")
         if folder_has_required_content(root):
-            print(f"✅ Deepest valid folder found: {root}")
+            print(f" Deepest valid folder found: {root}")
             return root
-    print("❌ No valid folder found.")
+    print(" No valid folder found.")
     return None
 
 def process_predictions(folder_path, task):
@@ -115,34 +115,34 @@ def process_predictions(folder_path, task):
         print(f"🩺 Processing survival task in: {folder_path}")
         
         if os.path.exists(test_file):
-            print(f"📥 Found test predictions file: {test_file}")
+            print(f" Found test predictions file: {test_file}")
             test_data = pd.read_parquet(test_file)
-            print(f"📊 Loaded test data: {len(test_data)} rows")
+            print(f" Loaded test data: {len(test_data)} rows")
             
             try:
                 scores_test = calculate_survival_metrics(None, test_file)
                 scores_test["N_TEST"] = len(test_data)
                 out_path = os.path.join(folder_path, "scores_test.csv")
                 pd.DataFrame([scores_test]).to_csv(out_path, index=False)
-                print(f"✅ Saved survival test scores to: {out_path}")
+                print(f" Saved survival test scores to: {out_path}")
             except Exception as e:
-                print(f"❌ Error while processing test survival scores: {e}")
+                print(f" Error while processing test survival scores: {e}")
         else:
-            print(f"⚠️ Test file not found: {test_file}")
+            print(f" Test file not found: {test_file}")
         
         if os.path.exists(train_file):
-            print(f"📥 Found train predictions file: {train_file}")
+            print(f" Found train predictions file: {train_file}")
             train_data = pd.read_parquet(train_file)
-            print(f"📊 Loaded train data: {len(train_data)} rows")
+            print(f" Loaded train data: {len(train_data)} rows")
             
             try:
                 scores_train = calculate_survival_metrics(train_file, None)
                 scores_train["N_TRAIN"] = len(train_data)
                 out_path = os.path.join(folder_path, "scores_train.csv")
                 pd.DataFrame([scores_train]).to_csv(out_path, index=False)
-                print(f"✅ Saved survival train scores to: {out_path}")
+                print(f" Saved survival train scores to: {out_path}")
             except Exception as e:
-                print(f"❌ Error while processing train survival scores: {e}")
+                print(f" Error while processing train survival scores: {e}")
         else:
-            print(f"⚠️ Train file not found: {train_file}")
+            print(f" Train file not found: {train_file}")
 

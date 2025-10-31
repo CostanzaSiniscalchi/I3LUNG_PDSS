@@ -206,8 +206,6 @@ def run_training(config, mods):
                     seed=seed,
                 )
 
-                print(f"[DEBUG] About to run train_val → results_path = {full_path}")
-
                 train_val(
                     P,
                     config,

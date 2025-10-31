@@ -34,7 +34,7 @@ def calculate_survival_metrics(predictions_train_path, predictions_test_path):
         # Concordance Index (train)
         ci_train = concordance_index_censored(train_data["EVENT"], train_data["TIME"], pred_train)[0]
     else:
-        print("⚠️ Train file not found or path is None. Skipping train metrics.")
+        print(" Train file not found or path is None. Skipping train metrics.")
 
     # Concordance Index (test)
     ci_test = concordance_index_censored(test_data["EVENT"], test_data["TIME"], pred_test)[0]

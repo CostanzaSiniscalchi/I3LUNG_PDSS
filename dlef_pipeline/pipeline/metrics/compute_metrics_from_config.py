@@ -128,10 +128,10 @@ def find_result_directories(path_info):
         )
 
         if not os.path.exists(base_path):
-            print(f"⚠️  Path does not exist: {base_path}")
+            print(f"  Path does not exist: {base_path}")
             continue
 
-        print(f"🔍 Searching in: {base_path}")
+        print(f" Searching in: {base_path}")
 
         # Find all seed_0 directories
         for root, dirs, files in os.walk(base_path):
@@ -152,7 +152,7 @@ def compute_classification_metrics_for_path(path, outcome):
         path: Path to seed_0 directory
         outcome: Outcome name
     """
-    print(f"\n📊 Computing classification metrics for: {path}")
+    print(f"\n Computing classification metrics for: {path}")
 
     # Check if cross-validation (no eval folder) or standard (eval folder exists)
     has_eval = os.path.isdir(os.path.join(path, 'eval'))
@@ -201,7 +201,7 @@ def compute_classification_metrics_for_path(path, outcome):
             # Weighted average of other metrics
             weighted_metrics = compute_weighted_metrics(fold_metrics, fold_weights)
         else:
-            print("   ❌ No predictions found")
+            print("    No predictions found")
             return
     else:
         # Standard/evaluation: use eval folder
@@ -231,9 +231,9 @@ def compute_classification_metrics_for_path(path, outcome):
         f.write('f1,specificity,sensitivity\n')
         f.write(f'{weighted_metrics["f1"]:.6f},{weighted_metrics["specificity"]:.6f},{weighted_metrics["sensitivity"]:.6f}\n')
 
-    print(f"   ✅ AUC = {auc:.4f}, CI = [{ci[0]:.4f}, {ci[1]:.4f}]")
-    print(f"   ✅ F1 = {weighted_metrics['f1']:.4f}, Spec = {weighted_metrics['specificity']:.4f}, Sens = {weighted_metrics['sensitivity']:.4f}")
-    print(f"   📝 Saved to: {auc_file} and {metrics_file}")
+    print(f"    AUC = {auc:.4f}, CI = [{ci[0]:.4f}, {ci[1]:.4f}]")
+    print(f"    F1 = {weighted_metrics['f1']:.4f}, Spec = {weighted_metrics['specificity']:.4f}, Sens = {weighted_metrics['sensitivity']:.4f}")
+    print(f"    Saved to: {auc_file} and {metrics_file}")
 
 
 def compute_survival_metrics_for_path(path, outcome):
@@ -282,14 +282,14 @@ def compute_survival_metrics_for_path(path, outcome):
         predictions = pd.read_parquet(pred_path)
 
     if len(predictions) == 0:
-        print("   ❌ No predictions found")
+        print("    No predictions found")
         return
 
     # Extract survival data
     # Assume predictions has columns: 'y_true' (time), 'event' (censoring), 'y_pred' (risk score)
     # Adjust based on your actual column names
     if 'event' not in predictions.columns:
-        print("   ⚠️  'event' column not found in predictions, skipping")
+        print("     'event' column not found in predictions, skipping")
         return
 
     event = predictions['event'].values.astype(bool)
@@ -305,8 +305,8 @@ def compute_survival_metrics_for_path(path, outcome):
         f.write('c_index,ci_lower,ci_upper\n')
         f.write(f'{result["c_index"]:.6f},{result["ci"][0]:.6f},{result["ci"][1]:.6f}\n')
 
-    print(f"   ✅ C-index = {result['c_index']:.4f}, CI = [{result['ci'][0]:.4f}, {result['ci'][1]:.4f}]")
-    print(f"   📝 Saved to: {cindex_file}")
+    print(f"    C-index = {result['c_index']:.4f}, CI = [{result['ci'][0]:.4f}, {result['ci'][1]:.4f}]")
+    print(f"    Saved to: {cindex_file}")
 
 
 def main():
@@ -318,7 +318,7 @@ def main():
     args = parser.parse_args()
 
     # Load config
-    print(f"📖 Loading config from: {args.config}")
+    print(f" Loading config from: {args.config}")
     with open(args.config) as f:
         config = yaml.safe_load(f)
 
@@ -326,19 +326,19 @@ def main():
     path_info = build_path_from_config(config, args.base_dir)
     task = path_info['task']
 
-    print(f"\n🎯 Task: {task}")
-    print(f"📊 Training type: {path_info['training_type']}")
-    print(f"🔬 Outcomes: {', '.join(path_info['outcomes'])}")
-    print(f"🧬 Modalities: {path_info['mod_string']}")
+    print(f"\n Task: {task}")
+    print(f" Training type: {path_info['training_type']}")
+    print(f" Outcomes: {', '.join(path_info['outcomes'])}")
+    print(f" Modalities: {path_info['mod_string']}")
 
     # Find result directories
     result_dirs = find_result_directories(path_info)
 
     if len(result_dirs) == 0:
-        print("\n❌ No result directories found!")
+        print("\n No result directories found!")
         return
 
-    print(f"\n📦 Found {len(result_dirs)} result director{'y' if len(result_dirs) == 1 else 'ies'}")
+    print(f"\n Found {len(result_dirs)} result director{'y' if len(result_dirs) == 1 else 'ies'}")
 
     # Compute metrics based on task type
     for outcome, seed_dir in result_dirs:
@@ -347,9 +347,9 @@ def main():
         elif task == 'survival':
             compute_survival_metrics_for_path(seed_dir, outcome)
         else:
-            print(f"⚠️  Unknown task type: {task}")
+            print(f"  Unknown task type: {task}")
 
-    print("\n✅ All metrics computed!")
+    print("\n All metrics computed!")
 
 
 if __name__ == "__main__":
