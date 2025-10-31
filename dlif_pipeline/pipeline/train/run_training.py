@@ -9,6 +9,7 @@ from .hyperparameters_tuning.hyperparam_tuning import pick_best_hyperparams, pic
 import json
 from metrics.compute_scores import compute_scores
 from metrics.calculate_average import compute_weighted_average
+from metrics.compute_metrics_from_config import run_task_metrics
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 
@@ -147,6 +148,9 @@ def run_training(config, mods):
                 compute_scores(final_seed_path, config["task"])
                 compute_weighted_average(final_seed_path, config["task"])
 
+            # Compute extended metrics (DeLong CI, F1, etc.)
+            run_task_metrics(config, ROOT)
+
             final_results.append({
                 "seed": seed,
                 "path": final_seed_path,
@@ -225,6 +229,9 @@ def run_training(config, mods):
             if config.get("training_type") == "cross_validation":
                 compute_weighted_average(base_seed_path, config["task"])
 
-                print(f"Training completed for seed {seed}, fold {fold} at {full_path}")
+            # Compute extended metrics (DeLong CI, F1, etc.)
+            run_task_metrics(config, ROOT)
+
+            print(f"Training completed for seed {seed}, fold {fold} at {full_path}")
 
         return {"experiment_paths": experiment_paths}

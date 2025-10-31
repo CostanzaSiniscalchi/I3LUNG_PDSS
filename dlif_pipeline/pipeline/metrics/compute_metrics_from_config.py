@@ -43,9 +43,6 @@ def build_path_from_config(config, base_dir):
     Returns:
         Path structure components
     """
-    # Compute ROOT the same way as run_training.py does:
-    # ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
-    # From pipeline/metrics/compute_metrics_from_config.py, go up 4 levels to get to csiniscalchi
     root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
     task = config.get('task')  # 'classification' or 'survival'
     training_type = config.get('training_type')  # 'cross_validation', 'standard', 'evaluation'
@@ -288,15 +285,22 @@ def compute_survival_metrics_for_path(path, outcome):
         return
 
     # Extract survival data
-    # Assume predictions has columns: 'y_true' (time), 'event' (censoring), 'y_pred' (risk score)
-    # Adjust based on your actual column names
-    if 'event' not in predictions.columns:
-        print("     'event' column not found in predictions, skipping")
+    # Handle different column name formats:
+    # Format 1: 'event', 'y_true', 'y_pred' (old format)
+    # Format 2: 'y_true0' (time), 'y_true1' (event), 'y_pred0' (risk score) (new format)
+    if 'y_true0' in predictions.columns and 'y_true1' in predictions.columns:
+        # New format
+        time = predictions['y_true0'].values.astype(float)
+        event = predictions['y_true1'].values.astype(bool)
+        risk_score = predictions['y_pred0'].values.astype(float)
+    elif 'event' in predictions.columns and 'y_true' in predictions.columns:
+        # Old format
+        event = predictions['event'].values.astype(bool)
+        time = predictions['y_true'].values.astype(float)
+        risk_score = predictions['y_pred'].values.astype(float)
+    else:
+        print("     Required columns not found in predictions (need y_true0/y_true1 or event/y_true), skipping")
         return
-
-    event = predictions['event'].values.astype(bool)
-    time = predictions['y_true'].values.astype(float)
-    risk_score = predictions['y_pred'].values.astype(float)
 
     # Compute C-index with CI
     result = compute_c_index_and_ci(event, time, risk_score, n_boot=1000)
@@ -311,21 +315,23 @@ def compute_survival_metrics_for_path(path, outcome):
     print(f"    Saved to: {cindex_file}")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Compute metrics from config file"
-    )
-    parser.add_argument("--config", required=True, help="Path to config YAML file")
-    parser.add_argument("--base_dir", required=True, help="Base results directory")
-    args = parser.parse_args()
+def run_task_metrics(config_arg, base_dir):
+    """
+    Compute extended metrics (DeLong CI, F1, etc.) for trained models.
 
+    Args:
+        config_arg: Either a path to a config YAML file (str) or a config dictionary (dict)
+        base_dir: Base results directory
+    """
     # Load config
-    print(f" Loading config from: {args.config}")
-    with open(args.config) as f:
-        config = yaml.safe_load(f)
+    if isinstance(config_arg, str):
+        with open(config_arg) as f:
+            config = yaml.safe_load(f)
+    else:
+        config = config_arg
 
     # Parse path info
-    path_info = build_path_from_config(config, args.base_dir)
+    path_info = build_path_from_config(config, base_dir)
     task = path_info['task']
 
     print(f"\n Task: {task}")
@@ -353,6 +359,17 @@ def main():
 
     print("\n All metrics computed!")
 
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Compute metrics from config file"
+    )
+    parser.add_argument("--config", required=True, help="Path to config YAML file")
+    parser.add_argument("--base_dir", required=True, help="Base results directory")
+    args = parser.parse_args()
+    config = args.config
+    base_dir = args.base_dir
+    run_task_metrics(config, base_dir)
 
 if __name__ == "__main__":
     main()
