@@ -37,6 +37,7 @@ def run_training(config, mods):
     if config.get("FILTER_CHEMO_IMMUNO") is not None:
         prefix_parts.append(f"chemoio_{config['FILTER_CHEMO_IMMUNO']}")
     if config.get("USE_COHORT2_FILTER"):
+        print("in run training")
         prefix_parts.append("cohort2")
 
     # intracenters analysis
@@ -67,7 +68,6 @@ def run_training(config, mods):
     mod_string = "_".join([k for k, v in mods.items() if v])
     bag_path_mods = f"bags_{mod_string}"
     bag_path = os.path.join(ROOT, "bags", bag_path_mods)
-    print(f"[DEBUG] bag_path = '{bag_path}'")
 
   
     P = Project(ROOT)
@@ -198,8 +198,6 @@ def run_training(config, mods):
             base_seed_path = os.path.join(base_path, f"seed_{seed}")
             experiment_paths.append(base_seed_path)
 
-            print(f"[DEBUG] Base seed path = {base_seed_path}")
-
             for fold in folds:
                 # Build the full training path
                 full_path = build_full_path(
@@ -222,7 +220,6 @@ def run_training(config, mods):
                     training_type=training_type
                 )  
 
-            print("[DEBUG] CONFIG at run_training base_seed: ", config)
             if(config.get("task") == "survival"):
                 compute_scores(full_path, config["task"])
             if config.get("training_type") == "cross_validation":

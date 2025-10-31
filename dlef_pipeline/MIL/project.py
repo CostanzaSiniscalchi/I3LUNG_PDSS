@@ -61,7 +61,6 @@ class Project:
  
         """ 
         self.root = root 
-        print(f"🔍 [DEBUG] root = '{root}'")
         if is_project(root) and kwargs: 
                 raise errors.ProjectError(f"Project already exists at {root}") 
         elif is_project(root): 
