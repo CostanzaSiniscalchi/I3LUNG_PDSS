@@ -2,7 +2,7 @@
 
 !.gitignore
 !*/
-!mlef_pipeline/*
+!dlif_pipeline/**/*
 !rwd_features.json
 !classification_config.json
 !data_curation.py
@@ -20,3 +20,7 @@
 # py cache
 __pycache__/
 *.pyc
+
+# Ignore specific dlif_pipeline subdirectories
+dlif_pipeline/data/
+dlif_pipeline/bags/
