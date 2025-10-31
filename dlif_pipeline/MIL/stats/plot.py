@@ -16,6 +16,7 @@ def scatter(
     y_pred: np.ndarray,
     data_dir: str,
     name: str = '_plot',
+    save_plots: bool = False,
     neptune_run: Optional["neptune.Run"] = None
 ) -> List[float]:
     """Generate and save scatter plots, and calculate R^2 (coefficient
@@ -27,6 +28,7 @@ def scatter(
         y_pred (np.ndarray): 2D array of predictions.
         data_dir (str): Path to directory in which to save plots.
         name (str, optional): Label for filename. Defaults to '_plot'.
+        save_plots (bool, optional): Save scatter plots as PNG files. Defaults to False.
         neptune_run (optional): Neptune Run. If provided, will upload plot.
 
     Returns:
@@ -55,12 +57,13 @@ def scatter(
     with matplotlib_backend('Agg'):
         for i in range(y_true.shape[1]):
             r_squared += [metrics.r2_score(y_true[:, i], y_pred[:, i])]
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning)
-                p = sns.jointplot(x=yt_sub[:, i], y=yp_sub[:, i], kind="reg")
-            p.set_axis_labels('y_true', 'y_pred')
-            plt.savefig(os.path.join(data_dir, f'Scatter{name}-{i}.png'))
-            if neptune_run:
+            if save_plots:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    p = sns.jointplot(x=yt_sub[:, i], y=yp_sub[:, i], kind="reg")
+                p.set_axis_labels('y_true', 'y_pred')
+                plt.savefig(os.path.join(data_dir, f'Scatter{name}-{i}.png'))
+            if save_plots and neptune_run:
                 neptune_run[f'results/graphs/Scatter{name}-{i}'].upload(
                     os.path.join(data_dir, f'Scatter{name}-{i}.png')
                 )

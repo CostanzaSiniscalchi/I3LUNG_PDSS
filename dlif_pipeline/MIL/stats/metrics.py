@@ -95,7 +95,8 @@ def classification_metrics(
     df: pd.DataFrame,
     label: str = '',
     level: str = 'tile',
-    data_dir: Optional[str] = None
+    data_dir: Optional[str] = None,
+    save_plots: bool = False
 ) -> Dict[str, Dict[str, float]]:
     """Generates categorical metrics (AUC/AP) from a set of predictions.
 
@@ -110,6 +111,8 @@ def classification_metrics(
             labeling plots. Defaults to 'tile'.
         data_dir (str, optional): Path to data directory for saving plots.
             If None, plots are not saved. Defaults to the current directory.
+        save_plots (bool, optional): Save ROC and PRC plots as PNG files.
+            Defaults to False.
 
     Returns:
         Dict containing metrics, with the keys 'auc' and 'ap'.
@@ -167,7 +170,7 @@ def classification_metrics(
         ]
         try:
             for i, fit in enumerate(p.imap(_generate_tile_roc, yt_and_yp)):
-                if data_dir is not None:
+                if data_dir is not None and save_plots:
                     fit.save_roc(data_dir, f"{label_start}{outcome}_{level}_ROC{i}")
                     fit.save_prc(data_dir, f"{label_start}{outcome}_{level}_PRC{i}")
                 all_auc[outcome] += [fit.auroc]
@@ -274,6 +277,7 @@ def regression_metrics(
     label: str = '',
     level: str = 'tile',
     data_dir: str = '',
+    save_plots: bool = False
 ) -> Dict[str, List[float]]:
     """Generates metrics (R^2, coefficient of determination) from predictions.
 
@@ -288,6 +292,8 @@ def regression_metrics(
             labeling plots. Defaults to 'tile'.
         data_dir (str, optional): Path to data directory for saving.
             Defaults to None.
+        save_plots (bool, optional): Save scatter plots as PNG files.
+            Defaults to False.
         neptune_run (:class:`neptune.Run`, optional): Neptune run in which to
             log results. Defaults to None.
 
@@ -317,6 +323,7 @@ def regression_metrics(
         df[y_pred_cols].values,
         data_dir,
         f"{label_end}_by_{level}",
+        save_plots=save_plots,
     )
 
     # Show results

@@ -31,6 +31,7 @@ def eval_mil(
     outdir: str = 'mil',
     attention_heatmaps: bool = False,
     save_attention: bool = False,
+    save_plots: bool = False,
     uq: bool = False,
     aggregation_level: Optional[str] = None,
     **heatmap_kwargs
@@ -60,6 +61,8 @@ def eval_mil(
         attention_heatmaps (bool): Generate attention heatmaps for slides.
             Not available for multi-modal MIL models. Defaults to False.
         save_attention (bool): Save attention scores as .npz files.
+            Defaults to False.
+        save_plots (bool): Save ROC/PRC/scatter plots as PNG files.
             Defaults to False.
         interpolation (str, optional): Interpolation strategy for smoothing
             attention heatmaps. Defaults to 'bicubic'.
@@ -95,6 +98,7 @@ def eval_mil(
         outdir=outdir,
         attention_heatmaps=attention_heatmaps,
         save_attention=save_attention,
+        save_plots=save_plots,
         uq=uq,
         params=params,
         aggregation_level=aggregation_level,
@@ -302,6 +306,7 @@ def run_eval(
     outdir: str = 'mil',
     attention_heatmaps: bool = False,
     save_attention: bool = False,
+    save_plots: bool = False,
     uq: bool = False,
     params: Optional[dict] = None,
     aggregation_level: Optional[str] = None,
@@ -324,6 +329,8 @@ def run_eval(
         attention_heatmaps (bool): Generate attention heatmaps for slides.
             Defaults to False.
         save_attention (bool): Save attention scores as .npz files.
+            Defaults to False.
+        save_plots (bool): Save ROC/PRC/scatter plots as PNG files.
             Defaults to False.
         interpolation (str, optional): Interpolation strategy for smoothing
             attention heatmaps. Defaults to 'bicubic'.
@@ -371,7 +378,7 @@ def run_eval(
 
     # Print classification metrics, including per-category accuracy)
     metrics_df = utils.rename_df_cols(df, outcomes, model_type=config.model_type)
-    config.run_metrics(metrics_df, level='slide', outdir=model_dir)
+    config.run_metrics(metrics_df, level='slide', outdir=model_dir, save_plots=save_plots)
 
     # Export attention
     if outdir and y_att and save_attention:

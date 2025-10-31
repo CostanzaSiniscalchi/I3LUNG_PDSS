@@ -55,6 +55,8 @@ def train_mil(
             Not available for multi-modal MIL models. Defaults to False.
         save_attention (bool): Save attention scores as .npz files.
             Defaults to False.
+        save_plots (bool): Save ROC/PRC/scatter plots as PNG files.
+            Defaults to False.
         interpolation (str, optional): Interpolation strategy for smoothing
             attention heatmaps. Defaults to 'bicubic'.
         cmap (str, optional): Matplotlib colormap for heatmap. Can be any
@@ -210,6 +212,7 @@ def _train_multimodal_mixed_mil(
     outdir: str = 'mil',
     attention_heatmaps: bool = False,
     save_attention: bool = False,
+    save_plots: bool = False,
     uq: bool = False,
     events: Optional[str] = None,
     device: Optional[str] = None,
@@ -240,6 +243,8 @@ def _train_multimodal_mixed_mil(
         attention_heatmaps (bool): Generate attention heatmaps for slides.
             Defaults to False.
         save_attention (bool): Save attention scores as .npz files.
+            Defaults to False.
+        save_plots (bool): Save ROC/PRC/scatter plots as PNG files.
             Defaults to False.
         interpolation (str, optional): Interpolation strategy for smoothing
             attention heatmaps. Defaults to 'bicubic'.
@@ -318,7 +323,7 @@ def _train_multimodal_mixed_mil(
 
     # Print classification metrics, including per-category accuracy
     utils.rename_df_cols(df, outcomes, model_type=config.model_type, inplace=True)
-    config.run_metrics(df, level='slide', outdir=outdir)
+    config.run_metrics(df, level='slide', outdir=outdir, save_plots=save_plots)
 
     # Export attention to numpy arrays
     if attention and outdir and save_attention:

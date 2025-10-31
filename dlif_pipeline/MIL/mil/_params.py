@@ -137,6 +137,7 @@ class TrainerConfig:
         outdir: str = 'mil',
         attention_heatmaps: bool = False,
         save_attention: bool = False,
+        save_plots: bool = False,
         uq: bool = False,
         aggregation_level: Optional[str] = None,
         params: Optional[dict] = None,
@@ -162,6 +163,10 @@ class TrainerConfig:
             outdir (str): Path at which to save results.
             attention_heatmaps (bool): Generate attention heatmaps for slides.
                 Not available for multi-modal MIL models. Defaults to False.
+            save_attention (bool): Save attention scores as .npz files.
+                Defaults to False.
+            save_plots (bool): Save ROC/PRC/scatter plots as PNG files.
+                Defaults to False.
             interpolation (str, optional): Interpolation strategy for smoothing
                 attention heatmaps. Defaults to 'bicubic'.
             cmap (str, optional): Matplotlib colormap for heatmap. Can be any
@@ -202,6 +207,7 @@ class TrainerConfig:
             model,
             attention_heatmaps=attention_heatmaps,
             save_attention=save_attention,
+            save_plots=save_plots,
             uq=uq,
             **heatmap_kwargs,
             **eval_kwargs
@@ -438,6 +444,8 @@ class TrainerConfig:
                 Not available for multi-modal MIL models. Defaults to False.
             save_attention (bool): Save attention scores as .npz files.
                 Defaults to False.
+            save_plots (bool): Save ROC/PRC/scatter plots as PNG files.
+                Defaults to False.
             interpolation (str, optional): Interpolation strategy for smoothing
                 attention heatmaps. Defaults to 'bicubic'.
             cmap (str, optional): Matplotlib colormap for heatmap. Can be any
@@ -596,16 +604,17 @@ class TrainerConfig:
         """
         return self.model_config.inspect_batch(batch)
 
-    def run_metrics(self, df, level='slide', outdir=None):
+    def run_metrics(self, df, level='slide', outdir=None, save_plots=False):
         """Run metrics and save plots to disk.
 
         Args:
             df (pd.DataFrame): Dataframe with predictions and outcomes.
             level (str): Level at which to calculate metrics. Either 'slide' or 'patient'.
             outdir (str): Output directory for saving metrics.
+            save_plots (bool): Save ROC/PRC/scatter plots as PNG files. Defaults to False.
 
         """
-        self.model_config.run_metrics(df, level=level, outdir=outdir)
+        self.model_config.run_metrics(df, level=level, outdir=outdir, save_plots=save_plots)
 
 
 # -----------------------------------------------------------------------------
@@ -1049,22 +1058,23 @@ class MILModelConfig:
         )
 
 
-    def run_metrics(self, df, level='slide', outdir=None) -> None:
+    def run_metrics(self, df, level='slide', outdir=None, save_plots=False) -> None:
         """Run metrics and save plots to disk.
 
         Args:
             df (pd.DataFrame): Dataframe with predictions and outcomes.
             level (str): Level at which to calculate metrics. Either 'slide' or 'patient'.
             outdir (str): Output directory for saving metrics.
+            save_plots (bool): Save ROC/PRC/scatter plots as PNG files. Defaults to False.
 
         """
         import MIL.stats.metrics as stats_metrics
         if self.model_type in ['classification', 'ordinal', 'multimodal']:
-            stats_metrics.classification_metrics(df, level=level, data_dir=outdir)
+            stats_metrics.classification_metrics(df, level=level, data_dir=outdir, save_plots=save_plots)
         elif self.model_type in ['survival', 'multimodal_survival']:
             stats_metrics.survival_metrics(df, level=level, data_dir=outdir)
         else:
-            stats_metrics.regression_metrics(df, level=level, data_dir=outdir)
+            stats_metrics.regression_metrics(df, level=level, data_dir=outdir, save_plots=save_plots)
 
 # -----------------------------------------------------------------------------
 
