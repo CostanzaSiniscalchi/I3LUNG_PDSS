@@ -18,10 +18,36 @@ train_df: [ "data/features_dataset_radpy_fixed.parquet", "data/features_dataset_
 annotation_file: data/annotations.csv
 
 mods:
+    # RWD
+  - rwd: true
+    radpy: false
+    dp: false
+    genomics: false
+    # RWD_DP
+  - rwd: true
+    radpy: false
+    dp: true
+    genomics: false
+    # RWD_FMRAD
+  - rwd: true
+    radfm: true
+    dp: false
+    genomics: false
+    # RWD_PYRAD
+  - rwd: true
+    radpy: true
+    dp: false
+    genomics: false
+    # RWD_DP_FMRAD
+  - rwd: true
+    radfm: true
+    dp: true
+    genomics: false
+    # RWD_DP_PYRAD
   - rwd: true
     radpy: true
     dp: true
-    genomics: true
+    genomics: false
 
 folds:
   cross_validation_stratified:

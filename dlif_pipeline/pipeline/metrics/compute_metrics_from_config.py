@@ -31,7 +31,7 @@ from metrics.survival_cindex_ci import compute_c_index_and_ci
 from metrics.other_metrics import compute_classification_metrics, compute_weighted_metrics
 
 
-def build_path_from_config(config, base_dir):
+def build_path_from_config(config, mod_string, base_dir):
     """
     Build the results path based on config parameters.
     Uses the same logic as train/run_training.py for path construction.
@@ -50,10 +50,6 @@ def build_path_from_config(config, base_dir):
     source = config.get('source', 'pyrad')
     imp = config.get('imp', 'noimp')
     outcomes = config.get('task_settings', {}).get('outcomes', [])
-
-    # Build modality string from mods
-    mods = config.get('mods', [{}])[0]  # Get first mods config
-    mod_string = "_".join([k for k, v in mods.items() if v])
 
     # Build prefix parts the same way as run_training.py
     prefix_parts = ["results"]
@@ -314,7 +310,7 @@ def compute_survival_metrics_for_path(path, outcome):
     print(f"    Saved to: {cindex_file}")
 
 
-def run_task_metrics(config_arg, base_dir):
+def run_task_metrics(config_arg, mod_string, base_dir):
     """
     Compute extended metrics (DeLong CI, F1, etc.) for trained models.
 
@@ -330,7 +326,7 @@ def run_task_metrics(config_arg, base_dir):
         config = config_arg
 
     # Parse path info
-    path_info = build_path_from_config(config, base_dir)
+    path_info = build_path_from_config(config, mod_string, base_dir)
     task = path_info['task']
 
     print(f"\n Task: {task}")
