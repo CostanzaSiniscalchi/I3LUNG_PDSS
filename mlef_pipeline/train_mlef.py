@@ -185,7 +185,7 @@ def train_and_evaluate_modality(
     
     # 2. Split data
     print("2. Splitting data...")
-    with open('split.json', 'r') as f:
+    with open('mlef_pipeline/split.json', 'r') as f:
         split = json.load(f)
     
     train_set = dataset[dataset['Subject'].isin(split['TRAIN_SET'])].set_index('Subject')
@@ -203,19 +203,18 @@ def train_and_evaluate_modality(
     # y_test = dl.get_outcome(y_test_raw, outcome)
     # y_ext = dl.get_outcome(y_ext_raw, outcome) if not ext_set.empty else pd.Series()
     
-    with open('submodel_features.json', 'r') as f:
+    with open('mlef_pipeline/submodel_features.json', 'r') as f:
         submodel_features = json.load(f)
         submodel_features = [f for f in submodel_features if f in X_train.columns]
     
     X_train = X_train.drop(columns=submodel_features, errors='ignore')
     X_test = X_test.drop(columns=submodel_features, errors='ignore')
     X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
-    
     # 4. Imputation
     print("4. Imputing missing values...")
     X_train_imputed, imputer = dl.impute_df(X_train)
+    X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer)
     X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
-    X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer) if not X_ext.empty else (X_ext, None)
     
     # 5. Normalization
     print("5. Normalizing features...")
