@@ -53,7 +53,7 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
             train_data_path = [os.path.join(project_root, td.lstrip('../')) for td in train_data]
         else:
             train_data_path = os.path.join(project_root, train_data.lstrip('../'))
-        print(f"[DEBUG] train_data_path = {train_data_path}")
+        
         df = pd.read_parquet(train_data_path)
         
         # Drop columns of unused modalities (if they exist in the mapping)

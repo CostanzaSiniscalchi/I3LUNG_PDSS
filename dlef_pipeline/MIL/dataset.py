@@ -175,8 +175,6 @@ class Dataset:
             for row in csv_reader:
                 patients.extend([row[patient_index]])
         patients = list(set(patients))
-        log.debug(f"Number of patients in annotations: {len(patients)}")
-        log.debug(f"Slides found: {len(slide_list)}")
 
         # Then, check for sets of slides that would match to the same patient;
         # due to ambiguity, these will be skipped.

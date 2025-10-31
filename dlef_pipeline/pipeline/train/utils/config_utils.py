@@ -37,18 +37,13 @@ def get_folds(training_type, config=None):
 
     # 1) Look for a 'folds' mapping in the provided config
     if config is not None:
-        print("[DEBUG] Config is not None, attempting to retrieve 'folds' section...")
         folds_from_config = config.get("folds", {})
-        print(f"[DEBUG] folds_from_config = {folds_from_config!r}")
 
         if training_type in folds_from_config:
-            print(f"[DEBUG] Found '{training_type}' in folds_from_config. Returning: {folds_from_config[training_type]!r}")
+            print(f"Training type '{training_type}' in folds_from_config. Returning: {folds_from_config[training_type]!r}")
             return folds_from_config[training_type]
         else:
-            print(f"[DEBUG] '{training_type}' not in folds_from_config; will fall back to defaults.")
-
-    else:
-        print("[DEBUG] Config is None, skipping config-based folds.")
+            print(f"Training type '{training_type}' Will fall back to defaults.")
 
     # Default mapping
     default_folds = {
@@ -59,7 +54,8 @@ def get_folds(training_type, config=None):
         "cross_validation": [
             'GHD', 'INT', 'MH', 'SZMC', 'VHIO'
         ],
-        "standard": ['ALL']
+        "standard": ['ALL'],
+        "evaluation": ['ALL']  # Evaluation mode doesn't actually use folds, but needs to be defined
     }
     print(f"[DEBUG] default_folds keys = {list(default_folds.keys())!r}")
 

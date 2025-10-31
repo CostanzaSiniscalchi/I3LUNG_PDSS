@@ -12,7 +12,7 @@ def pick_best_hyperparams(base_results_path, config):
     from metrics.survival_cindex_ci import compute_c_index_and_ci
 
     print(f"\n Searching best hyperparameters in: {base_results_path}")
-    print(f"[DEBUG] Task: {config['task']}")
+    print(f"Task: {config['task']}")
 
     task = config["task"]
     best_score = -1
@@ -21,10 +21,8 @@ def pick_best_hyperparams(base_results_path, config):
     # STEP 1: iterates over each hyperparameter combination
     for combo_folder in os.listdir(base_results_path):
         combo_path = os.path.join(base_results_path, combo_folder)
-        print(f"\n[DEBUG] Checking combo folder: {combo_folder}")
         
         if not combo_folder.startswith("hparam_") or not os.path.isdir(combo_path):
-            print(f"[DEBUG] Skipping {combo_folder}")
             continue
 
         # STEP 2: gather all predictions from all seeds for this combo
@@ -32,14 +30,12 @@ def pick_best_hyperparams(base_results_path, config):
         
         for seed_folder in os.listdir(combo_path):
             seed_path = os.path.join(combo_path, seed_folder)
-            print(f"[DEBUG]   Processing seed: {seed_folder}")
             
             if not os.path.isdir(seed_path):
                 continue
 
             try:
 
-                print(f"[DEBUG]     Cross-validation - reading from folds")
                 folders = [f.name for f in os.scandir(seed_path) if f.is_dir()]
                 
                 for folder in folders:
@@ -53,7 +49,6 @@ def pick_best_hyperparams(base_results_path, config):
                     if os.path.exists(pred_path):
                         pred_df = pd.read_parquet(pred_path)
                         all_predictions.append(pred_df)
-                        print(f"[DEBUG]     Loaded {len(pred_df)} predictions from {folder}")
             
             except Exception as e:
                 print(f" Error processing {seed_path}: {e}")
@@ -66,7 +61,6 @@ def pick_best_hyperparams(base_results_path, config):
         
         # STEP 5: concatenate all predictions
         combined_predictions = pd.concat(all_predictions, ignore_index=True)
-        print(f"[DEBUG] Total predictions for {combo_folder}: {len(combined_predictions)}")
         
         # STEP 6: calculate AUC or C-INDEX on all predictions together
         try:
