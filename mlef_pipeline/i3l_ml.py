@@ -180,7 +180,7 @@ class ML:
             selected_features = self.lasso_selection(X, y, target_features=15, tolerance=10)
             X = X[selected_features]
         
-        with open('mlef_pipeline/classification_config.json', 'r') as f:
+        with open('classification_config.json', 'r') as f:
             param_grids = json.load(f)
 
         best_clf = self.hyperparameter_tuning(

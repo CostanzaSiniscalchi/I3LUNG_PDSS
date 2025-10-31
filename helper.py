@@ -4,7 +4,427 @@ import matplotlib.pyplot as plt
 import os
 from DeLong_test import auc_roc_ci, delong_roc_variance, fastDeLong_no_weights, compute_ground_truth_statistics
 from scipy import stats
-from typing import List, Dict
+import shap
+from sklearn.linear_model import LogisticRegression
+from pathlib import Path
+from typing import Iterable, Optional, Union, List, Tuple, Literal, Dict
+
+
+def delong_test_comparison(y_true, y_pred1, y_pred2, alpha=0.05):
+    """
+    Compare two ROC curves using DeLong's test for statistical significance.
+    Compute p-value for the difference between two AUCs.
+    
+    Args:
+        y_true: True binary labels
+        y_pred1: Predictions from first model (e.g., biomarker)
+        y_pred2: Predictions from second model (e.g., MLEF model)
+        alpha: Significance level (default 0.05)
+    
+    Returns:
+        dict: Contains AUCs, p-value, and significance test results
+    """
+    # Compute AUC and variance for each model
+    auc1, var1 = delong_roc_variance(y_true, y_pred1)
+    auc2, var2 = delong_roc_variance(y_true, y_pred2)
+    
+    # Compute covariance between the two AUCs
+    # For this we need to combine predictions and compute joint variance
+    predictions_combined = np.array([y_pred1, y_pred2])
+    order, label_1_count = compute_ground_truth_statistics(y_true)
+    predictions_sorted_transposed = predictions_combined[:, order]
+    aucs, cov_matrix = fastDeLong_no_weights(predictions_sorted_transposed, label_1_count)
+    
+    # Extract covariance
+    cov_12 = cov_matrix[0, 1] if cov_matrix.ndim > 1 else 0
+    
+    # Compute test statistic
+    auc_diff = auc1 - auc2
+    var_diff = var1 + var2 - 2 * cov_12
+    
+    if var_diff <= 0:
+        var_diff = 1e-10  # Avoid division by zero
+    
+    z_score = auc_diff / np.sqrt(var_diff)
+    p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))  # Two-tailed test
+    
+    # Get confidence intervals
+    auc1_ci = auc_roc_ci(y_true, y_pred1, 0.95)[1]
+    auc2_ci = auc_roc_ci(y_true, y_pred2, 0.95)[1]
+    
+    return {
+        'auc1': auc1,
+        'auc2': auc2,
+        'auc1_ci': auc1_ci,
+        'auc2_ci': auc2_ci,
+        'auc_difference': auc_diff,
+        'p_value': p_value,
+        'z_score': z_score,
+        'significant': p_value < alpha,
+        'alpha': alpha
+    }
+
+
+def p_to_stars(p: float) -> str:
+    """Converts a p-value to a significance star string."""
+    if p <= 0.0001: return '****'
+    if p <= 0.001: return '***'
+    if p <= 0.01: return '**'
+    if p <= 0.05: return '*'
+    return 'ns'
+
+def plot_auc_results(
+    architecture: Literal["MLEF", "DLIF"],
+    outcome: str,                                              # e.g. OS_24, OS_6, DCR
+    analyses: Union[str, Iterable[str]],                       # e.g. "C23" or ["C2", "ADENO", ...]
+    *,
+    modality_order: Optional[List[str]] = None,                # enforce x-axis order
+    exclude_modalities: Iterable[str] = ("DP", "FMRAD", "PYRAD"),
+    title_prefix: Optional[str] = None,
+    min_bubble: float = 30,
+    max_bubble: float = 250,
+    show: bool = True,
+    save_dir: Optional[Union[str, Path]] = None
+):
+    """
+    Expected per-analysis layout (e.g. 'C23'):
+        MLEF/ (or DLIF/)
+         OS_24/ (or DCR/ OR OS_6/)
+          C23/
+            RWD/
+              model_XX.pkl
+              train_set.xlsx
+              test_set.xlsx
+              prediction_CV.xlsx   (columns: Subject, y_pred, y_true)
+              results.xlsx      (metrics incl. CV AUC)
+            RWD_DP/
+               RWD_ONLY/         (MLEF only)
+            RWD_PYRAD/
+            RWD_FMRAD/
+            RWD_DP_PYRAD/
+            RWD_DP_FMRAD/
+    """
+
+    # ------------------------- utilities -------------------------
+    def _parse_mean_std(val) -> Tuple[float, float]:
+        if pd.isna(val):
+            return (np.nan, np.nan)
+        if isinstance(val, (int, float, np.floating)):
+            return (float(val), 0.0)
+        s = str(val).replace("+/-", "±")
+        parts = [p.strip() for p in s.split("±")]
+        try:
+            if len(parts) == 2:
+                return (float(parts[0]), float(parts[1]))
+            return (float(parts[0]), 0.0)
+        except Exception:
+            return (np.nan, np.nan)
+
+    def _read_auc_cv(results_path: Path) -> Tuple[float, float]:
+        if results_path is None or not results_path.exists():
+            return (np.nan, np.nan)
+        df = pd.read_excel(results_path)
+        # 1) direct 'CV AUC'
+        for col in df.columns:
+            if str(col).strip().upper() in ("CV AUC", "CV_AUC", "AUC_CV", "AUC_cv"):
+                return _parse_mean_std(df[col].iloc[0])
+        # 2) SET + AUC with a 'CV' row
+        set_cols = [c for c in df.columns if str(c).strip().upper() in ("SET", "SPLIT", "PHASE")]
+        auc_cols = [c for c in df.columns if str(c).strip().upper() == "AUC"]
+        if set_cols and auc_cols:
+            sub = df.copy()
+            mask = False
+            for sc in set_cols:
+                mask = mask | (sub[sc].astype(str).str.upper().str.contains("CV"))
+            sub = sub[mask]
+            if not sub.empty:
+                return _parse_mean_std(sub[auc_cols[0]].iloc[0])
+        # 3) any 'AUC' column at first row
+        if auc_cols:
+            return _parse_mean_std(df[auc_cols[0]].iloc[0])
+        return (np.nan, np.nan)
+
+    def _read_model_name(model_path: Path) -> str:
+        """
+        Model files are named like 'model_LR' or 'model_RF'.
+        Return the substring after the first underscore.
+        """
+        if model_path is None or not model_path.exists():
+            return "UnknownModel"
+        stem = model_path.name  # allow filenames without extensions
+        # If it has an extension, strip it
+        if "." in stem:
+            stem = stem.split(".", 1)[0]
+        if "_" in stem:
+            return stem.split("_", 1)[1] or "UnknownModel"
+        return "UnknownModel"
+
+    def _read_n_train(train_path: Path) -> int:
+        if train_path is None or not train_path.exists():
+            return int(np.nan)
+        try:
+            return int(pd.read_excel(train_path).shape[0])
+        except Exception:
+            return int(np.nan)
+
+    def _scale_sizes(raw_sizes: Iterable[Union[int, float]]) -> np.ndarray:
+        arr = np.array(list(raw_sizes), dtype=float)
+        if arr.size == 0 or np.all(np.isnan(arr)):
+            return np.array([])
+        amin, amax = np.nanmin(arr), np.nanmax(arr)
+        if not np.isfinite(amin) or not np.isfinite(amax) or (amax - amin < 1e-9):
+            return np.full_like(arr, (min_bubble + max_bubble) / 2.0)
+        norm = (arr - amin) / (amax - amin + 1e-6)
+        return norm * (max_bubble - min_bubble) + min_bubble
+
+    def _ordered_modalities(mods: List[str]) -> List[str]:
+        filtered = [m for m in mods if m not in exclude_modalities]
+        if modality_order:
+            in_order = [m for m in modality_order if m in filtered]
+            leftovers = [m for m in filtered if m not in in_order]
+            return in_order + leftovers
+        return filtered
+
+    def _collect_modalities(analysis_dir: Path) -> List[str]:
+        return _ordered_modalities([p.name for p in analysis_dir.iterdir()
+                                    if p.is_dir() and p.name.upper().startswith("RWD")])
+
+    def _pair_paths(analysis_dir: Path, modality: str):
+        """
+        Robust path resolver:
+        - accepts RWD_ONLY or rwd-only (any case)
+        - accepts files named like results(.xlsx/.xls), prediction(_CV)?.xlsx, train_set(.xlsx), etc.
+        - accepts files with different case
+        """
+        def find_first(dir_: Path, stems: List[str]) -> Optional[Path]:
+            if not dir_.exists():
+                return None
+            # try exact matches first
+            for st in stems:
+                for ext in ("", ".xlsx", ".xls"):
+                    p = dir_ / f"{st}{ext}"
+                    if p.exists():
+                        return p
+            # then glob by prefix (case-insensitive)
+            cand: List[Path] = []
+            for st in stems:
+                cand += list(dir_.glob(f"{st}*"))
+                cand += list(dir_.glob(f"{st.upper()}*"))
+                cand += list(dir_.glob(f"{st.lower()}*"))
+            # prefer xlsx/xls if multiple
+            cand = sorted(cand, key=lambda x: (x.suffix.lower() not in {".xlsx", ".xls"}, len(x.name)))
+            return cand[0] if cand else None
+
+        def find_subdir_any(dir_: Path, names: List[str]) -> Optional[Path]:
+            if not dir_.exists():
+                return None
+            # exact
+            for n in names:
+                p = dir_ / n
+                if p.exists() and p.is_dir():
+                    return p
+            # case-insensitive scan
+            low_targets = {n.lower(): n for n in names}
+            for p in dir_.iterdir():
+                if p.is_dir() and p.name.lower() in low_targets:
+                    return p
+            return None
+
+        mod_dir = analysis_dir / modality
+
+        paths = {
+            "mod": {
+                "results": find_first(mod_dir, ["results", "Results"]),
+                "pred":    find_first(mod_dir, ["prediction_CV", "prediction", "Prediction"]),
+                "model":   find_first(mod_dir, ["model_", "model"]),   # picks model_LR / model_RF
+                "train":   find_first(mod_dir, ["train_set", "Train_set", "train"]),
+            },
+            "rwd_only": None
+        }
+
+        if architecture == "MLEF":
+            ro_dir = find_subdir_any(
+                mod_dir,
+                ["RWD_ONLY", "rwd-only", "Rwd_only", "RWD-ONLY"]
+            )
+            if ro_dir:
+                paths["rwd_only"] = {
+                    "results": find_first(ro_dir, ["results", "Results"]),
+                    "pred":    find_first(ro_dir, ["prediction_CV", "prediction", "Prediction"]),
+                    "model":   find_first(ro_dir, ["model_", "model"]),
+                    "train":   find_first(ro_dir, ["train_set", "Train_set", "train"]),
+                }
+        return paths
+
+
+    def _compute_pvalue(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
+        """
+        Read predictions directly from prediction.xlsx files (Subject, y_pred, y_true),
+        align on Subject, then run DeLong.
+        """
+        if not (pred_mod_path and pred_ro_path and pred_mod_path.exists() and pred_ro_path.exists()):
+            return None
+        dm = pd.read_excel(pred_mod_path)
+        dr = pd.read_excel(pred_ro_path)
+        # minimal schema check
+        for col in ("Subject", "y_pred", "y_true"):
+            if col not in dm.columns:
+                return None
+        if "Subject" not in dr.columns or "y_pred" not in dr.columns:
+            return None
+
+        m = dm.rename(columns={"y_pred": "y_pred_mod"})
+        r = dr.rename(columns={"y_pred": "y_pred_ro"})
+        merged = pd.merge(m[["Subject", "y_true", "y_pred_mod"]],
+                          r[["Subject", "y_pred_ro"]],
+                          on="Subject", how="inner")
+        if merged.empty:
+            return None
+        return float(delong_test_comparison(
+            merged["y_true"].to_numpy(),
+            merged["y_pred_mod"].to_numpy(),
+            merged["y_pred_ro"].to_numpy()
+        )['p_value'])
+
+    def _plot_one(analysis: str, rows: List[dict]) -> plt.Figure:
+        modalities = [r["modality"] for r in rows]
+        X = np.arange(len(modalities))
+
+        auc_mod_mean = np.array([r["auc_mod_mean"] for r in rows], dtype=float)
+        auc_mod_std  = np.array([r["auc_mod_std"]  for r in rows], dtype=float)
+        n_train_mod  = np.array([r["n_train_mod"]  for r in rows], dtype=float)
+        sizes        = _scale_sizes(n_train_mod)
+        model_names  = [r["model_mod"] for r in rows]
+
+        fig = plt.figure(figsize=(12, 6))
+        # BLUE: modality
+        plt.plot(X, auc_mod_mean, linestyle="-", marker="o", label="CV AUC", color="#1a80bb")
+        plt.scatter(X, auc_mod_mean, s=sizes, color="#1a80bb", zorder=3)
+        plt.fill_between(X, auc_mod_mean - auc_mod_std, auc_mod_mean + auc_mod_std,
+                         alpha=0.3, color="#8cc5e3", label="Confidence interval")
+
+        multimodal_better = None
+
+        if architecture == "MLEF":
+            auc_ro_mean = np.array([r["auc_ro_mean"] for r in rows], dtype=float)
+            auc_ro_std  = np.array([r["auc_ro_std"]  for r in rows], dtype=float)
+            plt.plot(X, auc_ro_mean, linestyle="-", marker="o", label="CV AUC - RWD-only matched", color="#a00000")
+            plt.scatter(X, auc_ro_mean, s=sizes, color="#a00000", zorder=3)
+            plt.fill_between(X, auc_ro_mean - auc_ro_std, auc_ro_mean + auc_ro_std,
+                             alpha=0.3, color="#d8a6a6", label="Confidence interval - RWD-only matched")
+            multimodal_better = (auc_mod_mean > auc_ro_mean)
+
+        xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})" for m, n in zip(modalities, n_train_mod)]
+        plt.xticks(X, xticks)
+
+        # --- BLUE annotations (now show stars here) ---
+        for i, (mval, mstd, mname) in enumerate(zip(auc_mod_mean, auc_mod_std, model_names)):
+            base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
+            plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
+                    fontsize=9, ha="center", color="#1a80bb")
+            # stars belong to the multimodal-vs-RWD comparison
+            star = rows[i].get("stars", "")
+            if star:
+                # nudge a bit to the right of the blue text
+                plt.text(i + 0.33, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
+
+
+        # --- RED annotations (keep values but REMOVE stars here) ---
+        if architecture == "MLEF":
+            for i, rrow in enumerate(rows):
+                rv, rs, rname = rrow["auc_ro_mean"], rrow["auc_ro_std"], rrow["model_ro"]
+                base_y = 0.02 if multimodal_better[i] else 0.06
+                if np.isfinite(rv) and np.isfinite(rs):
+                    plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
+                            fontsize=9, ha="center", color="#a00000")
+
+        ttl = title_prefix or f"CV AUC - {architecture}"
+        plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
+        plt.ylabel("AUC")
+        plt.ylim(0, 1)
+        plt.grid(True, linestyle="--", alpha=0.6)
+        plt.legend()
+        plt.xlim(-0.4, len(modalities) - 0.55)
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+            out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{analysis}.png"
+            plt.savefig(out, dpi=600, bbox_inches="tight")
+        if show:
+            plt.show()
+        return fig
+
+    # ------------------------- main logic -------------------------
+    if isinstance(analyses, str):
+        analyses = [analyses]
+
+    for analysis in analyses:
+        analysis_dir = architecture / outcome /analysis
+        if not analysis_dir.exists():
+            continue
+
+        modalities = _collect_modalities(analysis_dir)
+        if not modalities:
+            continue
+
+        rows: List[dict] = []
+        for mod in modalities:
+            paths = _pair_paths(analysis_dir, mod)
+            # modality side
+            auc_m, std_m = _read_auc_cv(paths["mod"]["results"])
+            model_m = _read_model_name(paths["mod"]["model"])
+            ntrain_m = _read_n_train(paths["mod"]["train"])
+
+            row = {
+                "modality": mod,
+                "auc_mod_mean": float(auc_m),
+                "auc_mod_std": float(std_m) if np.isfinite(std_m) else 0.0,
+                "n_train_mod": ntrain_m,
+                "model_mod": model_m,
+            }
+
+            # paired RWD_ONLY (MLEF only) with RWD red==blue behavior
+            if architecture == "MLEF":
+                if mod == "RWD":
+                    # enforce coincidence for RWD: red == blue; no p-value
+                    row.update({
+                        "auc_ro_mean": row["auc_mod_mean"],
+                        "auc_ro_std":  row["auc_mod_std"],
+                        "n_train_ro":  row["n_train_mod"],
+                        "model_ro":    row["model_mod"],
+                        "pvalue":      None,
+                        "stars":       ""
+                    })
+                else:
+                    ro = paths["rwd_only"]
+                    if ro is not None:
+                        auc_r, std_r = _read_auc_cv(ro["results"])
+                        pval = _compute_pvalue(paths["mod"]["pred"], ro["pred"])
+                        row.update({
+                            "auc_ro_mean": float(auc_r),
+                            "auc_ro_std":  float(std_r) if np.isfinite(std_r) else 0.0,
+                            "n_train_ro":  _read_n_train(ro["train"]),
+                            "model_ro":    _read_model_name(ro["model"]),
+                            "pvalue":      pval,
+                            "stars":       p_to_stars(pval) if (pval is not None and np.isfinite(pval)) else ""
+                        })
+                    else:
+                        row.update({
+                            "auc_ro_mean": np.nan,
+                            "auc_ro_std":  np.nan,
+                            "n_train_ro":  np.nan,
+                            "model_ro":    "NA",
+                            "pvalue":      None,
+                            "stars":       ""
+                        })
+
+            rows.append(row)
+
+        rows = [r for r in rows if np.isfinite(r["auc_mod_mean"])]
+        if not rows:
+            continue
+
+        _ = _plot_one(analysis, rows)
+
 
 def add_single_biomarkers(outcome: str, df: pd.DataFrame, to_show: list[str]) -> tuple[pd.DataFrame, list[str]]: 
         """
@@ -138,70 +558,6 @@ def compute_metrics(y_true, y_pred, y_proba):
         'Specificity': specificity
     }
 
-
-def delong_test_comparison(y_true, y_pred1, y_pred2, alpha=0.05):
-    """
-    Compare two ROC curves using DeLong's test for statistical significance.
-    Compute p-value for the difference between two AUCs.
-    
-    Args:
-        y_true: True binary labels
-        y_pred1: Predictions from first model (e.g., biomarker)
-        y_pred2: Predictions from second model (e.g., ML model)
-        alpha: Significance level (default 0.05)
-    
-    Returns:
-        dict: Contains AUCs, p-value, and significance test results
-    """
-    # Compute AUC and variance for each model
-    auc1, var1 = delong_roc_variance(y_true, y_pred1)
-    auc2, var2 = delong_roc_variance(y_true, y_pred2)
-    
-    # Compute covariance between the two AUCs
-    # For this we need to combine predictions and compute joint variance
-    predictions_combined = np.array([y_pred1, y_pred2])
-    order, label_1_count = compute_ground_truth_statistics(y_true)
-    predictions_sorted_transposed = predictions_combined[:, order]
-    aucs, cov_matrix = fastDeLong_no_weights(predictions_sorted_transposed, label_1_count)
-    
-    # Extract covariance
-    cov_12 = cov_matrix[0, 1] if cov_matrix.ndim > 1 else 0
-    
-    # Compute test statistic
-    auc_diff = auc1 - auc2
-    var_diff = var1 + var2 - 2 * cov_12
-    
-    if var_diff <= 0:
-        var_diff = 1e-10  # Avoid division by zero
-    
-    z_score = auc_diff / np.sqrt(var_diff)
-    p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))  # Two-tailed test
-    
-    # Get confidence intervals
-    auc1_ci = auc_roc_ci(y_true, y_pred1, 0.95)[1]
-    auc2_ci = auc_roc_ci(y_true, y_pred2, 0.95)[1]
-    
-    return {
-        'auc1': auc1,
-        'auc2': auc2,
-        'auc1_ci': auc1_ci,
-        'auc2_ci': auc2_ci,
-        'auc_difference': auc_diff,
-        'p_value': p_value,
-        'z_score': z_score,
-        'significant': p_value < alpha,
-        'alpha': alpha
-    }
-
-
-def p_to_stars(p: float) -> str:
-    """Converts a p-value to a significance star string."""
-    if p <= 0.0001: return '****'
-    if p <= 0.001: return '***'
-    if p <= 0.01: return '**'
-    if p <= 0.05: return '*'
-    return 'ns'
-
 def plot_radar_charts(
     biomarker_scores: Dict,
     model_scores: Dict,
@@ -331,3 +687,14 @@ def plot_radar_charts(
         plt.tight_layout()
         plt.subplots_adjust(top=0.85, bottom=0.2)
         plt.show()
+
+def shap_beeswarm(model, X_train: pd.DataFrame, X_test: pd.DataFrame, mapping = {}) -> None:
+    if isinstance(model, LogisticRegression):
+        explainer = shap.Explainer(model.predict_proba, X_train) 
+    else:
+        explainer = shap.Explainer(model, X_train) 
+    shap_values = explainer(X_test)
+    shap_values.feature_names = [mapping.get(name, name) for name in shap_values.feature_names]
+    shap.plots.beeswarm(shap_values[:,:,1], show=False, max_display=20)
+
+plt.show()

@@ -33,11 +33,11 @@ class DataLoader:
                 path = self.data_path[mode]
                 mode_data[mode] = pd.read_csv(path)
                 if mode == Mode.RWD:
-                    with open ('mlef_pipeline/features.json', 'r') as f:
+                    with open ('features.json', 'r') as f:
                         selected_features = json.load(f)['RWD']
                     mode_data[mode] = mode_data[mode][['Subject'] + selected_features]
                 elif mode == Mode.GEN:
-                    with open ('mlef_pipeline/features.json', 'r') as f:
+                    with open ('features.json', 'r') as f:
                         selected_features = json.load(f)['GEN']
                     mode_data[mode] = mode_data[mode][['Subject'] + selected_features]
             else:

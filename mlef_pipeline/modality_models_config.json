@@ -1,0 +1,17 @@
+{
+    "models": {
+        "RWD": "RF",
+        "RWD_DP": "LR",
+        "RWD_FMRAD": "LR",
+        "RWD_PYRAD": "LR",
+        "RWD_DP_FMRAD": "LR",
+        "RWD_DP_PYRAD": "LR"
+    },
+    "rwd_only_models": {
+        "RWD_DP": "LR",
+        "RWD_FMRAD": "LR",
+        "RWD_PYRAD": "LR",
+        "RWD_DP_FMRAD": "LR",
+        "RWD_DP_PYRAD": "LR"
+    }
+}
