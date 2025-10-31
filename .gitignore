@@ -17,7 +17,7 @@
 !features.json
 !graphs_classification.ipynb
 !graphs_i3lung.ipynb
-
+!DeLong_test.py
 # py cache
 __pycache__/
 *.pyc
