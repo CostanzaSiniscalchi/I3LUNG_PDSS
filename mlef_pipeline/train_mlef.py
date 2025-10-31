@@ -20,6 +20,12 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.utils import compute_sample_weight
+import random
+# Make runs deterministic across numpy and python's random where applicable
+np.random.seed(10)
+random.seed(10)
+# Ensure hash-based operations are deterministic
+os.environ['PYTHONHASHSEED'] = '10'
 
 # Add mlef_pipeline to path
 sys.path.insert(0, str(Path(__file__).parent / 'mlef_pipeline'))
@@ -100,16 +106,14 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
     
     Returns:
         y_pred_cv: Cross-validated predictions
-        cv_auc_mean: Mean CV AUC
-        cv_auc_std: Std of CV AUC
+        cv_auc: DeLong CV AUC
+        cv_auc_std: 95% CI of CV AUC
     """
-    from sklearn.metrics import roc_auc_score
     from sklearn.base import clone
     
     stats = Statistics()
     
     y_pred_cv = np.zeros(len(y))
-    cv_aucs = []
     
     for train_idx, val_idx in cv_splits:
         # Clone model for each fold
@@ -128,10 +132,7 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
         
         # Predict on validation fold
         y_pred_cv[val_idx] = fold_model.predict_proba(X_val_fold)[:, 1]
-        
-        # Compute fold AUC
-        fold_auc = roc_auc_score(y_val_fold, y_pred_cv[val_idx])
-        cv_aucs.append(fold_auc)
+    
     
     # Compute overall CV AUC and confidence interval
     cv_auc, ci = stats.auc_roc_ci(y, y_pred_cv, alpha=0.95)
@@ -212,13 +213,27 @@ def train_and_evaluate_modality(
     X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
     # 4. Imputation
     print("4. Imputing missing values...")
+    train_index = X_train.index
+    test_index = X_test.index
+    ext_index = X_ext.index
+
     X_train_imputed, imputer = dl.impute_df(X_train)
     X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer)
     X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
     
+
+    X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
+    X_test_imputed = X_test_imputed.set_index(test_index)
+    X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer) if not X_ext.empty else (X_ext, None)
+    X_ext_imputed = X_ext_imputed.set_index(ext_index)
+    
     # 5. Normalization
     print("5. Normalizing features...")
     X_train_scaled, scaler, to_standard_normalize, to_log_normalize = dl.normalize(X_train_imputed)
+    print(f'to standard normalize: {to_standard_normalize}, to log normalize: {to_log_normalize}')
+    print('test columns', X_test_imputed.columns)
+    print(f'train columns', X_train_imputed.columns)
+
     X_test_scaled, _, _, _ = dl.normalize(
         X_test_imputed, scaler=scaler, 
         to_standard_normalize=to_standard_normalize, 
@@ -232,6 +247,7 @@ def train_and_evaluate_modality(
         )
     else:
         X_ext_scaled = X_ext
+
     
     # 6. Setup cross-validation
     print("6. Setting up cross-validation...")
@@ -641,7 +657,7 @@ def main():
         print(summary_df.to_string(index=False))
         
         # Save summary
-        summary_path = base_path / 'MLEF' / subanalysis.value / 'training_summary.xlsx'
+        summary_path = base_path / 'MLEF' / outcome.value / subanalysis.value / 'training_summary.xlsx'
         summary_df.to_excel(summary_path, index=False)
         print(f"\n✓ Summary saved to {summary_path}")
     
