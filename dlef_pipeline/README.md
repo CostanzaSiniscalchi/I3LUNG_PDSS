@@ -191,3 +191,36 @@ results/
 
 **Configuration:**
 - `mil_params.json` - Complete model configuration and hyperparameters
+
+## Citation
+
+If you use this pipeline in your research, please cite:
+
+```bibtex
+@software{mil_pipeline_2024,
+  title     = {Multi-Instance Learning Pipeline for Medical Imaging},
+  author    = {Sacco, Matteo and Lerma, Ludovica},
+  year      = {2024},
+  url       = {https://github.com/AI-ON-Laboratory/MIL},
+  publisher = {AI-ON Laboratory}
+}
+```
+
+## Support
+
+For assistance:
+
+- **Issues**: [GitHub Issues](https://github.com/AI-ON-Laboratory/MIL/issues)
+- **Documentation**: See `docs/` directory
+- **Examples**: Review `configs-test/` for configuration templates
+- **Contact**: @matte-esse, @LudoLe
+
+## License
+
+[Specify license here - e.g., MIT, Apache 2.0, etc.]
+
+---
+
+**Version**: 1.0.0  
+**Last Updated**: October 2024  
+**Maintainers**: Matteo Sacco, Ludovica Lerma
