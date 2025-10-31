@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy import stats
+from sksurv.metrics import concordance_index_censored
 
 
 
@@ -213,3 +214,56 @@ class Statistics:
 
         return aucs, delongcov
     
+
+    def compute_c_index_and_ci(self, event, time, risk_score, n_boot=1000, alpha=0.05, seed=42):
+        """
+        Bootstrap estimation of C-index and percentile confidence interval.
+        
+        Parameters:
+            event, time, risk_score: arrays
+            n_boot: number of bootstrap replicates
+            alpha: significance level
+            seed: reproducibility
+        
+        Returns:
+            dict with:
+                - c_index: original point estimate
+                - ci: (lower, upper) confidence interval
+                - bootstrap_distribution: list of all bootstrapped estimates
+        """
+        np.random.seed(seed)
+        c_indexes = []
+        event = np.asarray(event, dtype=bool)
+        time = np.asarray(time, dtype=float)
+        risk_score = np.asarray(risk_score, dtype=float)
+        valid_mask = ~np.isnan(risk_score)
+        event = event[valid_mask]
+        time = time[valid_mask]
+        risk_score = risk_score[valid_mask]
+        
+        n = len(time)
+        event = np.asarray(event, dtype=bool)
+        time = np.asarray(time, dtype=float)
+        risk_score = np.asarray(risk_score, dtype=float)
+        valid_mask = ~np.isnan(risk_score)
+        event = event[valid_mask]
+        time = time[valid_mask]
+        risk_score = risk_score[valid_mask]
+        
+        n = len(time)
+        
+        for _ in range(n_boot):
+            idx = np.random.choice(n, size=n, replace=True)
+            c_idx = concordance_index_censored(event[idx], time[idx], risk_score[idx])[0]
+            if not np.isnan(c_idx):
+                c_indexes.append(c_idx)
+                
+        c_index_orig = concordance_index_censored(event, time, risk_score)[0]
+        ci_lower = np.percentile(c_indexes, 100 * (alpha / 2))
+        ci_upper = np.percentile(c_indexes, 100 * (1 - alpha / 2))
+        
+        return {
+            "c_index": c_index_orig,
+            "ci": (ci_lower, ci_upper),
+            "bootstrap_distribution": c_indexes
+        }
