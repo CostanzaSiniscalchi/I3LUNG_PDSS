@@ -16,13 +16,13 @@ from enums import *
 class DataLoader:
 
     data_path = {
-        Mode.RWD: '../data/rwd.csv',
-        Mode.DP: '../data/digital_pathology.csv',
-        Mode.FMRAD: '../data/fmrad.csv',
-        Mode.PYRAD: '../data/pyradiomics.csv',
-        Mode.GEN: '../data/genomics.csv'
+        Mode.RWD: 'data/rwd.csv',
+        Mode.DP: 'data/digital_pathology.csv',
+        Mode.FMRAD: 'data/fmrad.csv',
+        Mode.PYRAD: 'data/pyradiomics.csv',
+        Mode.GEN: 'data/genomics.csv'
     }
-    outcomes_path = '../data/outcomes.csv'
+    outcomes_path = 'data/outcomes.csv'
 
 
     def _get_data(self, modes: list[Mode]):
@@ -46,7 +46,7 @@ class DataLoader:
         return mode_data
     
 
-    def _early_fusion(self, mode_data: dict[Mode, pd.DataFrame], outcome: str) -> pd.DataFrame:
+    def _early_fusion(self, mode_data: dict[Mode, pd.DataFrame], outcome: str, is_survival: bool=False) -> pd.DataFrame:
         merged = pd.DataFrame()
 
         outcomes = pd.read_csv(self.outcomes_path)
@@ -54,19 +54,44 @@ class DataLoader:
         if Mode.FMRAD in mode_data.keys():
             # reduce the number of fm_rad features with lasso
             print("Selecting FM-RAD features with LASSO...")
-            fmrad = pd.merge(
-                left=mode_data[Mode.FMRAD],
-                right=outcomes[['Subject', outcome]],
-                on='Subject',
-                how='inner'
-            ).dropna(subset=[outcome])
+            
+            if not is_survival:
+                fmrad = pd.merge(
+                    left=mode_data[Mode.FMRAD],
+                    right=outcomes[['Subject', outcome]],
+                    on='Subject',
+                    how='inner'
+                ).dropna(subset=[outcome])
 
-            selected_fmrad = ML.lasso_selection(
-                X=fmrad.drop(columns=['Subject', outcome]),
-                y=fmrad[outcome],
-                target_features=100,
-                tolerance=10,
-            )
+                selected_fmrad = ML.lasso_selection(
+                    X=fmrad.drop(columns=['Subject', outcome]),
+                    y=fmrad[outcome],
+                    target_features=100,
+                    tolerance=10,
+                )
+            else:
+                fmrad = pd.merge(
+                    left=mode_data[Mode.FMRAD],
+                    right=outcomes[['Subject', 'DEATH EVENT', 'OS MONTHS']],
+                    on='Subject',
+                    how='inner'
+                ).dropna(subset=['DEATH EVENT', 'OS MONTHS']).rename(columns={
+                    'OS MONTHS': 'TIME',
+                    'DEATH EVENT': 'EVENT'
+                })
+
+                fmrad['EVENT'] = fmrad['EVENT'].astype(bool)
+                fmrad['TIME'] = fmrad['TIME'].astype(float)
+                y_train = fmrad[['EVENT', 'TIME']].to_records(index=False)
+                selected_fmrad = ML.coxnet_selection(
+                    X_train=fmrad.drop(columns=['Subject', 'EVENT', 'TIME']),
+                    y_train=y_train,
+                    cv=5,
+                    folds=None,
+                    target_features=100,
+                    uncertainty=10,
+                )
+                
             mode_data[Mode.FMRAD] = mode_data[Mode.FMRAD][['Subject'] + selected_fmrad]
 
         for data in mode_data.values():
@@ -107,9 +132,9 @@ class DataLoader:
         return df[df['Subject'].isin(subanalysis_features['Subject'])]
     
 
-    def create_dataset(self, modes: list[Mode], outcome: str, subanalysis: str=Subanalysis.C23) -> pd.DataFrame:
+    def create_dataset(self, modes: list[Mode], outcome: str, subanalysis: str=Subanalysis.C23, is_survival: bool=False) -> pd.DataFrame:
         mode_data = self._get_data(modes)
-        dataset = self._early_fusion(mode_data, outcome)
+        dataset = self._early_fusion(mode_data, outcome, is_survival=is_survival)
 
         outcomes = pd.read_csv(self.outcomes_path) #add OS_6 and OS_24
         
@@ -160,6 +185,12 @@ class DataLoader:
         
         return imputed_df, imputer
     
+    def convert_to_float(self, df: pd.DataFrame) -> pd.DataFrame:
+        for column in df.columns:
+            if df[column].dtype == 'object':
+                df[column] = pd.to_numeric(df[column], errors='coerce').astype('float64')
+        
+        return df
 
     def normalize(self, df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normalize: list[str]=None, to_log_normalize: list[str]=None) -> Tuple[pd.DataFrame, StandardScaler, list[str]]:
         features_names = list(df.columns)
@@ -186,30 +217,15 @@ class DataLoader:
         if len(to_standard_normalize) > 0:
             df[to_standard_normalize] = scaler.transform(df[to_standard_normalize])
         df = df.rename(columns={col: f'log_{col}' for col in to_log_normalize})
-        print(f'{len(to_log_normalize)} features log normalized')
-        print(f'{len(to_standard_normalize)} features standardized')
+        # print(f'{len(to_log_normalize)} features log normalized')
+        # print(f'{len(to_standard_normalize)} features standardized')
         
         return df, scaler, to_standard_normalize, to_log_normalize
-    
-
-    def get_outcome(self, outcome: pd.Series, outcome_name: Outcome):
-        match outcome_name:
-            case Outcome.OS_6:
-                outcome = (outcome >= 6).astype(int)
-
-            case Outcome.OS_24:
-                outcome = (outcome >= 24).astype(int)
-            case Outcome.DCR:
-                outcome = outcome
-            case _:
-                raise ValueError(f"Unsupported outcome: {outcome_name}")
-
-        return outcome
     
 
 class SafeGroupKFold(GroupKFold):
     def split(self, X, y, groups):
         for train_idx, val_idx in super().split(X, y, groups):
-            y_val = y[val_idx]
+            y_val = y.iloc[val_idx]
             if len(np.unique(y_val)) > 1:
                 yield train_idx, val_idx

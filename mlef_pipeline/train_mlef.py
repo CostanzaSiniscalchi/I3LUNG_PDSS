@@ -20,6 +20,12 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.utils import compute_sample_weight
+import random
+# Make runs deterministic across numpy and python's random where applicable
+np.random.seed(10)
+random.seed(10)
+# Ensure hash-based operations are deterministic
+os.environ['PYTHONHASHSEED'] = '10'
 
 # Add mlef_pipeline to path
 sys.path.insert(0, str(Path(__file__).parent / 'mlef_pipeline'))
@@ -64,6 +70,56 @@ def get_modality_folder_name(modes: List[Mode]) -> str:
     return '_'.join(sorted([m.value for m in modes]))
 
 
+def load_modality_models_config(config_path: str = 'mlef_pipeline/modality_models_config.json') -> Tuple[dict, dict]:
+    """Load the modality models configuration file.
+    
+    Returns:
+        Tuple of (models_config, rwd_only_models_config)
+    """
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        return config.get('models', {}), config.get('rwd_only_models', {})
+    except FileNotFoundError:
+        print(f"Warning: Config file {config_path} not found. Using default model.")
+        return {}, {}
+
+
+def get_model_for_modality(modality_folder: str, config: dict, default_model: Model = Model.LR) -> Model:
+    """Get the model type for a specific modality from the config."""
+    model_str = config.get(modality_folder, default_model.value)
+    try:
+        return Model[model_str]
+    except KeyError:
+        print(f"Warning: Invalid model '{model_str}' for modality {modality_folder}. Using {default_model.value}.")
+        return default_model
+
+
+def get_rwd_only_model_for_modality(modality_folder: str, rwd_only_config: dict, 
+                                     parent_model: Model, default_model: Model = Model.LR) -> Model:
+    """Get the model type for RWD-only analysis from the config.
+    
+    Args:
+        modality_folder: The modality name (e.g., 'RWD_DP')
+        rwd_only_config: The rwd_only_models configuration dictionary
+        parent_model: The model used for the parent modality (fallback)
+        default_model: The overall default model
+    
+    Returns:
+        Model to use for RWD-only analysis
+    """
+    if modality_folder in rwd_only_config:
+        model_str = rwd_only_config[modality_folder]
+        try:
+            return Model[model_str]
+        except KeyError:
+            print(f"Warning: Invalid RWD-only model '{model_str}' for modality {modality_folder}. Using parent model {parent_model.value}.")
+            return parent_model
+    else:
+        # If not specified in rwd_only_config, use parent modality's model
+        return parent_model
+
+
 def create_output_dirs(base_path: Path, subanalysis: str, modality_folder: str, outcome: str) -> Path:
     """Create output directory structure and return the modality path."""
     output_dir = base_path / 'MLEF' / outcome / subanalysis / modality_folder
@@ -100,16 +156,14 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
     
     Returns:
         y_pred_cv: Cross-validated predictions
-        cv_auc_mean: Mean CV AUC
-        cv_auc_std: Std of CV AUC
+        cv_auc: DeLong CV AUC
+        cv_auc_std: 95% CI of CV AUC
     """
-    from sklearn.metrics import roc_auc_score
     from sklearn.base import clone
     
     stats = Statistics()
     
     y_pred_cv = np.zeros(len(y))
-    cv_aucs = []
     
     for train_idx, val_idx in cv_splits:
         # Clone model for each fold
@@ -128,10 +182,7 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
         
         # Predict on validation fold
         y_pred_cv[val_idx] = fold_model.predict_proba(X_val_fold)[:, 1]
-        
-        # Compute fold AUC
-        fold_auc = roc_auc_score(y_val_fold, y_pred_cv[val_idx])
-        cv_aucs.append(fold_auc)
+    
     
     # Compute overall CV AUC and confidence interval
     cv_auc, ci = stats.auc_roc_ci(y, y_pred_cv, alpha=0.95)
@@ -210,21 +261,18 @@ def train_and_evaluate_modality(
     X_train = X_train.drop(columns=submodel_features, errors='ignore')
     X_test = X_test.drop(columns=submodel_features, errors='ignore')
     X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
-    
     # 4. Imputation
     print("4. Imputing missing values...")
+
     X_train_imputed, imputer = dl.impute_df(X_train)
+    X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer)
     X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
-    X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer) if not X_ext.empty else (X_ext, None)
-    
+
     # 5. Normalization
     print("5. Normalizing features...")
     X_train_scaled, scaler, to_standard_normalize, to_log_normalize = dl.normalize(X_train_imputed)
-    X_test_scaled, _, _, _ = dl.normalize(
-        X_test_imputed, scaler=scaler, 
-        to_standard_normalize=to_standard_normalize, 
-        to_log_normalize=to_log_normalize
-    )
+
+    
     if not X_ext.empty:
         X_ext_scaled, _, _, _ = dl.normalize(
             X_ext_imputed, scaler=scaler,
@@ -233,6 +281,12 @@ def train_and_evaluate_modality(
         )
     else:
         X_ext_scaled = X_ext
+
+    X_test_scaled, _, _, _ = dl.normalize(
+            X_test_imputed, scaler=scaler, 
+            to_standard_normalize=to_standard_normalize, 
+            to_log_normalize=to_log_normalize
+        )
     
     # 6. Setup cross-validation
     print("6. Setting up cross-validation...")
@@ -292,21 +346,11 @@ def train_and_evaluate_modality(
 
     # 11. Save datasets (with outcome)
     print("11. Saving datasets...")
-    # train_set_with_outcome = train_set.copy()
-    # train_set_with_outcome[outcome.value] = y_train
-    # test_set_with_outcome = test_set.copy()
-    # test_set_with_outcome[outcome.value] = y_test
-    # ext_set_with_outcome = ext_set.copy()
-    # if not ext_set.empty:
-    #     ext_set_with_outcome[outcome.value] = y_ext
     train_set_with_outcome = X_train_scaled.copy()
-    train_set_with_outcome['Subject'] = train_set.index
     train_set_with_outcome[outcome.value] = y_train
     test_set_with_outcome = X_test_scaled.copy()
-    test_set_with_outcome['Subject'] = test_set.index
     test_set_with_outcome[outcome.value] = y_test
     ext_set_with_outcome = X_ext_scaled.copy()
-    ext_set_with_outcome['Subject'] = ext_set.index
     if not ext_set.empty:
         ext_set_with_outcome[outcome.value] = y_ext
     
@@ -415,14 +459,10 @@ def train_rwd_matched_model(
     test_set = rwd_dataset[rwd_dataset['Subject'].isin(split['TEST_SET'])].set_index('Subject')
     ext_set = rwd_dataset[rwd_dataset['Subject'].str.startswith('UOC')].set_index('Subject')
 
-    X_train, y_train_raw = train_set.drop(columns=[outcome.value]), train_set[outcome.value]
-    X_test, y_test_raw = test_set.drop(columns=[outcome.value]), test_set[outcome.value]
-    X_ext, y_ext_raw = ext_set.drop(columns=[outcome.value]), ext_set[outcome.value]
+    X_train, y_train = train_set.drop(columns=[outcome.value]), train_set[outcome.value]
+    X_test, y_test = test_set.drop(columns=[outcome.value]), test_set[outcome.value]
+    X_ext, y_ext = ext_set.drop(columns=[outcome.value]), ext_set[outcome.value]
 
-    y_train = dl.get_outcome(y_train_raw, outcome)
-    y_test = dl.get_outcome(y_test_raw, outcome)
-    y_ext = dl.get_outcome(y_ext_raw, outcome) if not ext_set.empty else pd.Series()
-    
     with open('submodel_features.json', 'r') as f:
         submodel_features = json.load(f)
         submodel_features = [f for f in submodel_features if f in X_train.columns]
@@ -555,9 +595,12 @@ def main():
     # Convert string arguments to enums
     outcome = Outcome[args.outcome]
     subanalysis = Subanalysis[args.subanalysis]
-    model_type = Model[args.model]
+    default_model_type = Model[args.model]
     base_path = Path(args.output_dir)
     select_features = not args.no_feature_selection
+    
+    # Load modality models configuration
+    modality_models_config, rwd_only_models_config = load_modality_models_config()
     
     # Determine which modalities to train
     if args.modalities:
@@ -585,12 +628,19 @@ def main():
     print("="*80)
     print(f"Outcome: {outcome.value}")
     print(f"Subanalysis: {subanalysis.value}")
-    print(f"Model type: {model_type.value}")
+    print(f"Default model type: {default_model_type.value}")
     print(f"Feature selection: {'LASSO' if select_features else 'disabled'}")
     print(f"Output directory: {base_path.resolve()}")
     print(f"\nModalities to train ({len(modalities_to_train)}):")
     for modes in modalities_to_train:
-        print(f"  - {get_modality_folder_name(modes)}")
+        modality_folder = get_modality_folder_name(modes)
+        model_for_modality = get_model_for_modality(modality_folder, modality_models_config, default_model_type)
+        if modality_folder != 'RWD':
+            rwd_only_model = get_rwd_only_model_for_modality(modality_folder, rwd_only_models_config, 
+                                                               model_for_modality, default_model_type)
+            print(f"  - {modality_folder} (Model: {model_for_modality.value}, RWD-only: {rwd_only_model.value})")
+        else:
+            print(f"  - {modality_folder} (Model: {model_for_modality.value})")
     print("="*80 + "\n")
     
     # Store all results
@@ -598,7 +648,12 @@ def main():
     
     # Train each modality combination
     for i, modes in enumerate(modalities_to_train, 1):
-        print(f"\n[{i}/{len(modalities_to_train)}] Processing {get_modality_folder_name(modes)}...")
+        modality_folder = get_modality_folder_name(modes)
+        print(f"\n[{i}/{len(modalities_to_train)}] Processing {modality_folder}...")
+        
+        # Get the model type for this modality from config
+        model_type = get_model_for_modality(modality_folder, modality_models_config, default_model_type)
+        print(f"Using model: {model_type.value}")
         
         try:
             # Train main model
@@ -613,12 +668,18 @@ def main():
             all_results.append(result)
             
             # Train RWD-matched model if not RWD-only
-            if get_modality_folder_name(modes) != 'RWD':
+            if modality_folder != 'RWD':
+                # Get the model type for RWD-only analysis
+                rwd_only_model_type = get_rwd_only_model_for_modality(
+                    modality_folder, rwd_only_models_config, model_type, default_model_type
+                )
+                print(f"Training RWD-only with model: {rwd_only_model_type.value}")
+                
                 rwd_result = train_rwd_matched_model(
                     modes=modes,
                     outcome=outcome,
                     subanalysis=subanalysis,
-                    model_type=model_type,
+                    model_type=rwd_only_model_type,
                     base_path=base_path,
                     select_features=select_features
                 )
@@ -626,10 +687,10 @@ def main():
                     all_results.append(rwd_result)
             
         except Exception as e:
-            print(f"\n❌ Error training {get_modality_folder_name(modes)}: {str(e)}")
+            print(f"\n❌ Error training {modality_folder}: {str(e)}")
             import traceback
             traceback.print_exc()
-            continue
+            break
     
     # Print summary
     print("\n" + "="*80)
@@ -642,7 +703,7 @@ def main():
         print(summary_df.to_string(index=False))
         
         # Save summary
-        summary_path = base_path / 'MLEF' / subanalysis.value / 'training_summary.xlsx'
+        summary_path = base_path / 'MLEF' / outcome.value / subanalysis.value / 'training_summary.xlsx'
         summary_df.to_excel(summary_path, index=False)
         print(f"\n✓ Summary saved to {summary_path}")
     
