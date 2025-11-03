@@ -39,20 +39,19 @@ export MPLBACKEND=Agg  # Required for headless plotting
 
 The expected directory structure is as follows:
 ```
-/mnt/labshare/PERSONAL/csiniscalchi/
-├── data/                                    # Data directory
-│   ├── annotations/                         # Annotation files
-│   ├── features_dataset_radfm.parquet      # RadFM feature dataset
-│   └── features_dataset_radpy_fixed.parquet # RadPy feature dataset
-├── bags/                                    # Bag-level features
-│   ├── radfm/                              # RadFM modality bags
-│   └── radpy/                              # RadPy modality bags
-├── results/                                 # Training outputs (auto-generated)
-└── I3LUNG_PDSS/
-    └── dlef_pipeline/                      # This repository
-        ├── configs/                        # Configuration files
-        ├── pipeline/                       # Training scripts
-        └── README.md
+I3LUNG_PDSS/
+└── dlif_pipeline/                          # This repository
+    ├── configs/                            # Configuration files
+    ├── pipeline/                           # Training scripts
+    ├── data/                               # Data directory
+    │   ├── annotations/                    # Annotation files
+    │   ├── features_dataset_radfm.parquet # RadFM feature dataset
+    │   └── features_dataset_radpy_fixed.parquet # RadPy feature dataset
+    ├── bags/                               # Bag-level features
+    │   ├── radfm/                         # RadFM modality bags
+    │   └── radpy/                         # RadPy modality bags
+    ├── results/                            # Training outputs (auto-generated)
+    └── README.md
 ```
 
 ## Configuration
