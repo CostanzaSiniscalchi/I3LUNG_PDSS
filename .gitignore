@@ -19,8 +19,12 @@
 !graphs_i3lung.ipynb
 !DeLong_test.py
 !helper.py
+!helper_survival.py
+!graphs_survival_analysis.ipynb
+!graphs_survival_fairness.ipynb
 # py cache
 __pycache__/
+
 *.pyc
 
 # Ignore specific dlif_pipeline subdirectories

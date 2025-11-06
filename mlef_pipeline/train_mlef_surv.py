@@ -181,7 +181,8 @@ def train_and_evaluate_modality(
     dataset = dl.create_dataset(
         modes=modes,
         outcome='OS MONTHS',
-        subanalysis=subanalysis
+        subanalysis=subanalysis,
+        is_survival=True
     )
     
     # 2. Split data
@@ -666,12 +667,22 @@ def train_rwd_matched_model(
     
     print(f"\n✓ RWD-matched model completed!")
     print(f"  CV C-Index: {cindex_cv['c_index']:.3f} ± {cv_auc_std:.3f}")
+    print(f"  Test C-Index: {cindex_test['c_index']:.3f} ± {test_auc_std:.3f}")
+    if not np.isnan(cindex_ext['c_index']):
+        print(f"  External C-Index: {cindex_ext['c_index']:.3f} ± {ext_auc_std:.3f}")
     
     return {
         'modality': f'{modality_folder}/rwd-only',
         'cv_cindex': cindex_cv['c_index'],
         'cv_cindex_std': cv_auc_std,
-        'n_train': len(y_train)
+        'test_cindex': cindex_test['c_index'],
+        'test_cindex_std': test_auc_std,
+        'ext_cindex': cindex_ext['c_index'],
+        'ext_cindex_std': ext_auc_std,
+        'n_features': len(features),
+        'n_train': len(y_train),
+        'n_test': len(y_test),
+        'n_ext': len(y_ext) if not ext_set.empty else 0
     }
 
 
@@ -775,8 +786,7 @@ def main():
         print(summary_df.to_string(index=False))
         
         # Save summary
-        summary_path = base_path / 'MLEF' / subanalysis.value / 'training_summary.xlsx'
-        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path = base_path / 'MLEF' / 'OS' / subanalysis.value / 'training_summary.xlsx'
         summary_df.to_excel(summary_path, index=False)
         print(f"\n✓ Summary saved to {summary_path}")
     
