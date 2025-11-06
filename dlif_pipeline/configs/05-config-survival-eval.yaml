@@ -1,0 +1,83 @@
+task: survival # classification/survival
+task_settings:
+  outcomes: ["OS_MONTHS"]
+  events: DEATH_EVENT_OC # survival only variable
+  loss: mm_survival_loss # mm_survival_loss  mm_loss
+  save_monitor: c_index  # survival only variable
+
+training_type: evaluation # hyperparameter_tuning  # cross_validation_stratified
+data-type: hypothesis_driven  # hypothesis_driven/data_driven
+source: pyrad  # pyrad/foundation
+imp: noimp  # noimp/imp
+seed: [0]
+
+use_early_stopping: true
+prepare_dataset: false
+
+train_df: [ "data/features_dataset_radpy_fixed.parquet", "data/features_dataset_radfm.parquet" ]
+annotation_file: data/annotations.csv
+
+mods:
+    # RWD
+  - rwd: true
+    radpy: false
+    dp: false
+    genomics: false
+    # RWD_DP
+  - rwd: true
+    radpy: false
+    dp: true
+    genomics: false
+    # RWD_FMRAD
+  - rwd: true
+    radfm: true
+    dp: false
+    genomics: false
+    # RWD_PYRAD
+  - rwd: true
+    radpy: true
+    dp: false
+    genomics: false
+    # RWD_DP_FMRAD
+  - rwd: true
+    radfm: true
+    dp: true
+    genomics: false
+    # RWD_DP_PYRAD
+  - rwd: true
+    radpy: true
+    dp: true
+    genomics: false
+
+folds:
+  cross_validation_stratified:
+    - GHD_2
+    - INT_2
+    - MH_2
+    - SZMC_2
+    - VHIO_2
+    - GHD_3
+    - INT_3
+    - MH_3
+    - SZMC_3
+    - VHIO_3
+  cross_validation:
+    - GHD
+    - INT
+    - MH
+    - SZMC
+    - VHIO
+  standard:
+    - ALL
+
+# default hyperparameters
+hyperparameters_default:
+  batch_size: 64
+  reconstruction_weight: 0.1
+  n_layers: 1
+
+# --- CONFIG FLAGS ---
+# USE_COHORT2_FILTER: [ true ]
+#  FILTER_SQUAMOUS: ["0.0", "1.0"]  # NSCLC_HISTOLOGY_SQUAMOUS == 1
+#  FILTER_CHEMO_IMMUNO: ["0", "1"]
+SKIP_TRAINING: false
