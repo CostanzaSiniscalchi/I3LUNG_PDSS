@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from DeLong_test import auc_roc_ci, delong_roc_variance, fastDeLong_no_weights, compute_ground_truth_statistics
+from .DeLong_test import auc_roc_ci, delong_roc_variance, fastDeLong_no_weights, compute_ground_truth_statistics
 from scipy import stats
 import shap
 from sklearn.linear_model import LogisticRegression
@@ -84,11 +84,18 @@ def plot_auc_results(
     min_bubble: float = 30,
     max_bubble: float = 250,
     show: bool = True,
-    save_dir: Optional[Union[str, Path]] = None
+    save_dir: Optional[Union[str, Path]] = None,
+    dlif_base_path: Optional[Union[str, Path]] = None,         # Base path for DLIF pipeline
+    dlif_eval_type: str = "standard",                          # standard, cross_validation, or evaluation
+    dlif_feature_type: str = "hypothesis_driven",              # hypothesis_driven or data_driven
+    dlif_extraction: str = "pyrad-noimp",                      # feature extraction method
+    dlif_seed: int = 0                                         # seed number
 ):
     """
-    Expected per-analysis layout (e.g. 'C23'):
-        MLEF/ (or DLIF/)
+    Expected per-analysis layout:
+
+    MLEF:
+        MLEF/
          OS_24/ (or DCR/ OR OS_6/)
           C23/
             RWD/
@@ -103,6 +110,26 @@ def plot_auc_results(
             RWD_FMRAD/
             RWD_DP_PYRAD/
             RWD_DP_FMRAD/
+
+    DLIF:
+        dlif_pipeline/results/
+         C23/
+          os_months_24/ (or DCR/)
+           classification/
+            standard/ (or cross_validation/, evaluation/)
+             hypothesis_driven/ (or data_driven/)
+              pyrad-noimp/ (or other extraction methods)
+               rwd/
+                seed_0/
+                 predictions.parquet
+                 predictions_train.parquet
+                 eval_auc_ci.csv
+                 eval_classification_metrics.csv
+               rwd_dp/
+               rwd_radfm/
+               rwd_radpy/
+               rwd_radfm_dp/
+               rwd_radpy_dp/
     """
 
     # ------------------------- utilities -------------------------
@@ -143,6 +170,37 @@ def plot_auc_results(
         if auc_cols:
             return _parse_mean_std(df[auc_cols[0]].iloc[0])
         return (np.nan, np.nan)
+
+    def _read_auc_dlif(auc_csv_path: Path) -> Tuple[float, float]:
+        """Read AUC from DLIF's eval_auc_ci.csv file."""
+        if auc_csv_path is None or not auc_csv_path.exists():
+            return (np.nan, np.nan)
+        try:
+            df = pd.read_csv(auc_csv_path)
+            # Expected columns: auc, ci_lower, ci_upper
+            if 'auc' in df.columns:
+                auc = float(df['auc'].iloc[0])
+                # Calculate std from CI if available
+                if 'ci_lower' in df.columns and 'ci_upper' in df.columns:
+                    ci_lower = float(df['ci_lower'].iloc[0])
+                    ci_upper = float(df['ci_upper'].iloc[0])
+                    # Approximate std from 95% CI: (upper - lower) / (2 * 1.96)
+                    std = (ci_upper - ci_lower) / (2 * 1.96)
+                    return (auc, std)
+                return (auc, 0.0)
+        except Exception:
+            pass
+        return (np.nan, np.nan)
+
+    def _read_n_train_dlif(predictions_train_path: Path) -> int:
+        """Read number of training samples from DLIF's predictions_train.parquet."""
+        if predictions_train_path is None or not predictions_train_path.exists():
+            return int(np.nan)
+        try:
+            df = pd.read_parquet(predictions_train_path)
+            return int(len(df))
+        except Exception:
+            return int(np.nan)
 
     def _read_model_name(model_path: Path) -> str:
         """
@@ -185,13 +243,43 @@ def plot_auc_results(
             return in_order + leftovers
         return filtered
 
+    def _map_dlif_to_mlef_modality(dlif_name: str) -> str:
+        """
+        Map DLIF modality names to MLEF-style names.
+        DLIF: rwd, rwd_dp, rwd_radfm, rwd_radpy, rwd_radfm_dp, rwd_radpy_dp
+        MLEF: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD
+        """
+        mapping = {
+            'rwd': 'RWD',
+            'rwd_dp': 'RWD_DP',
+            'rwd_radfm': 'RWD_FMRAD',
+            'rwd_radpy': 'RWD_PYRAD',
+            'rwd_radfm_dp': 'RWD_DP_FMRAD',
+            'rwd_radpy_dp': 'RWD_DP_PYRAD',
+        }
+        return mapping.get(dlif_name.lower(), dlif_name.upper())
+
+    def _map_mlef_to_dlif_modality(mlef_name: str) -> str:
+        """
+        Map MLEF modality names to DLIF-style names.
+        """
+        mapping = {
+            'RWD': 'rwd',
+            'RWD_DP': 'rwd_dp',
+            'RWD_FMRAD': 'rwd_radfm',
+            'RWD_PYRAD': 'rwd_radpy',
+            'RWD_DP_FMRAD': 'rwd_radfm_dp',
+            'RWD_DP_PYRAD': 'rwd_radpy_dp',
+        }
+        return mapping.get(mlef_name.upper(), mlef_name.lower())
+
     def _collect_modalities(analysis_dir: Path) -> List[str]:
         return _ordered_modalities([p.name for p in analysis_dir.iterdir()
                                     if p.is_dir() and p.name.upper().startswith("RWD")])
 
     def _pair_paths(analysis_dir: Path, modality: str):
         """
-        Robust path resolver:
+        Robust path resolver for MLEF:
         - accepts RWD_ONLY or rwd-only (any case)
         - accepts files named like results(.xlsx/.xls), prediction(_CV)?.xlsx, train_set(.xlsx), etc.
         - accepts files with different case
@@ -254,6 +342,40 @@ def plot_auc_results(
                     "model":   find_first(ro_dir, ["model_", "model"]),
                     "train":   find_first(ro_dir, ["train_set", "Train_set", "train"]),
                 }
+        return paths
+
+    def _pair_paths_dlif(base_dir: Path, modality: str) -> dict:
+        """
+        Path resolver for DLIF architecture.
+        Returns dict with paths to DLIF files.
+        """
+        # DLIF modality directories use lowercase with underscores
+        dlif_modality = _map_mlef_to_dlif_modality(modality)
+
+        # Build path: base_dir / modality / seed_X /
+        mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
+
+        if not mod_dir.exists():
+            return {
+                "mod": {
+                    "results": None,
+                    "pred": None,
+                    "model": None,
+                    "train": None,
+                },
+                "rwd_only": None
+            }
+
+        paths = {
+            "mod": {
+                "results": mod_dir / "eval_auc_ci.csv" if (mod_dir / "eval_auc_ci.csv").exists() else None,
+                "pred": mod_dir / "predictions.parquet" if (mod_dir / "predictions.parquet").exists() else None,
+                "model": None,  # DLIF stores models differently
+                "train": mod_dir / "predictions_train.parquet" if (mod_dir / "predictions_train.parquet").exists() else None,
+            },
+            "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
+        }
+
         return paths
 
 
@@ -357,22 +479,66 @@ def plot_auc_results(
     if isinstance(analyses, str):
         analyses = [analyses]
 
+    # Convert outcome to DLIF format if needed
+    def _outcome_to_dlif(outcome_str: str) -> str:
+        """Convert MLEF outcome names to DLIF format."""
+        mapping = {
+            'OS_24': 'os_months_24',
+            'OS_6': 'os_months_6',
+            'DCR': 'DCR'
+        }
+        return mapping.get(outcome_str, outcome_str)
+
     for analysis in analyses:
-        analysis_dir = architecture / outcome /analysis
+        # Build the correct path based on architecture
+        if architecture == "MLEF":
+            # MLEF: MLEF/outcome/analysis/
+            base_path = Path("MLEF") / outcome / analysis
+            analysis_dir = base_path
+        else:  # DLIF
+            # DLIF: dlif_pipeline/results/analysis/outcome/classification/eval_type/feature_type/extraction/
+            if dlif_base_path is None:
+                dlif_base_path = Path("dlif_pipeline/results")
+            else:
+                dlif_base_path = Path(dlif_base_path)
+
+            dlif_outcome = _outcome_to_dlif(outcome)
+            analysis_dir = (dlif_base_path / analysis / dlif_outcome / "classification" /
+                          dlif_eval_type / dlif_feature_type / dlif_extraction)
+
         if not analysis_dir.exists():
             continue
 
-        modalities = _collect_modalities(analysis_dir)
+        # Collect modalities
+        if architecture == "DLIF":
+            # For DLIF, list directories and map them to MLEF names
+            if not analysis_dir.exists():
+                continue
+            dlif_modalities = [p.name for p in analysis_dir.iterdir()
+                             if p.is_dir() and p.name.lower().startswith("rwd")]
+            modalities = [_map_dlif_to_mlef_modality(m) for m in dlif_modalities]
+            modalities = _ordered_modalities(modalities)
+        else:
+            modalities = _collect_modalities(analysis_dir)
+
         if not modalities:
             continue
 
         rows: List[dict] = []
         for mod in modalities:
-            paths = _pair_paths(analysis_dir, mod)
-            # modality side
-            auc_m, std_m = _read_auc_cv(paths["mod"]["results"])
-            model_m = _read_model_name(paths["mod"]["model"])
-            ntrain_m = _read_n_train(paths["mod"]["train"])
+            # Get paths based on architecture
+            if architecture == "DLIF":
+                paths = _pair_paths_dlif(analysis_dir, mod)
+                # Read DLIF-specific files
+                auc_m, std_m = _read_auc_dlif(paths["mod"]["results"])
+                model_m = "MIL"  # DLIF uses MIL models
+                ntrain_m = _read_n_train_dlif(paths["mod"]["train"])
+            else:
+                paths = _pair_paths(analysis_dir, mod)
+                # modality side
+                auc_m, std_m = _read_auc_cv(paths["mod"]["results"])
+                model_m = _read_model_name(paths["mod"]["model"])
+                ntrain_m = _read_n_train(paths["mod"]["train"])
 
             row = {
                 "modality": mod,
