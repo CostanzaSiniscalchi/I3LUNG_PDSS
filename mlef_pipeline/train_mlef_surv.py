@@ -269,6 +269,21 @@ def train_and_evaluate_modality(
     y_train = y_train[['EVENT', 'TIME']]
     
     # 9. Feature selection (coxnet)
+    fm_rad_features = [col for col in X_train_scaled.columns if col.startswith('pred_') or col.startswith('log_pred_')]
+    if len(fm_rad_features) > 0:
+        selected_fm_rad_features = ml.coxnet_selection(
+            X_train=X_train_scaled[fm_rad_features],
+            y_train=y_train.to_records(index=False),
+            cv=cv_getter,
+            folds=train_folds,
+            target_features=100,
+            uncertainty=10,
+        )
+        X_train_scaled = X_train_scaled.drop(columns=[col for col in fm_rad_features if col not in selected_fm_rad_features])
+        X_test_scaled = X_test_scaled.drop(columns=[col for col in fm_rad_features if col not in selected_fm_rad_features])
+        X_ext_scaled = X_ext_scaled.drop(columns=[col for col in fm_rad_features if col not in selected_fm_rad_features]) if not X_ext_scaled.empty else X_ext_scaled
+        print(f"  ✓ Selected {len(selected_fm_rad_features)} radiomics features")
+    
     if select_features:
         print("8. Performing feature selection...")
         features = ml.coxnet_selection(

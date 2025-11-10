@@ -176,6 +176,16 @@ class ML:
             index=y.index
         )
 
+        fm_rad_features = [col for col in X.columns if col.startswith('pred_')]
+        if len(fm_rad_features) > 0:
+            selected_fm_rad_features = self.lasso_selection(
+                X[fm_rad_features], 
+                y,
+                target_features=100,
+                tolerance=10
+            )
+            X = X.drop(columns=[col for col in fm_rad_features if col not in selected_fm_rad_features])
+            
         if select_features:
             selected_features = self.lasso_selection(X, y, target_features=15, tolerance=10)
             X = X[selected_features]
