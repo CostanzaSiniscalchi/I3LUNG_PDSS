@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import json
+import os
 
 def create_annotations(
     outcomes_path='Mil2/data/data/outcomes.csv',
@@ -36,6 +37,7 @@ def create_annotations(
     
     train_subjects = set(split['TRAIN_SET'])
     test_subjects = set(split['TEST_SET'])
+    ext_val_subjects = set(split['EXT_VAL_SET'])
     
     # Filter only RWD subjects
     rwd_subjects = set(rwd['Subject'])
@@ -60,7 +62,7 @@ def create_annotations(
             return 'train'
         elif subject in test_subjects:
             return 'test'
-        elif subject.startswith('UOC'):
+        elif subject in ext_val_subjects:
             return 'ext_val'
         return None
     
@@ -137,10 +139,19 @@ def create_annotations(
     # Add early stopping
     np.random.seed(seed)
     train_df = ann[ann['dataset'] == 'train']
-    total_n = int(len(train_df) * val_split)
-    early_stop_indices = train_df.sample(n=total_n, random_state=seed).index
-    print(f"Selected {total_n} train subjects for early stopping")
-    
+
+    # Try to load from split.json, otherwise generate randomly
+    split_file = 'Mil2/data/data/split.json'
+    if os.path.exists(split_file):
+        with open(split_file, 'r') as f:
+            split_data = json.load(f)
+        early_stop_indices = split_data.get('EARLY_STOP_SET', [])
+        print(f"Loaded {len(early_stop_indices)} early stopping subjects from {split_file}")
+    else:
+        total_n = int(len(train_df) * val_split)
+        early_stop_indices = train_df.sample(n=total_n, random_state=seed).index.tolist()
+        print(f"Generated {total_n} early stopping subjects randomly")
+
     for outcome in outcome_cols:
         fold_col = f'fold_{outcome}'
         early_stop_col = f'early_stopping_{outcome}'
@@ -152,11 +163,11 @@ def create_annotations(
         ann[early_stop_col] = "no"
         
         for idx in early_stop_indices:
-            if pd.notna(ann.at[idx, fold_col]):
+            if idx in ann.index and pd.notna(ann.at[idx, fold_col]):
                 ann.at[idx, early_stop_col] = "yes"
         
         print(f"Added early stopping for {outcome}")
-    
+        
     # Reorder columns to match expected format
     base_cols = ['slide', 'FOLD', 'dataset'] + outcome_cols + ['patient']
     

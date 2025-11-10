@@ -18,7 +18,7 @@ def create_feature_dataset_from_processed(
     
     dfs = []
     
-    for split in ['train', 'test', 'uoc']:
+    for split in ['train', 'test', 'ext_val']:
         # Load processed data
         rwd = pd.read_csv(f'{base_path}/rwd_{split}_processed.csv')
         rad = pd.read_csv(f'{base_path}/{rad_type}_{split}_processed.csv')

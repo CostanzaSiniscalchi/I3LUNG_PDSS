@@ -63,57 +63,57 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
 # Load RWD
 rwd_train = pd.read_csv('Mil2/data/data/split/rwd_train.csv', index_col='Subject')
 rwd_test = pd.read_csv('Mil2/data/data/split/rwd_test.csv', index_col='Subject')
-rwd_uoc = pd.read_csv('Mil2/data/data/split/rwd_uoc.csv', index_col='Subject')
+rwd_ext_val = pd.read_csv('Mil2/data/data/split/rwd_ext_val.csv', index_col='Subject')
 
 # Impute and normalize RWD
 print("Processing RWD...")
 rwd_train_imputed, rwd_imputer = impute_df(rwd_train)
 rwd_test_imputed, _ = impute_df(rwd_test, imputer=rwd_imputer)
-rwd_uoc_imputed, _ = impute_df(rwd_uoc, imputer=rwd_imputer)
+rwd_ext_val_imputed, _ = impute_df(rwd_ext_val, imputer=rwd_imputer)
 
 rwd_train_proc, rwd_scaler, rwd_to_std, rwd_to_log = normalize(rwd_train_imputed)
 rwd_test_proc, _, _, _ = normalize(rwd_test_imputed, scaler=rwd_scaler, to_standard_normalize=rwd_to_std, to_log_normalize=rwd_to_log)
-rwd_uoc_proc, _, _, _ = normalize(rwd_uoc_imputed, scaler=rwd_scaler, to_standard_normalize=rwd_to_std, to_log_normalize=rwd_to_log)
+rwd_ext_val_proc, _, _, _ = normalize(rwd_ext_val_imputed, scaler=rwd_scaler, to_standard_normalize=rwd_to_std, to_log_normalize=rwd_to_log)
 
 # Save RWD
 rwd_train_proc.to_csv('Mil2/data/data/split/rwd_train_processed.csv')
 rwd_test_proc.to_csv('Mil2/data/data/split/rwd_test_processed.csv')
-rwd_uoc_proc.to_csv('Mil2/data/data/split/rwd_uoc_processed.csv')
+rwd_ext_val_proc.to_csv('Mil2/data/data/split/rwd_ext_val_processed.csv')
 
 # Load Genomics
 gen_train = pd.read_csv('Mil2/data/data/split/genomics_train.csv', index_col='Subject')
 gen_test = pd.read_csv('Mil2/data/data/split/genomics_test.csv', index_col='Subject')
-gen_uoc = pd.read_csv('Mil2/data/data/split/genomics_uoc.csv', index_col='Subject')
+gen_ext_val = pd.read_csv('Mil2/data/data/split/genomics_ext_val.csv', index_col='Subject')
 
 # Impute and normalize Genomics
 print("Processing Genomics...")
 gen_train_imputed, gen_imputer = impute_df(gen_train)
 gen_test_imputed, _ = impute_df(gen_test, imputer=gen_imputer)
-gen_uoc_imputed, _ = impute_df(gen_uoc, imputer=gen_imputer)
+gen_ext_val_imputed, _ = impute_df(gen_ext_val, imputer=gen_imputer)
 
 gen_train_proc, gen_scaler, gen_to_std, gen_to_log = normalize(gen_train_imputed)
 gen_test_proc, _, _, _ = normalize(gen_test_imputed, scaler=gen_scaler, to_standard_normalize=gen_to_std, to_log_normalize=gen_to_log)
-gen_uoc_proc, _, _, _ = normalize(gen_uoc_imputed, scaler=gen_scaler, to_standard_normalize=gen_to_std, to_log_normalize=gen_to_log)
+gen_ext_val_proc, _, _, _ = normalize(gen_ext_val_imputed, scaler=gen_scaler, to_standard_normalize=gen_to_std, to_log_normalize=gen_to_log)
 
 # Save Genomics
 gen_train_proc.to_csv('Mil2/data/data/split/genomics_train_processed.csv')
 gen_test_proc.to_csv('Mil2/data/data/split/genomics_test_processed.csv')
-gen_uoc_proc.to_csv('Mil2/data/data/split/genomics_uoc_processed.csv')
+gen_ext_val_proc.to_csv('Mil2/data/data/split/genomics_ext_val_processed.csv')
 
 # Standardize other modalities
 for modality in ['digital_pathology', 'pyradiomics', 'fmrad']:
     print(f"Processing {modality}...")
     train = pd.read_csv(f'Mil2/data/data/split/{modality}_train.csv', index_col='Subject')
     test = pd.read_csv(f'Mil2/data/data/split/{modality}_test.csv', index_col='Subject')
-    uoc = pd.read_csv(f'Mil2/data/data/split/{modality}_uoc.csv', index_col='Subject')
+    ext_val = pd.read_csv(f'Mil2/data/data/split/{modality}_ext_val.csv', index_col='Subject')
     
     scaler = StandardScaler()
     train_proc = pd.DataFrame(scaler.fit_transform(train), columns=train.columns, index=train.index)
     test_proc = pd.DataFrame(scaler.transform(test), columns=test.columns, index=test.index)
-    uoc_proc = pd.DataFrame(scaler.transform(uoc), columns=uoc.columns, index=uoc.index)
+    ext_val_proc = pd.DataFrame(scaler.transform(ext_val), columns=ext_val.columns, index=ext_val.index)
     
     train_proc.to_csv(f'Mil2/data/data/split/{modality}_train_processed.csv')
     test_proc.to_csv(f'Mil2/data/data/split/{modality}_test_processed.csv')
-    uoc_proc.to_csv(f'Mil2/data/data/split/{modality}_uoc_processed.csv')
+    ext_val_proc.to_csv(f'Mil2/data/data/split/{modality}_ext_val_processed.csv')
 
 print("Done!")
