@@ -21,6 +21,13 @@ import numpy as np
 import pandas as pd
 from sklearn.utils import compute_sample_weight
 import random
+from sklearn.model_selection import GroupKFold
+
+# Suppress specific warnings
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
+warnings.filterwarnings('ignore', category=FutureWarning, module='sklearn')
+warnings.filterwarnings('ignore', category=UserWarning, module='skopt')
+
 # Make runs deterministic across numpy and python's random where applicable
 np.random.seed(10)
 random.seed(10)
@@ -70,7 +77,7 @@ def get_modality_folder_name(modes: List[Mode]) -> str:
     return '_'.join(sorted([m.value for m in modes]))
 
 
-def load_modality_models_config(config_path: str = 'mlef_pipeline/modality_models_config.json') -> Tuple[dict, dict]:
+def load_modality_models_config(config_path: str = 'modality_models_config.json') -> Tuple[dict, dict]:
     """Load the modality models configuration file.
     
     Returns:
@@ -150,12 +157,12 @@ def save_datasets(output_dir: Path, train_set: pd.DataFrame, test_set: pd.DataFr
 
 
 def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits, 
-                           train_folds: pd.Series) -> Tuple[np.ndarray, float, float]:
+                           train_folds: pd.Series) -> Tuple[pd.Series, float, float]:
     """
     Compute cross-validation predictions using LOCO-CV.
     
     Returns:
-        y_pred_cv: Cross-validated predictions
+        y_pred_cv: Cross-validated predictions (pd.Series with original index)
         cv_auc: DeLong CV AUC
         cv_auc_std: 95% CI of CV AUC
     """
@@ -163,7 +170,8 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
     
     stats = Statistics()
     
-    y_pred_cv = np.zeros(len(y))
+    # Initialize Series with original index to preserve Subject IDs
+    y_pred_cv = pd.Series(np.zeros(len(y)), index=y.index, name='y_pred')
     
     for train_idx, val_idx in cv_splits:
         # Clone model for each fold
@@ -180,12 +188,12 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
         # Fit model on this fold
         fold_model.fit(X_train_fold, y_train_fold, sample_weight=sample_weight)
         
-        # Predict on validation fold
-        y_pred_cv[val_idx] = fold_model.predict_proba(X_val_fold)[:, 1]
+        # Predict on validation fold - use .iloc to set by position
+        y_pred_cv.iloc[val_idx] = fold_model.predict_proba(X_val_fold)[:, 1]
     
     
-    # Compute overall CV AUC and confidence interval
-    cv_auc, ci = stats.auc_roc_ci(y, y_pred_cv, alpha=0.95)
+    # Compute overall CV AUC and confidence interval (convert to numpy for stats)
+    cv_auc, ci = stats.auc_roc_ci(y.values, y_pred_cv.values, alpha=0.95)
     cv_auc_std = (ci[1] - ci[0]) / 2
     
     return y_pred_cv, cv_auc, cv_auc_std
@@ -291,7 +299,7 @@ def train_and_evaluate_modality(
     # 6. Setup cross-validation
     print("6. Setting up cross-validation...")
     train_folds = dl.get_loco_folds(pd.Series(train_set.index))
-    cv = SafeGroupKFold(n_splits=len(train_folds.unique()))
+    cv = GroupKFold(n_splits=len(train_folds.unique()))
     
     def get_cv_splits():
         return list(cv.split(X_train_scaled, y_train, groups=train_folds))
@@ -360,9 +368,9 @@ def train_and_evaluate_modality(
     # 12. Save CV predictions
     print("12. Saving CV predictions...")
     cv_predictions = pd.DataFrame({
-        'Subject': X_train_final.index,
-        'y_pred': y_pred_cv,
-        'y_true': y_train
+        'Subject': y_pred_cv.index,  # Now y_pred_cv is a Series with the correct index
+        'y_pred': y_pred_cv.values,
+        'y_true': y_train.values
     })
     cv_predictions.to_excel(output_dir / 'prediction_CV.xlsx', index=False)
 

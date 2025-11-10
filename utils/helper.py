@@ -74,7 +74,7 @@ def p_to_stars(p: float) -> str:
     return 'ns'
 
 def plot_auc_results(
-    architecture: Literal["MLEF", "DLIF"],
+    architecture: Union[Literal["MLEF", "DLIF"], Path],
     outcome: str,                                              # e.g. OS_24, OS_6, DCR
     analyses: Union[str, Iterable[str]],                       # e.g. "C23" or ["C2", "ADENO", ...]
     *,
@@ -281,7 +281,7 @@ def plot_auc_results(
         """
         Robust path resolver for MLEF:
         - accepts RWD_ONLY or rwd-only (any case)
-        - accepts files named like results(.xlsx/.xls), prediction(_CV)?.xlsx, train_set(.xlsx), etc.
+        - accepts files named like results(.xlsx/.xls), prediction(_CV).xlsx, train_set(.xlsx), etc.
         - accepts files with different case
         """
         def find_first(dir_: Path, stems: List[str]) -> Optional[Path]:
@@ -330,7 +330,7 @@ def plot_auc_results(
             "rwd_only": None
         }
 
-        if architecture == "MLEF":
+        if arch_name == "MLEF":
             ro_dir = find_subdir_any(
                 mod_dir,
                 ["RWD_ONLY", "rwd-only", "Rwd_only", "RWD-ONLY"]
@@ -427,7 +427,7 @@ def plot_auc_results(
 
         multimodal_better = None
 
-        if architecture == "MLEF":
+        if arch_name == "MLEF":
             auc_ro_mean = np.array([r["auc_ro_mean"] for r in rows], dtype=float)
             auc_ro_std  = np.array([r["auc_ro_std"]  for r in rows], dtype=float)
             plt.plot(X, auc_ro_mean, linestyle="-", marker="o", label="CV AUC - RWD-only matched", color="#a00000")
@@ -452,7 +452,7 @@ def plot_auc_results(
 
 
         # --- RED annotations (keep values but REMOVE stars here) ---
-        if architecture == "MLEF":
+        if arch_name == "MLEF":
             for i, rrow in enumerate(rows):
                 rv, rs, rname = rrow["auc_ro_mean"], rrow["auc_ro_std"], rrow["model_ro"]
                 base_y = 0.02 if multimodal_better[i] else 0.06
@@ -460,7 +460,7 @@ def plot_auc_results(
                     plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
                             fontsize=9, ha="center", color="#a00000")
 
-        ttl = title_prefix or f"CV AUC - {architecture}"
+        ttl = title_prefix or f"CV AUC - {arch_name}"
         plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
         plt.ylabel("AUC")
         plt.ylim(0, 1)
@@ -478,6 +478,14 @@ def plot_auc_results(
     # ------------------------- main logic -------------------------
     if isinstance(analyses, str):
         analyses = [analyses]
+    
+    # Normalize architecture to both string name and Path
+    if isinstance(architecture, Path):
+        arch_path = architecture
+        arch_name = architecture.name  # Get the last part of the path (e.g., "MLEF" or "DLIF")
+    else:
+        arch_path = Path(architecture)
+        arch_name = architecture
 
     # Convert outcome to DLIF format if needed
     def _outcome_to_dlif(outcome_str: str) -> str:
@@ -549,7 +557,7 @@ def plot_auc_results(
             }
 
             # paired RWD_ONLY (MLEF only) with RWD red==blue behavior
-            if architecture == "MLEF":
+            if arch_name == "MLEF":
                 if mod == "RWD":
                     # enforce coincidence for RWD: red == blue; no p-value
                     row.update({
