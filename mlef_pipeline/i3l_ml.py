@@ -15,6 +15,7 @@ from sksurv.metrics import concordance_index_censored
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
 warnings.filterwarnings('ignore', category=FutureWarning, module='sklearn')
+warnings.filterwarnings('ignore', category=UserWarning, module='skopt')
 
 
 class ML:
@@ -163,7 +164,7 @@ class ML:
         Parameters:
         X (pd.DataFrame): Feature set.
         y (pd.Series): Target variable.
-        model (str): Model type ('LR', 'RF', 'XGB').
+        model (str): Model type ('LR', 'RF').
         cv: Cross-validation strategy.
         select_features (bool): Whether to perform feature selection using Lasso.
         Returns:

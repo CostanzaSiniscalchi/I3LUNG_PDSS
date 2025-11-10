@@ -62,7 +62,7 @@ class DataLoader:
                     on='Subject',
                     how='inner'
                 ).dropna(subset=[outcome])
-
+                print(f'columns before selection: {fmrad.columns}')
                 selected_fmrad = ML.lasso_selection(
                     X=fmrad.drop(columns=['Subject', outcome]),
                     y=fmrad[outcome],
@@ -184,13 +184,6 @@ class DataLoader:
             imputed_df[col] = imputed_df[col].round(0).astype(int)
         
         return imputed_df, imputer
-    
-    def convert_to_float(self, df: pd.DataFrame) -> pd.DataFrame:
-        for column in df.columns:
-            if df[column].dtype == 'object':
-                df[column] = pd.to_numeric(df[column], errors='coerce').astype('float64')
-        
-        return df
 
     def normalize(self, df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normalize: list[str]=None, to_log_normalize: list[str]=None) -> Tuple[pd.DataFrame, StandardScaler, list[str]]:
         features_names = list(df.columns)
