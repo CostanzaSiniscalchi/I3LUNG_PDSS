@@ -1,0 +1,9 @@
+{
+    "default": {
+        "tile_px": 256,
+        "tile_um": 256,
+        "stride_div": 1,
+        "tiles_per_slide": 0,
+        "format": "tfrecords"
+    }
+}
