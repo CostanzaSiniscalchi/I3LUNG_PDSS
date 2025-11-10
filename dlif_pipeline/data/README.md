@@ -9,6 +9,7 @@ Place the following files in the `/data` directory before running the pipeline:
 - `digital_pathology.csv`
 - `fmrad.csv`
 - `split.json`
+- `features.json`
 - `Mil2/data/data/no_genomics_train.json`
 - `Mil2/data/data/no_genomics_test.json`
 - `Mil2/data/data/no_genomics_ext_val.json`
