@@ -23,11 +23,11 @@
 !helper_survival_fairness.py
 !graphs_survival_analysis.ipynb
 !graphs_survival_fairness.ipynb
+!I3LUNG_PDSS/dlif_pipeline/data/**/*
 # py cache
 __pycache__/
 
 *.pyc
 
 # Ignore specific dlif_pipeline subdirectories
-dlif_pipeline/data/
 dlif_pipeline/bags/

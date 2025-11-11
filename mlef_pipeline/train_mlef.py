@@ -22,6 +22,7 @@ import pandas as pd
 from sklearn.utils import compute_sample_weight
 import random
 from sklearn.model_selection import GroupKFold
+from sklearn.metrics import f1_score, confusion_matrix
 
 # Suppress specific warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
@@ -156,22 +157,71 @@ def save_datasets(output_dir: Path, train_set: pd.DataFrame, test_set: pd.DataFr
     print(f"  ✓ Saved datasets to {output_dir}")
 
 
+def compute_metrics_with_ci(y_true: np.ndarray, y_pred_proba: np.ndarray, 
+                           threshold: float = 0.5) -> dict:
+    """
+    Compute classification metrics with confidence intervals.
+    
+    Args:
+        y_true: True labels
+        y_pred_proba: Predicted probabilities
+        threshold: Classification threshold
+    
+    Returns:
+        Dictionary with metrics and their std (from CI)
+    """
+    stats = Statistics()
+    
+    # Calculate AUC with CI
+    auc, ci = stats.auc_roc_ci(y_true, y_pred_proba, alpha=0.95)
+    auc_std = (ci[1] - ci[0]) / 2
+    
+    # Convert probabilities to binary predictions
+    y_pred_binary = (y_pred_proba >= threshold).astype(int)
+    
+    # Calculate F1 macro
+    f1_macro = f1_score(y_true, y_pred_binary, average='macro', zero_division=0)
+    
+    # Calculate confusion matrix for sensitivity and specificity
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred_binary).ravel()
+    
+    # Sensitivity (recall, TPR)
+    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    
+    # Specificity (TNR)
+    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    
+    return {
+        'auc': auc,
+        'auc_std': auc_std,
+        'f1_macro': f1_macro,
+        'sensitivity': sensitivity,
+        'specificity': specificity
+    }
+
+
 def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits, 
-                           train_folds: pd.Series) -> Tuple[pd.Series, float, float]:
+                           train_folds: pd.Series) -> Tuple[pd.Series, dict]:
     """
     Compute cross-validation predictions using LOCO-CV.
     
     Returns:
         y_pred_cv: Cross-validated predictions (pd.Series with original index)
-        cv_auc: DeLong CV AUC
-        cv_auc_std: 95% CI of CV AUC
+        cv_metrics: Dictionary with CV metrics (auc, auc_std, f1_macro, f1_macro_std, 
+                    sensitivity, sensitivity_std, specificity, specificity_std)
     """
     from sklearn.base import clone
     
-    stats = Statistics()
-    
     # Initialize Series with original index to preserve Subject IDs
     y_pred_cv = pd.Series(np.zeros(len(y)), index=y.index, name='y_pred')
+    
+    # Store per-fold metrics for weighted std calculation
+    fold_metrics = {
+        'f1_macro': [],
+        'sensitivity': [],
+        'specificity': [],
+        'sizes': []
+    }
     
     for train_idx, val_idx in cv_splits:
         # Clone model for each fold
@@ -189,14 +239,67 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
         fold_model.fit(X_train_fold, y_train_fold, sample_weight=sample_weight)
         
         # Predict on validation fold - use .iloc to set by position
-        y_pred_cv.iloc[val_idx] = fold_model.predict_proba(X_val_fold)[:, 1]
+        y_pred_proba_fold = fold_model.predict_proba(X_val_fold)[:, 1]
+        y_pred_cv.iloc[val_idx] = y_pred_proba_fold
+        
+        # Calculate per-fold metrics
+        y_pred_binary = (y_pred_proba_fold >= 0.5).astype(int)
+        
+        # F1 macro for this fold
+        f1_fold = f1_score(y_val_fold, y_pred_binary, average='macro', zero_division=0)
+        fold_metrics['f1_macro'].append(f1_fold)
+        
+        # Sensitivity and specificity for this fold
+        tn, fp, fn, tp = confusion_matrix(y_val_fold, y_pred_binary).ravel()
+        sensitivity_fold = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        specificity_fold = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+        
+        fold_metrics['sensitivity'].append(sensitivity_fold)
+        fold_metrics['specificity'].append(specificity_fold)
+        fold_metrics['sizes'].append(len(val_idx))
     
+    # Compute overall CV metrics (global across all predictions)
+    stats = Statistics()
+    auc, ci = stats.auc_roc_ci(y.values, y_pred_cv.values, alpha=0.95)
+    auc_std = (ci[1] - ci[0]) / 2
     
-    # Compute overall CV AUC and confidence interval (convert to numpy for stats)
-    cv_auc, ci = stats.auc_roc_ci(y.values, y_pred_cv.values, alpha=0.95)
-    cv_auc_std = (ci[1] - ci[0]) / 2
+    y_pred_binary_all = (y_pred_cv.values >= 0.5).astype(int)
+    f1_macro_overall = f1_score(y.values, y_pred_binary_all, average='macro', zero_division=0)
     
-    return y_pred_cv, cv_auc, cv_auc_std
+    tn, fp, fn, tp = confusion_matrix(y.values, y_pred_binary_all).ravel()
+    sensitivity_overall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    specificity_overall = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    
+    # Calculate weighted standard deviations for f1_macro, sensitivity, specificity
+    fold_sizes = np.array(fold_metrics['sizes'])
+    
+    def weighted_std(values, weights, mean_val):
+        """Calculate weighted standard deviation."""
+        values = np.array(values)
+        valid = ~np.isnan(values)
+        values_valid = values[valid]
+        weights_valid = weights[valid]
+        
+        if len(values_valid) == 0:
+            return 0.0
+        
+        var = np.average((values_valid - mean_val)**2, weights=weights_valid)
+        return np.sqrt(var)
+    
+    f1_macro_std = weighted_std(fold_metrics['f1_macro'], fold_sizes, f1_macro_overall)
+    sensitivity_std = weighted_std(fold_metrics['sensitivity'], fold_sizes, sensitivity_overall)
+    specificity_std = weighted_std(fold_metrics['specificity'], fold_sizes, specificity_overall)
+    
+    return y_pred_cv, {
+        'auc': auc,
+        'auc_std': auc_std,
+        'f1_macro': f1_macro_overall,
+        'f1_macro_std': f1_macro_std,
+        'sensitivity': sensitivity_overall,
+        'sensitivity_std': sensitivity_std,
+        'specificity': specificity_overall,
+        'specificity_std': specificity_std
+    }
 
 
 def train_and_evaluate_modality(
@@ -324,7 +427,7 @@ def train_and_evaluate_modality(
     
     # 8. Compute cross-validation predictions
     print("8. Computing CV predictions...")
-    y_pred_cv, cv_auc, cv_auc_std = compute_cv_predictions(
+    y_proba_cv, cv_metrics = compute_cv_predictions(
         model, X_train_final, y_train, get_cv_splits(), train_folds
     )
     
@@ -335,16 +438,20 @@ def train_and_evaluate_modality(
     # model.fit(X_train_final, y_train, sample_weight=sample_weight)
     
     y_pred_test = model.predict_proba(X_test_final)[:, 1]
-    test_auc, test_ci = stats.auc_roc_ci(y_test, y_pred_test, alpha=0.95)
-    test_auc_std = (test_ci[1] - test_ci[0]) / 2
+    test_metrics = compute_metrics_with_ci(y_test.values, y_pred_test)
     
     if not X_ext_final.empty:
         y_pred_ext = model.predict_proba(X_ext_final)[:, 1]
-        ext_auc, ext_ci = stats.auc_roc_ci(y_ext, y_pred_ext, alpha=0.95)
-        ext_auc_std = (ext_ci[1] - ext_ci[0]) / 2
+        ext_metrics = compute_metrics_with_ci(y_ext.values, y_pred_ext)
     else:
         y_pred_ext = np.array([])
-        ext_auc, ext_auc_std = np.nan, np.nan
+        ext_metrics = {
+            'auc': np.nan,
+            'auc_std': np.nan,
+            'f1_macro': np.nan,
+            'sensitivity': np.nan,
+            'specificity': np.nan
+        }
     
     # 10. Save model
     print("10. Saving model...")
@@ -365,42 +472,100 @@ def train_and_evaluate_modality(
     save_datasets(output_dir, train_set_with_outcome, test_set_with_outcome, 
                   ext_set_with_outcome, train_folds)
     
-    # 12. Save CV predictions
-    print("12. Saving CV predictions...")
+    # 12. Save predictions
+    print("12. Saving predictions...")
+    
+    # Save CV predictions
     cv_predictions = pd.DataFrame({
-        'Subject': y_pred_cv.index,  # Now y_pred_cv is a Series with the correct index
-        'y_pred': y_pred_cv.values,
+        'Subject': y_proba_cv.index,  # Now y_pred_cv is a Series with the correct index
+        'y_proba': y_proba_cv.values,
+        'y_pred': (y_proba_cv.values >= 0.5).astype(int),
         'y_true': y_train.values
     })
     cv_predictions.to_excel(output_dir / 'prediction_CV.xlsx', index=False)
+    
+    # Save TEST predictions
+    test_predictions = pd.DataFrame({
+        'Subject': X_test_final.index,
+        'y_proba': y_pred_test,
+        'y_pred': (y_pred_test >= 0.5).astype(int),
+        'y_true': y_test.values
+    })
+    test_predictions.to_excel(output_dir / 'prediction_TEST.xlsx', index=False)
+    
+    # Save EXVAL predictions (if available)
+    if not X_ext_final.empty:
+        exval_predictions = pd.DataFrame({
+            'Subject': X_ext_final.index,
+            'y_proba': y_pred_ext,
+            'y_pred': (y_pred_ext >= 0.5).astype(int),
+            'y_true': y_ext.values
+        })
+        exval_predictions.to_excel(output_dir / 'prediction_EXVAL.xlsx', index=False)
 
     # 13. Save results
     print("13. Saving results...")
     results = pd.DataFrame({
         'SET': ['CV', 'TEST', 'EXVAL'],
         'AUC': [
-            f'{cv_auc:.2f} ± {cv_auc_std:.2f}',
-            f'{test_auc:.2f} ± {test_auc_std:.2f}',
-            f'{ext_auc:.2f} ± {ext_auc_std:.2f}' if not np.isnan(ext_auc) else 'N/A'
+            f'{cv_metrics["auc"]:.2f} ± {cv_metrics["auc_std"]:.2f}',
+            f'{test_metrics["auc"]:.2f} ± {test_metrics["auc_std"]:.2f}',
+            f'{ext_metrics["auc"]:.2f} ± {ext_metrics["auc_std"]:.2f}' if not np.isnan(ext_metrics["auc"]) else 'N/A'
+        ],
+        'F1_MACRO': [
+            f'{cv_metrics["f1_macro"]:.2f} ± {cv_metrics["f1_macro_std"]:.2f}',
+            f'{test_metrics["f1_macro"]:.2f}',
+            f'{ext_metrics["f1_macro"]:.2f}' if not np.isnan(ext_metrics["f1_macro"]) else 'N/A'
+        ],
+        'SENSITIVITY': [
+            f'{cv_metrics["sensitivity"]:.2f} ± {cv_metrics["sensitivity_std"]:.2f}',
+            f'{test_metrics["sensitivity"]:.2f}',
+            f'{ext_metrics["sensitivity"]:.2f}' if not np.isnan(ext_metrics["sensitivity"]) else 'N/A'
+        ],
+        'SPECIFICITY': [
+            f'{cv_metrics["specificity"]:.2f} ± {cv_metrics["specificity_std"]:.2f}',
+            f'{test_metrics["specificity"]:.2f}',
+            f'{ext_metrics["specificity"]:.2f}' if not np.isnan(ext_metrics["specificity"]) else 'N/A'
         ],
         'n': [len(y_train), len(y_test), len(y_ext) if not ext_set.empty else 0]
     })
     results.to_excel(output_dir / 'results.xlsx', index=False)
     
     print("\n✓ Training completed successfully!")
-    print(f"  CV AUC: {cv_auc:.3f} ± {cv_auc_std:.3f}")
-    print(f"  Test AUC: {test_auc:.3f} ± {test_auc_std:.3f}")
-    if not np.isnan(ext_auc):
-        print(f"  External AUC: {ext_auc:.3f} ± {ext_auc_std:.3f}")
+    print(f"  CV AUC: {cv_metrics['auc']:.3f} ± {cv_metrics['auc_std']:.3f}")
+    print(f"  CV F1 Macro: {cv_metrics['f1_macro']:.3f} ± {cv_metrics['f1_macro_std']:.3f}")
+    print(f"  CV Sensitivity: {cv_metrics['sensitivity']:.3f} ± {cv_metrics['sensitivity_std']:.3f}")
+    print(f"  CV Specificity: {cv_metrics['specificity']:.3f} ± {cv_metrics['specificity_std']:.3f}")
+    print(f"  Test AUC: {test_metrics['auc']:.3f} ± {test_metrics['auc_std']:.3f}")
+    print(f"  Test F1 Macro: {test_metrics['f1_macro']:.3f}")
+    print(f"  Test Sensitivity: {test_metrics['sensitivity']:.3f}")
+    print(f"  Test Specificity: {test_metrics['specificity']:.3f}")
+    if not np.isnan(ext_metrics['auc']):
+        print(f"  External AUC: {ext_metrics['auc']:.3f} ± {ext_metrics['auc_std']:.3f}")
+        print(f"  External F1 Macro: {ext_metrics['f1_macro']:.3f}")
+        print(f"  External Sensitivity: {ext_metrics['sensitivity']:.3f}")
+        print(f"  External Specificity: {ext_metrics['specificity']:.3f}")
     
     return {
         'modality': modality_folder,
-        'cv_auc': cv_auc,
-        'cv_auc_std': cv_auc_std,
-        'test_auc': test_auc,
-        'test_auc_std': test_auc_std,
-        'ext_auc': ext_auc,
-        'ext_auc_std': ext_auc_std,
+        'cv_auc': cv_metrics['auc'],
+        'cv_auc_std': cv_metrics['auc_std'],
+        'cv_f1_macro': cv_metrics['f1_macro'],
+        'cv_f1_macro_std': cv_metrics['f1_macro_std'],
+        'cv_sensitivity': cv_metrics['sensitivity'],
+        'cv_sensitivity_std': cv_metrics['sensitivity_std'],
+        'cv_specificity': cv_metrics['specificity'],
+        'cv_specificity_std': cv_metrics['specificity_std'],
+        'test_auc': test_metrics['auc'],
+        'test_auc_std': test_metrics['auc_std'],
+        'test_f1_macro': test_metrics['f1_macro'],
+        'test_sensitivity': test_metrics['sensitivity'],
+        'test_specificity': test_metrics['specificity'],
+        'ext_auc': ext_metrics['auc'],
+        'ext_auc_std': ext_metrics['auc_std'],
+        'ext_f1_macro': ext_metrics['f1_macro'],
+        'ext_sensitivity': ext_metrics['sensitivity'],
+        'ext_specificity': ext_metrics['specificity'],
         'n_features': len(selected_features),
         'n_train': len(y_train),
         'n_test': len(y_test),
@@ -460,7 +625,7 @@ def train_rwd_matched_model(
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Follow same pipeline as main training
-    with open('split.json', 'r') as f:
+    with open('mlef_pipeline/split.json', 'r') as f:
         split = json.load(f)
     
     train_set = rwd_dataset[rwd_dataset['Subject'].isin(split['TRAIN_SET'])].set_index('Subject')
@@ -471,7 +636,7 @@ def train_rwd_matched_model(
     X_test, y_test = test_set.drop(columns=[outcome.value]), test_set[outcome.value]
     X_ext, y_ext = ext_set.drop(columns=[outcome.value]), ext_set[outcome.value]
 
-    with open('submodel_features.json', 'r') as f:
+    with open('mlef_pipeline/submodel_features.json', 'r') as f:
         submodel_features = json.load(f)
         submodel_features = [f for f in submodel_features if f in X_train.columns]
     
@@ -513,7 +678,7 @@ def train_rwd_matched_model(
     X_test_final = X_test_scaled[selected_features]
     X_ext_final = X_ext_scaled[selected_features] if not X_ext_scaled.empty else X_ext_scaled
     
-    y_pred_cv, cv_auc, cv_auc_std = compute_cv_predictions(
+    y_proba_cv, cv_metrics = compute_cv_predictions(
         model, X_train_final, y_train, get_cv_splits(), train_folds
     )
     
@@ -521,16 +686,20 @@ def train_rwd_matched_model(
     model.fit(X_train_final, y_train, sample_weight=sample_weight)
     
     y_pred_test = model.predict_proba(X_test_final)[:, 1]
-    test_auc, test_ci = stats.auc_roc_ci(y_test, y_pred_test, alpha=0.95)
-    test_auc_std = (test_ci[1] - test_ci[0]) / 2
+    test_metrics = compute_metrics_with_ci(y_test.values, y_pred_test)
     
     if not X_ext_final.empty:
         y_pred_ext = model.predict_proba(X_ext_final)[:, 1]
-        ext_auc, ext_ci = stats.auc_roc_ci(y_ext, y_pred_ext, alpha=0.95)
-        ext_auc_std = (ext_ci[1] - ext_ci[0]) / 2
+        ext_metrics = compute_metrics_with_ci(y_ext.values, y_pred_ext)
     else:
         y_pred_ext = np.array([])
-        ext_auc, ext_auc_std = np.nan, np.nan
+        ext_metrics = {
+            'auc': np.nan,
+            'auc_std': np.nan,
+            'f1_macro': np.nan,
+            'sensitivity': np.nan,
+            'specificity': np.nan
+        }
     
     # Save everything
     joblib.dump(model, output_dir / f'model_{model_type.value}.pkl')
@@ -549,32 +718,83 @@ def train_rwd_matched_model(
     save_datasets(output_dir, train_set_with_outcome, test_set_with_outcome,
                   ext_set_with_outcome, train_folds)
     
+    # Save predictions
     cv_predictions = pd.DataFrame({
         'Subject': X_train_final.index,
-        'y_pred': y_pred_cv,
+        'y_proba': y_proba_cv,
+        'y_pred': (y_proba_cv >= 0.5).astype(int),
         'y_true': y_train
     })
     cv_predictions.to_excel(output_dir / 'prediction_CV.xlsx', index=False)
     
+    # Save TEST predictions
+    test_predictions = pd.DataFrame({
+        'Subject': X_test_final.index,
+        'y_proba': y_pred_test,
+        'y_pred': (y_pred_test >= 0.5).astype(int),
+        'y_true': y_test.values
+    })
+    test_predictions.to_excel(output_dir / 'prediction_TEST.xlsx', index=False)
+    
+    # Save EXVAL predictions (if available)
+    if not X_ext_final.empty:
+        exval_predictions = pd.DataFrame({
+            'Subject': X_ext_final.index,
+            'y_proba': y_pred_ext,
+            'y_pred': (y_pred_ext >= 0.5).astype(int),
+            'y_true': y_ext.values
+        })
+        exval_predictions.to_excel(output_dir / 'prediction_EXVAL.xlsx', index=False)
+    
     results = pd.DataFrame({
         'SET': ['CV', 'TEST', 'EXVAL'],
         'AUC': [
-            f'{cv_auc:.2f} ± {cv_auc_std:.2f}',
-            f'{test_auc:.2f} ± {test_auc_std:.2f}',
-            f'{ext_auc:.2f} ± {ext_auc_std:.2f}' if not np.isnan(ext_auc) else 'N/A'
+            f'{cv_metrics["auc"]:.2f} ± {cv_metrics["auc_std"]:.2f}',
+            f'{test_metrics["auc"]:.2f} ± {test_metrics["auc_std"]:.2f}',
+            f'{ext_metrics["auc"]:.2f} ± {ext_metrics["auc_std"]:.2f}' if not np.isnan(ext_metrics["auc"]) else 'N/A'
+        ],
+        'F1_MACRO': [
+            f'{cv_metrics["f1_macro"]:.2f} ± {cv_metrics["f1_macro_std"]:.2f}',
+            f'{test_metrics["f1_macro"]:.2f}',
+            f'{ext_metrics["f1_macro"]:.2f}' if not np.isnan(ext_metrics["f1_macro"]) else 'N/A'
+        ],
+        'SENSITIVITY': [
+            f'{cv_metrics["sensitivity"]:.2f} ± {cv_metrics["sensitivity_std"]:.2f}',
+            f'{test_metrics["sensitivity"]:.2f}',
+            f'{ext_metrics["sensitivity"]:.2f}' if not np.isnan(ext_metrics["sensitivity"]) else 'N/A'
+        ],
+        'SPECIFICITY': [
+            f'{cv_metrics["specificity"]:.2f} ± {cv_metrics["specificity_std"]:.2f}',
+            f'{test_metrics["specificity"]:.2f}',
+            f'{ext_metrics["specificity"]:.2f}' if not np.isnan(ext_metrics["specificity"]) else 'N/A'
         ],
         'n': [len(y_train), len(y_test), len(y_ext) if not ext_set.empty else 0]
     })
     results.to_excel(output_dir / 'results.xlsx', index=False)
     
     print(f"\n✓ RWD-matched model completed!")
-    print(f"  CV AUC: {cv_auc:.3f} ± {cv_auc_std:.3f}")
+    print(f"  CV AUC: {cv_metrics['auc']:.3f} ± {cv_metrics['auc_std']:.3f}")
+    print(f"  CV F1 Macro: {cv_metrics['f1_macro']:.3f} ± {cv_metrics['f1_macro_std']:.3f}")
+    print(f"  CV Sensitivity: {cv_metrics['sensitivity']:.3f} ± {cv_metrics['sensitivity_std']:.3f}")
+    print(f"  CV Specificity: {cv_metrics['specificity']:.3f} ± {cv_metrics['specificity_std']:.3f}")
     
     return {
         'modality': f'{modality_folder}/rwd-only',
-        'cv_auc': cv_auc,
-        'cv_auc_std': cv_auc_std,
-        'n_train': len(y_train)
+        'cv_auc': cv_metrics['auc'],
+        'cv_auc_std': cv_metrics['auc_std'],
+        'cv_f1_macro': cv_metrics['f1_macro'],
+        'cv_f1_macro_std': cv_metrics['f1_macro_std'],
+        'cv_sensitivity': cv_metrics['sensitivity'],
+        'cv_sensitivity_std': cv_metrics['sensitivity_std'],
+        'cv_specificity': cv_metrics['specificity'],
+        'cv_specificity_std': cv_metrics['specificity_std'],
+        'test_auc': test_metrics['auc'],
+        'test_auc_std': test_metrics['auc_std'],
+        'test_f1_macro': test_metrics['f1_macro'],
+        'test_sensitivity': test_metrics['sensitivity'],
+        'test_specificity': test_metrics['specificity'],
+        'n_train': len(y_train),
+        'n_test': len(y_test)
     }
 
 

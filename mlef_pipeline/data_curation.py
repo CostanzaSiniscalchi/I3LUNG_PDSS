@@ -51,48 +51,48 @@ class DataLoader:
 
         outcomes = pd.read_csv(self.outcomes_path)
 
-        if Mode.FMRAD in mode_data.keys():
-            # reduce the number of fm_rad features with lasso
-            print("Selecting FM-RAD features with LASSO...")
+        # if Mode.FMRAD in mode_data.keys():
+        #     # reduce the number of fm_rad features with lasso
+        #     print("Selecting FM-RAD features with LASSO...")
             
-            if not is_survival:
-                fmrad = pd.merge(
-                    left=mode_data[Mode.FMRAD],
-                    right=outcomes[['Subject', outcome]],
-                    on='Subject',
-                    how='inner'
-                ).dropna(subset=[outcome])
-                selected_fmrad = ML.lasso_selection(
-                    X=fmrad.drop(columns=['Subject', outcome]),
-                    y=fmrad[outcome],
-                    target_features=100,
-                    tolerance=10,
-                )
-                print(selected_fmrad)
-            else:
-                fmrad = pd.merge(
-                    left=mode_data[Mode.FMRAD],
-                    right=outcomes[['Subject', 'DEATH EVENT', 'OS MONTHS']],
-                    on='Subject',
-                    how='inner'
-                ).dropna(subset=['DEATH EVENT', 'OS MONTHS']).rename(columns={
-                    'OS MONTHS': 'TIME',
-                    'DEATH EVENT': 'EVENT'
-                })
+        #     if not is_survival:
+        #         fmrad = pd.merge(
+        #             left=mode_data[Mode.FMRAD],
+        #             right=outcomes[['Subject', outcome]],
+        #             on='Subject',
+        #             how='inner'
+        #         ).dropna(subset=[outcome])
+        #         selected_fmrad = ML.lasso_selection(
+        #             X=fmrad.drop(columns=['Subject', outcome]),
+        #             y=fmrad[outcome],
+        #             target_features=100,
+        #             tolerance=10,
+        #         )
+        #         print(selected_fmrad)
+        #     else:
+        #         fmrad = pd.merge(
+        #             left=mode_data[Mode.FMRAD],
+        #             right=outcomes[['Subject', 'DEATH EVENT', 'OS MONTHS']],
+        #             on='Subject',
+        #             how='inner'
+        #         ).dropna(subset=['DEATH EVENT', 'OS MONTHS']).rename(columns={
+        #             'OS MONTHS': 'TIME',
+        #             'DEATH EVENT': 'EVENT'
+        #         })
 
-                fmrad['EVENT'] = fmrad['EVENT'].astype(bool)
-                fmrad['TIME'] = fmrad['TIME'].astype(float)
-                y_train = fmrad[['EVENT', 'TIME']].to_records(index=False)
-                selected_fmrad = ML.coxnet_selection(
-                    X_train=fmrad.drop(columns=['Subject', 'EVENT', 'TIME']),
-                    y_train=y_train,
-                    cv=5,
-                    folds=None,
-                    target_features=100,
-                    uncertainty=10,
-                )
+        #         fmrad['EVENT'] = fmrad['EVENT'].astype(bool)
+        #         fmrad['TIME'] = fmrad['TIME'].astype(float)
+        #         y_train = fmrad[['EVENT', 'TIME']].to_records(index=False)
+        #         selected_fmrad = ML.coxnet_selection(
+        #             X_train=fmrad.drop(columns=['Subject', 'EVENT', 'TIME']),
+        #             y_train=y_train,
+        #             cv=5,
+        #             folds=None,
+        #             target_features=100,
+        #             uncertainty=10,
+        #         )
                 
-            mode_data[Mode.FMRAD] = mode_data[Mode.FMRAD][['Subject'] + selected_fmrad]
+        #     mode_data[Mode.FMRAD] = mode_data[Mode.FMRAD][['Subject'] + selected_fmrad]
 
         for data in mode_data.values():
             if merged.empty:
@@ -113,7 +113,7 @@ class DataLoader:
             case Subanalysis.C23:
                 pass
             case Subanalysis.C2:
-                subanalysis_features = subanalysis_features[subanalysis_features['LINE_IO_COHORT3'] == 1]
+                subanalysis_features = subanalysis_features[subanalysis_features['IO LINE'] == 1]
             case Subanalysis.IO_ONLY:
                 subanalysis_features = subanalysis_features[subanalysis_features['IO IOCHT'] == 0]
             case Subanalysis.IO_CHT:
