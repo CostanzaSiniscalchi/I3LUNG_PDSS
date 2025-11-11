@@ -95,7 +95,7 @@ def plot_auc_results(
     Expected per-analysis layout:
 
     MLEF:
-        MLEF/
+        mlef_pipeline/results/
          OS_24/ (or DCR/ OR OS_6/)
           C23/
             RWD/
@@ -500,8 +500,8 @@ def plot_auc_results(
     for analysis in analyses:
         # Build the correct path based on architecture
         if architecture == "MLEF":
-            # MLEF: MLEF/outcome/analysis/
-            base_path = Path("MLEF") / outcome / analysis
+            # MLEF: mlef_pipeline/results/outcome/analysis/ 
+            base_path = Path("mlef_pipeline/MLEF") / outcome / analysis
             analysis_dir = base_path
         else:  # DLIF
             # DLIF: dlif_pipeline/results/analysis/outcome/classification/eval_type/feature_type/extraction/

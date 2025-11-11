@@ -20,6 +20,7 @@
 !DeLong_test.py
 !helper.py
 !helper_survival.py
+!helper_survival_fairness.py
 !graphs_survival_analysis.ipynb
 !graphs_survival_fairness.ipynb
 # py cache
