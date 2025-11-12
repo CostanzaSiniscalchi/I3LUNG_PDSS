@@ -645,8 +645,8 @@ def train_rwd_matched_model(
     X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
     
     X_train_imputed, imputer = dl.impute_df(X_train)
-    X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
     X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer) if not X_ext.empty else (X_ext, None)
+    X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
     
     X_train_scaled, scaler, to_standard_normalize, to_log_normalize = dl.normalize(X_train_imputed)
     X_test_scaled, _, _, _ = dl.normalize(X_test_imputed, scaler=scaler, 
@@ -688,18 +688,8 @@ def train_rwd_matched_model(
     y_pred_test = model.predict_proba(X_test_final)[:, 1]
     test_metrics = compute_metrics_with_ci(y_test.values, y_pred_test)
     
-    if not X_ext_final.empty:
-        y_pred_ext = model.predict_proba(X_ext_final)[:, 1]
-        ext_metrics = compute_metrics_with_ci(y_ext.values, y_pred_ext)
-    else:
-        y_pred_ext = np.array([])
-        ext_metrics = {
-            'auc': np.nan,
-            'auc_std': np.nan,
-            'f1_macro': np.nan,
-            'sensitivity': np.nan,
-            'specificity': np.nan
-        }
+    y_pred_ext = model.predict_proba(X_ext_final)[:, 1]
+    ext_metrics = compute_metrics_with_ci(y_ext.values, y_pred_ext)
     
     # Save everything
     joblib.dump(model, output_dir / f'model_{model_type.value}.pkl')
@@ -735,16 +725,14 @@ def train_rwd_matched_model(
         'y_true': y_test.values
     })
     test_predictions.to_excel(output_dir / 'prediction_TEST.xlsx', index=False)
-    
-    # Save EXVAL predictions (if available)
-    if not X_ext_final.empty:
-        exval_predictions = pd.DataFrame({
-            'Subject': X_ext_final.index,
-            'y_proba': y_pred_ext,
-            'y_pred': (y_pred_ext >= 0.5).astype(int),
-            'y_true': y_ext.values
-        })
-        exval_predictions.to_excel(output_dir / 'prediction_EXVAL.xlsx', index=False)
+
+    exval_predictions = pd.DataFrame({
+        'Subject': X_ext_final.index,
+        'y_proba': y_pred_ext,
+        'y_pred': (y_pred_ext >= 0.5).astype(int),
+        'y_true': y_ext.values
+    })
+    exval_predictions.to_excel(output_dir / 'prediction_EXVAL.xlsx', index=False)
     
     results = pd.DataFrame({
         'SET': ['CV', 'TEST', 'EXVAL'],
@@ -793,8 +781,15 @@ def train_rwd_matched_model(
         'test_f1_macro': test_metrics['f1_macro'],
         'test_sensitivity': test_metrics['sensitivity'],
         'test_specificity': test_metrics['specificity'],
+        'ext_auc': ext_metrics['auc'],
+        'ext_auc_std': ext_metrics['auc_std'],
+        'ext_f1_macro': ext_metrics['f1_macro'],
+        'ext_sensitivity': ext_metrics['sensitivity'],
+        'ext_specificity': ext_metrics['specificity'],
+        'n_features': len(selected_features),
         'n_train': len(y_train),
-        'n_test': len(y_test)
+        'n_test': len(y_test),
+        'n_ext': len(y_ext)
     }
 
 
