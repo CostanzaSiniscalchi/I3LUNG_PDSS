@@ -72,7 +72,7 @@ def get_modality_folder_name(modes: List[Mode]) -> str:
 
 def create_output_dirs(base_path: Path, subanalysis: str, modality_folder: str) -> Path:
     """Create output directory structure and return the modality path."""
-    output_dir = base_path / 'MLEF' / 'OS' / subanalysis / modality_folder
+    output_dir = base_path / 'results' / 'OS' / subanalysis / modality_folder
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Create RWD-matched subdirectory (for non-RWD modalities)
@@ -496,7 +496,7 @@ def train_rwd_matched_model(
     print(f"  Using {len(matched_subjects)} matched subjects")
     
     # Create output directory
-    output_dir = base_path / 'MLEF' / 'OS' / subanalysis.value / modality_folder / 'rwd-only'
+    output_dir = base_path / 'results' / 'OS' / subanalysis.value / modality_folder / 'rwd-only'
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Follow same pipeline as main training
@@ -712,8 +712,8 @@ def main():
                              'Options: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD')
     parser.add_argument('--no-feature-selection', action='store_true',
                         help='Disable feature selection')
-    parser.add_argument('--output-dir', type=str, default='.',
-                        help='Base output directory (default: current directory)')
+    parser.add_argument('--output-dir', type=str, default='mlef_pipeline',
+                        help='Base output directory (default: mlef_pipeline)')
     
     args = parser.parse_args()
     
@@ -758,11 +758,10 @@ def main():
     
     # Store all results
     all_results = []
-    
     # Train each modality combination
     for i, modes in enumerate(modalities_to_train, 1):
         print(f"\n[{i}/{len(modalities_to_train)}] Processing {get_modality_folder_name(modes)}...")
-        
+
         try:
             # Train main model
             result = train_and_evaluate_modality(
@@ -801,7 +800,7 @@ def main():
         print(summary_df.to_string(index=False))
         
         # Save summary
-        summary_path = base_path / 'MLEF' / 'OS' / subanalysis.value / 'training_summary.xlsx'
+        summary_path = base_path / 'results' / 'OS' / subanalysis.value / 'training_summary.xlsx'
         summary_df.to_excel(summary_path, index=False)
         print(f"\n✓ Summary saved to {summary_path}")
     

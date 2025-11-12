@@ -130,7 +130,7 @@ def get_rwd_only_model_for_modality(modality_folder: str, rwd_only_config: dict,
 
 def create_output_dirs(base_path: Path, subanalysis: str, modality_folder: str, outcome: str) -> Path:
     """Create output directory structure and return the modality path."""
-    output_dir = base_path / 'MLEF' / outcome / subanalysis / modality_folder
+    output_dir = base_path / 'results' / outcome / subanalysis / modality_folder
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Create RWD-matched subdirectory (for non-RWD modalities)
@@ -621,7 +621,7 @@ def train_rwd_matched_model(
     print(f"  Using {len(matched_subjects)} matched subjects")
     
     # Create output directory
-    output_dir = base_path / 'MLEF' / outcome.value / subanalysis.value / modality_folder / 'rwd-only'
+    output_dir = base_path / 'results' / outcome.value / subanalysis.value / modality_folder / 'rwd-only'
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Follow same pipeline as main training
@@ -815,7 +815,7 @@ def main():
                         help='Model type to train (default: LR)')
     parser.add_argument('--no-feature-selection', action='store_true',
                         help='Disable feature selection')
-    parser.add_argument('--output-dir', type=str, default='.',
+    parser.add_argument('--output-dir', type=str, default='mlef_pipeline',
                         help='Base output directory (default: current directory)')
     
     args = parser.parse_args()
@@ -931,7 +931,7 @@ def main():
         print(summary_df.to_string(index=False))
         
         # Save summary
-        summary_path = base_path / 'MLEF' / outcome.value / subanalysis.value / 'training_summary.xlsx'
+        summary_path = base_path / 'results' / outcome.value / subanalysis.value / 'training_summary.xlsx'
         summary_df.to_excel(summary_path, index=False)
         print(f"\n✓ Summary saved to {summary_path}")
     
