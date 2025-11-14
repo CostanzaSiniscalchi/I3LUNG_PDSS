@@ -890,7 +890,7 @@ def prepare_multimodal_mixed_bags(path: str, bags_path: str) -> None:
                     break
 
     # Process each slide with progress bar
-    slides = df.subject.unique()
+    slides = df['Subject'].unique()
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -902,7 +902,7 @@ def prepare_multimodal_mixed_bags(path: str, bags_path: str) -> None:
         task = progress.add_task("Processing slides...", total=len(slides))
         
         for slide in slides:
-            slide_data = df[df.subject == slide].iloc[0]
+            slide_data = df[df['Subject'] == slide].iloc[0]
             
             # Initialize dictionary for this slide
             slide_dict = {}

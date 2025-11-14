@@ -61,7 +61,7 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
         df = df.drop(columns=[mod_mapping[mod] for mod in excluded_mods if mod in mod_mapping], errors='ignore')
 
         # Ensure all missing values are properly handled
-        df = df.applymap(lambda x: None if isinstance(x, float) and pd.isna(x) else x)
+        df = df.map(lambda x: None if isinstance(x, float) and pd.isna(x) else x)
         df.dropna()  # This doesn't modify df in place
 
         df.to_parquet('df.parquet', index=False)
