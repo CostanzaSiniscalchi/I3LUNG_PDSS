@@ -1,17 +1,25 @@
 import pandas as pd
 import json
+from pathlib import Path
+
+# Get the directory containing this script
+SCRIPT_DIR = Path(__file__).parent
+DATA_DIR = SCRIPT_DIR.parent / 'data'
 
 def create_feature_dataset_from_processed(
-    base_path: str = 'Mil2/data/data/split',
+    base_path=None,
     rad_type: str = 'pyradiomics'
 ) -> pd.DataFrame:
-    
+
+    if base_path is None:
+        base_path = DATA_DIR / 'split'
+
     # Load genomics exclusion lists
-    with open('Mil2/data/data/no_genomics_train.json', 'r') as f:
+    with open(DATA_DIR / 'no_genomics_train.json', 'r') as f:
         no_gen_train = json.load(f)
-    with open('Mil2/data/data/no_genomics_test.json', 'r') as f:
+    with open(DATA_DIR / 'no_genomics_test.json', 'r') as f:
         no_gen_test = json.load(f)
-    with open('Mil2/data/data/no_genomics_ext_val.json', 'r') as f:
+    with open(DATA_DIR / 'no_genomics_ext_val.json', 'r') as f:
         no_gen_ext = json.load(f)
     
     exclude_genomics = set(no_gen_train + no_gen_test + no_gen_ext)
@@ -20,10 +28,10 @@ def create_feature_dataset_from_processed(
     
     for split in ['train', 'test', 'ext_val']:
         # Load processed data
-        rwd = pd.read_csv(f'{base_path}/rwd_{split}_processed.csv')
-        rad = pd.read_csv(f'{base_path}/{rad_type}_{split}_processed.csv')
-        dp = pd.read_csv(f'{base_path}/digital_pathology_{split}_processed.csv')
-        genomics = pd.read_csv(f'{base_path}/genomics_{split}_processed.csv')
+        rwd = pd.read_csv(Path(base_path) / f'rwd_{split}_processed.csv')
+        rad = pd.read_csv(Path(base_path) / f'{rad_type}_{split}_processed.csv')
+        dp = pd.read_csv(Path(base_path) / f'digital_pathology_{split}_processed.csv')
+        genomics = pd.read_csv(Path(base_path) / f'genomics_{split}_processed.csv')
         
         # Get RWD subjects (master list)
         rwd_subjects = set(rwd['Subject'])
@@ -78,10 +86,10 @@ def create_feature_dataset_from_processed(
 # Create both versions
 print("Creating pyradiomics version...")
 df_pyrad = create_feature_dataset_from_processed(rad_type='pyradiomics')
-df_pyrad.to_parquet('Mil2/data/data/features_dataset_radpy_fixed.parquet', index=False)
+df_pyrad.to_parquet(DATA_DIR / 'features_dataset_radpy_fixed.parquet', index=False)
 
 print("\nCreating fmrad version...")
 df_fmrad = create_feature_dataset_from_processed(rad_type='fmrad')
-df_fmrad.to_parquet('Mil2/data/data/features_dataset_fmrad.parquet', index=False)
+df_fmrad.to_parquet(DATA_DIR / 'features_dataset_fmrad.parquet', index=False)
 
 print("\nDone!")

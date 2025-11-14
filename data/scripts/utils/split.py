@@ -1,24 +1,29 @@
 import pandas as pd
 import json
 import os
+from pathlib import Path
 from typing import Tuple
 
-os.makedirs('Mil2/data/data/split', exist_ok=True)
+# Get the directory containing this script
+SCRIPT_DIR = Path(__file__).parent
+DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
 
-with open('Mil2/data/data/split.json', 'r') as f:
+os.makedirs(DATA_DIR / 'split', exist_ok=True)
+
+with open(DATA_DIR / 'split.json', 'r') as f:
     split = json.load(f)
 
-train_subjects = split['train']
-test_subjects = split['test']
-uoc_subjects = split['ext_val_set']
+train_subjects = split['TRAIN_SET']
+test_subjects = split['TEST_SET']
+uoc_subjects = split['EXT_VAL_SET']
 
-rwd = pd.read_csv('Mil2/data/data/rwd.csv')
-genomics = pd.read_csv('Mil2/data/data/genomics.csv')
-digital_pathology = pd.read_csv('Mil2/data/data/digital_pathology.csv')
-pyradiomics = pd.read_csv('Mil2/data/data/pyradiomics.csv')
-fmrad = pd.read_csv('Mil2/data/data/fmrad.csv')
+rwd = pd.read_csv(DATA_DIR / 'rwd.csv')
+genomics = pd.read_csv(DATA_DIR / 'genomics.csv')
+digital_pathology = pd.read_csv(DATA_DIR / 'digital_pathology.csv')
+pyradiomics = pd.read_csv(DATA_DIR / 'pyradiomics.csv')
+fmrad = pd.read_csv(DATA_DIR / 'fmrad.csv')
 
-with open('Mil2/data/data/features.json', 'r') as f:
+with open(DATA_DIR / 'features.json', 'r') as f:
     features = json.load(f)
 
 rwd_cols = ['Subject'] + [f for f in features['RWD'] if f in rwd.columns]
@@ -43,9 +48,9 @@ modalities = {
 
 for name, df in modalities.items():
     train, test, uoc = split_data(df)
-    
-    train.to_csv(f'Mil2/data/data/split/{name}_train.csv')
-    test.to_csv(f'Mil2/data/data/split/{name}_test.csv')
-    uoc.to_csv(f'Mil2/data/data/split/{name}_ext_val_set.csv')
-    
+
+    train.to_csv(DATA_DIR / 'split' / f'{name}_train.csv')
+    test.to_csv(DATA_DIR / 'split' / f'{name}_test.csv')
+    uoc.to_csv(DATA_DIR / 'split' / f'{name}_ext_val.csv')
+
     print(f"{name} - Train: {train.shape}, Test: {test.shape}, ext_val: {uoc.shape}")

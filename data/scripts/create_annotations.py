@@ -2,18 +2,34 @@ import pandas as pd
 import numpy as np
 import json
 import os
+from pathlib import Path
+
+# Get the directory containing this script
+SCRIPT_DIR = Path(__file__).parent
+DATA_DIR = SCRIPT_DIR.parent / 'data'
 
 def create_annotations(
-    outcomes_path='Mil2/data/data/outcomes.csv',
-    rwd_path='Mil2/data/data/rwd.csv',
-    split_path='Mil2/data/data/split.json',
-    features_path='Mil2/data/data/features_dataset_pyrad.parquet',  # For checking modalities
-    output_path='Mil2/data/data/annotations.csv',
+    outcomes_path=None,
+    rwd_path=None,
+    split_path=None,
+    features_path=None,
+    output_path=None,
     n_sub=5,
     use_subfolds=False,
     val_split=0.10,
     seed=42
 ):
+    # Set default paths if not provided
+    if outcomes_path is None:
+        outcomes_path = DATA_DIR / 'outcomes.csv'
+    if rwd_path is None:
+        rwd_path = DATA_DIR / 'rwd.csv'
+    if split_path is None:
+        split_path = DATA_DIR / 'split.json'
+    if features_path is None:
+        features_path = DATA_DIR / 'features_dataset_radpy_fixed.parquet'
+    if output_path is None:
+        output_path = DATA_DIR / 'annotations.csv'
     # Load data
     outcomes = pd.read_csv(outcomes_path)
     rwd = pd.read_csv(rwd_path)
@@ -141,12 +157,11 @@ def create_annotations(
     train_df = ann[ann['dataset'] == 'train']
 
     # Try to load from split.json, otherwise generate randomly
-    split_file = 'Mil2/data/data/split.json'
-    if os.path.exists(split_file):
-        with open(split_file, 'r') as f:
+    if os.path.exists(split_path):
+        with open(split_path, 'r') as f:
             split_data = json.load(f)
         early_stop_indices = split_data.get('EARLY_STOP_SET', [])
-        print(f"Loaded {len(early_stop_indices)} early stopping subjects from {split_file}")
+        print(f"Loaded {len(early_stop_indices)} early stopping subjects from {split_path}")
     else:
         total_n = int(len(train_df) * val_split)
         early_stop_indices = train_df.sample(n=total_n, random_state=seed).index.tolist()
