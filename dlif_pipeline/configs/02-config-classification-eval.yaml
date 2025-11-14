@@ -14,8 +14,8 @@ seed: [0]
 use_early_stopping: true
 prepare_dataset: false
 
-train_df: [ "data/features_dataset_radpy_fixed.parquet", "data/features_dataset_radfm.parquet" ]
-annotation_file: data/annotations.csv
+train_df: [ "../data/data/features_dataset_radpy_fixed.parquet", "../data/data/features_dataset_fmrad.parquet" ]
+annotation_file: ../data/data/annotations.csv
 
 mods:
     # RWD
