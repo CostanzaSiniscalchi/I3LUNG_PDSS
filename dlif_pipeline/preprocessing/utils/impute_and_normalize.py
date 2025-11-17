@@ -10,7 +10,7 @@ from typing import Tuple
 
 # Get the directory containing this script
 SCRIPT_DIR = Path(__file__).parent
-DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
+DATA_DIR = SCRIPT_DIR.parent.parent.parent / 'data'
 
 def impute_df(df: pd.DataFrame, imputer=None) -> Tuple[pd.DataFrame, IterativeImputer]:
     categorical_features = [col for col in df.columns if df[col].nunique() <= 10]

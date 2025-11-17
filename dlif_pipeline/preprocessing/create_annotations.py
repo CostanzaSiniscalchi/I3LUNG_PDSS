@@ -6,7 +6,7 @@ from pathlib import Path
 
 # Get the directory containing this script
 SCRIPT_DIR = Path(__file__).parent
-DATA_DIR = SCRIPT_DIR.parent / 'data'
+DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
 
 def create_annotations(
     outcomes_path=None,

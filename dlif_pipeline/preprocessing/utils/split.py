@@ -6,7 +6,7 @@ from typing import Tuple
 
 # Get the directory containing this script
 SCRIPT_DIR = Path(__file__).parent
-DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
+DATA_DIR = SCRIPT_DIR.parent.parent.parent / 'data'
 
 os.makedirs(DATA_DIR / 'split', exist_ok=True)
 
