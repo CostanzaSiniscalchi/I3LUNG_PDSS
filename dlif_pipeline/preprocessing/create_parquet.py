@@ -7,12 +7,8 @@ SCRIPT_DIR = Path(__file__).parent
 DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
 
 def create_feature_dataset_from_processed(
-    base_path=None,
     rad_type: str = 'pyradiomics'
 ) -> pd.DataFrame:
-
-    if base_path is None:
-        base_path = DATA_DIR / 'split'
 
     # Load genomics exclusion lists
     with open(DATA_DIR / 'no_genomics_train.json', 'r') as f:
@@ -24,71 +20,60 @@ def create_feature_dataset_from_processed(
     
     exclude_genomics = set(no_gen_train + no_gen_test + no_gen_ext)
     
-    dfs = []
+    # Load processed data
+    rwd = pd.read_csv(DATA_DIR / 'rwd_processed.csv', index_col='Subject')
+    rad = pd.read_csv(DATA_DIR / f'{rad_type}_processed.csv', index_col='Subject')
+    dp = pd.read_csv(DATA_DIR / 'digital_pathology_processed.csv', index_col='Subject')
+    genomics = pd.read_csv(DATA_DIR / 'genomics_processed.csv', index_col='Subject')
     
-    for split in ['train', 'test', 'ext_val']:
-        # Load processed data
-        rwd = pd.read_csv(Path(base_path) / f'rwd_{split}_processed.csv')
-        rad = pd.read_csv(Path(base_path) / f'{rad_type}_{split}_processed.csv')
-        dp = pd.read_csv(Path(base_path) / f'digital_pathology_{split}_processed.csv')
-        genomics = pd.read_csv(Path(base_path) / f'genomics_{split}_processed.csv')
-        
-        # Get RWD subjects (master list)
-        rwd_subjects = set(rwd['Subject'])
-        
-        # Filter other modalities to keep only RWD subjects
-        rad = rad[rad['Subject'].isin(rwd_subjects)]
-        dp = dp[dp['Subject'].isin(rwd_subjects)]
-        genomics = genomics[genomics['Subject'].isin(rwd_subjects)]
-        
-        # Create base dataframe with all RWD subjects
-        df_split = pd.DataFrame({'Subject': rwd['Subject']})
-        
-        # Add SET and CENTER from RWD
-        df_split['SET'] = rwd['SET']
-        df_split['CENTER'] = rwd['CENTER']
-        
-        # Columns to exclude from features
-        cols_to_exclude = ['Subject', 'SET', 'CENTER']
-        
-        # Add mod1 (RWD - always present)
-        df_split['mod1'] = rwd.drop(columns=[c for c in cols_to_exclude if c in rwd.columns]).apply(lambda r: r.tolist(), axis=1)
-        
-        # Add mod2 (radiomics) - None if subject not in rad
-        df_split['mod2'] = df_split['Subject'].apply(
-            lambda s: rad[rad['Subject'] == s].drop(columns=[c for c in cols_to_exclude if c in rad.columns]).values[0].tolist() 
-            if s in rad['Subject'].values else None
-        )
-        
-        # Add mod3 (digital pathology) - None if subject not in dp
-        df_split['mod3'] = df_split['Subject'].apply(
-            lambda s: dp[dp['Subject'] == s].drop(columns=[c for c in cols_to_exclude if c in dp.columns]).values[0].tolist() 
-            if s in dp['Subject'].values else None
-        )
-        
-        # Add mod4 (genomics) - None if subject not in genomics OR in exclusion list
-        df_split['mod4'] = df_split['Subject'].apply(
-            lambda s: genomics[genomics['Subject'] == s].drop(columns=[c for c in cols_to_exclude if c in genomics.columns]).values[0].tolist() 
-            if (s in genomics['Subject'].values and s not in exclude_genomics) else None
-        )
-        
-        dfs.append(df_split)
+    # Get RWD subjects (master list)
+    rwd_subjects = set(rwd.index)
     
-    # Merge all splits
-    full_df = pd.concat(dfs, ignore_index=True)
+    # Filter other modalities to keep only RWD subjects
+    rad = rad[rad.index.isin(rwd_subjects)]
+    dp = dp[dp.index.isin(rwd_subjects)]
+    genomics = genomics[genomics.index.isin(rwd_subjects)]
+    
+    # Drop SET and CENTER from features
+    cols_to_drop = ['SET', 'CENTER']
+    rwd_features = rwd.drop(columns=[c for c in cols_to_drop if c in rwd.columns])
+    rad_features = rad.drop(columns=[c for c in cols_to_drop if c in rad.columns])
+    dp_features = dp.drop(columns=[c for c in cols_to_drop if c in dp.columns])
+    gen_features = genomics.drop(columns=[c for c in cols_to_drop if c in genomics.columns])
+    
+    # Create base dataframe
+    df = pd.DataFrame({'Subject': rwd.index})
+    
+    # Add mod1 (RWD - always present)
+    df['mod1'] = rwd_features.apply(lambda r: r.tolist(), axis=1)
+    
+    # Add mod2 (radiomics) - None if subject not in rad
+    df['mod2'] = df['Subject'].apply(
+        lambda s: rad_features.loc[s].tolist() if s in rad_features.index else None
+    )
+    
+    # Add mod3 (digital pathology) - None if subject not in dp
+    df['mod3'] = df['Subject'].apply(
+        lambda s: dp_features.loc[s].tolist() if s in dp_features.index else None
+    )
+    
+    # Add mod4 (genomics) - None if subject not in genomics OR in exclusion list
+    df['mod4'] = df['Subject'].apply(
+        lambda s: gen_features.loc[s].tolist() if (s in gen_features.index and s not in exclude_genomics) else None
+    )
     
     # Null-out all-NaN lists
     for mod in ['mod1', 'mod2', 'mod3', 'mod4']:
-        full_df[mod] = full_df[mod].apply(
+        df[mod] = df[mod].apply(
             lambda lst: None if isinstance(lst, list) and all(pd.isna(x) for x in lst) else lst
         )
     
-    print(f"Final shape: {full_df.shape}")
+    print(f"Final shape: {df.shape}")
     for mod in ['mod1', 'mod2', 'mod3', 'mod4']:
-        non_null = full_df[mod].notna().sum()
+        non_null = df[mod].notna().sum()
         print(f"{mod}: {non_null} non-null entries")
     
-    return full_df
+    return df
 
 # Create both versions
 print("Creating pyradiomics version...")

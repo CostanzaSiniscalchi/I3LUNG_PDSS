@@ -1,20 +1,18 @@
 import pandas as pd
 import numpy as np
 import math
-import pickle
 from pathlib import Path
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.preprocessing import StandardScaler
 from typing import Tuple
 
-# Get the directory containing this script
 SCRIPT_DIR = Path(__file__).parent
 DATA_DIR = SCRIPT_DIR.parent.parent.parent / 'data'
 
 def impute_df(df: pd.DataFrame, imputer=None) -> Tuple[pd.DataFrame, IterativeImputer]:
     cols_to_impute = [col for col in df.columns if col not in ['CENTER', 'SET']]
-    metadata = df[['CENTER', 'SET']].copy() if 'CENTER' in df.columns else None
+    metadata = df[['CENTER', 'SET']].copy()
     df_to_impute = df[cols_to_impute]
     
     categorical_features = [col for col in df_to_impute.columns if df_to_impute[col].nunique() <= 10]
@@ -38,15 +36,12 @@ def impute_df(df: pd.DataFrame, imputer=None) -> Tuple[pd.DataFrame, IterativeIm
         imputed_df[col] = imputed_df[col].clip(upper=max_value, lower=min_value)
         imputed_df[col] = imputed_df[col].round(0).astype(int)
 
-    if metadata is not None:
-        imputed_df = pd.concat([metadata, imputed_df], axis=1)
-    
+    imputed_df = pd.concat([metadata, imputed_df], axis=1)
     return imputed_df, imputer
 
 def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normalize: list=None, to_log_normalize: list=None) -> Tuple[pd.DataFrame, StandardScaler, list, list]:
-    metadata_cols = ['CENTER', 'SET']
-    metadata = df[[col for col in metadata_cols if col in df.columns]].copy()
-    df_to_norm = df.drop(columns=[col for col in metadata_cols if col in df.columns])
+    metadata = df[['CENTER', 'SET']].copy()
+    df_to_norm = df.drop(columns=['CENTER', 'SET'])
     
     features_names = list(df_to_norm.columns)
     if to_log_normalize is None:
@@ -77,73 +72,79 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
     result = pd.concat([metadata, df_to_norm], axis=1)
     return result, scaler, to_standard_normalize, to_log_normalize
 
-# Load RWD
-rwd_train = pd.read_csv(DATA_DIR / 'split' / 'rwd_train.csv', index_col='Subject')
-rwd_test = pd.read_csv(DATA_DIR / 'split' / 'rwd_test.csv', index_col='Subject')
-rwd_ext_val = pd.read_csv(DATA_DIR / 'split' / 'rwd_ext_val.csv', index_col='Subject')
-
-# Impute and normalize RWD
+# RWD
 print("Processing RWD...")
-rwd_train_imputed, rwd_imputer = impute_df(rwd_train)
-rwd_test_imputed, _ = impute_df(rwd_test, imputer=rwd_imputer)
-rwd_ext_val_imputed, _ = impute_df(rwd_ext_val, imputer=rwd_imputer)
+rwd = pd.read_csv(DATA_DIR / 'rwd.csv', index_col='Subject')
 
-rwd_train_proc, rwd_scaler, rwd_to_std, rwd_to_log = normalize(rwd_train_imputed)
-rwd_test_proc, _, _, _ = normalize(rwd_test_imputed, scaler=rwd_scaler, to_standard_normalize=rwd_to_std, to_log_normalize=rwd_to_log)
-rwd_ext_val_proc, _, _, _ = normalize(rwd_ext_val_imputed, scaler=rwd_scaler, to_standard_normalize=rwd_to_std, to_log_normalize=rwd_to_log)
+train_mask = rwd['SET'] == 'TRAIN'
+rwd_train_imputed, rwd_imputer = impute_df(rwd[train_mask])
+rwd.loc[train_mask] = rwd_train_imputed
 
-# Save RWD
-rwd_train_proc.to_csv(DATA_DIR / 'split' / 'rwd_train_processed.csv')
-rwd_test_proc.to_csv(DATA_DIR / 'split' / 'rwd_test_processed.csv')
-rwd_ext_val_proc.to_csv(DATA_DIR / 'split' / 'rwd_ext_val_processed.csv')
+test_mask = rwd['SET'] == 'TEST'
+rwd_test_imputed, _ = impute_df(rwd[test_mask], imputer=rwd_imputer)
+rwd.loc[test_mask] = rwd_test_imputed
 
-# Load Genomics
-gen_train = pd.read_csv(DATA_DIR / 'split' / 'genomics_train.csv', index_col='Subject')
-gen_test = pd.read_csv(DATA_DIR / 'split' / 'genomics_test.csv', index_col='Subject')
-gen_ext_val = pd.read_csv(DATA_DIR / 'split' / 'genomics_ext_val.csv', index_col='Subject')
+ext_mask = rwd['SET'] == 'EXVAL'
+rwd_ext_imputed, _ = impute_df(rwd[ext_mask], imputer=rwd_imputer)
+rwd.loc[ext_mask] = rwd_ext_imputed
 
-# Impute and normalize Genomics
+rwd_train_proc, rwd_scaler, rwd_to_std, rwd_to_log = normalize(rwd[train_mask])
+rwd.loc[train_mask] = rwd_train_proc
+
+rwd_test_proc, _, _, _ = normalize(rwd[test_mask], scaler=rwd_scaler, to_standard_normalize=rwd_to_std, to_log_normalize=rwd_to_log)
+rwd.loc[test_mask] = rwd_test_proc
+
+rwd_ext_proc, _, _, _ = normalize(rwd[ext_mask], scaler=rwd_scaler, to_standard_normalize=rwd_to_std, to_log_normalize=rwd_to_log)
+rwd.loc[ext_mask] = rwd_ext_proc
+
+rwd.to_csv(DATA_DIR / 'rwd_processed.csv')
+
+# Genomics
 print("Processing Genomics...")
-gen_train_imputed, gen_imputer = impute_df(gen_train)
-gen_test_imputed, _ = impute_df(gen_test, imputer=gen_imputer)
-gen_ext_val_imputed, _ = impute_df(gen_ext_val, imputer=gen_imputer)
+gen = pd.read_csv(DATA_DIR / 'genomics.csv', index_col='Subject')
 
-gen_train_proc, gen_scaler, gen_to_std, gen_to_log = normalize(gen_train_imputed)
-gen_test_proc, _, _, _ = normalize(gen_test_imputed, scaler=gen_scaler, to_standard_normalize=gen_to_std, to_log_normalize=gen_to_log)
-gen_ext_val_proc, _, _, _ = normalize(gen_ext_val_imputed, scaler=gen_scaler, to_standard_normalize=gen_to_std, to_log_normalize=gen_to_log)
+train_mask = gen['SET'] == 'TRAIN'
+gen_train_imputed, gen_imputer = impute_df(gen[train_mask])
+gen.loc[train_mask] = gen_train_imputed
 
-# Save Genomics
-gen_train_proc.to_csv(DATA_DIR / 'split' / 'genomics_train_processed.csv')
-gen_test_proc.to_csv(DATA_DIR / 'split' / 'genomics_test_processed.csv')
-gen_ext_val_proc.to_csv(DATA_DIR / 'split' / 'genomics_ext_val_processed.csv')
+test_mask = gen['SET'] == 'TEST'
+gen_test_imputed, _ = impute_df(gen[test_mask], imputer=gen_imputer)
+gen.loc[test_mask] = gen_test_imputed
 
-# Standardize other modalities
+ext_mask = gen['SET'] == 'EXVAL'
+gen_ext_imputed, _ = impute_df(gen[ext_mask], imputer=gen_imputer)
+gen.loc[ext_mask] = gen_ext_imputed
+
+gen_train_proc, gen_scaler, gen_to_std, gen_to_log = normalize(gen[train_mask])
+gen.loc[train_mask] = gen_train_proc
+
+gen_test_proc, _, _, _ = normalize(gen[test_mask], scaler=gen_scaler, to_standard_normalize=gen_to_std, to_log_normalize=gen_to_log)
+gen.loc[test_mask] = gen_test_proc
+
+gen_ext_proc, _, _, _ = normalize(gen[ext_mask], scaler=gen_scaler, to_standard_normalize=gen_to_std, to_log_normalize=gen_to_log)
+gen.loc[ext_mask] = gen_ext_proc
+
+gen.to_csv(DATA_DIR / 'genomics_processed.csv')
+
+# Other modalities
 for modality in ['digital_pathology', 'pyradiomics', 'fmrad']:
     print(f"Processing {modality}...")
-    train = pd.read_csv(DATA_DIR / 'split' / f'{modality}_train.csv', index_col='Subject')
-    test = pd.read_csv(DATA_DIR / 'split' / f'{modality}_test.csv', index_col='Subject')
-    ext_val = pd.read_csv(DATA_DIR / 'split' / f'{modality}_ext_val.csv', index_col='Subject')
-
-    metadata_cols = ['CENTER', 'SET']
-    train_metadata = train[[col for col in metadata_cols if col in train.columns]]
-    test_metadata = test[[col for col in metadata_cols if col in test.columns]]
-    ext_val_metadata = ext_val[[col for col in metadata_cols if col in ext_val.columns]]
+    df = pd.read_csv(DATA_DIR / f'{modality}.csv', index_col='Subject')
     
-    train_features = train.drop(columns=[col for col in metadata_cols if col in train.columns])
-    test_features = test.drop(columns=[col for col in metadata_cols if col in test.columns])
-    ext_val_features = ext_val.drop(columns=[col for col in metadata_cols if col in ext_val.columns])
-
+    metadata = df[['CENTER', 'SET']].copy()
+    features = df.drop(columns=['CENTER', 'SET'])
+    
+    train_mask = df['SET'] == 'TRAIN'
     scaler = StandardScaler()
-    train_proc = pd.DataFrame(scaler.fit_transform(train_features), columns=train_features.columns, index=train_features.index)
-    test_proc = pd.DataFrame(scaler.transform(test_features), columns=test_features.columns, index=test_features.index)
-    ext_val_proc = pd.DataFrame(scaler.transform(ext_val_features), columns=ext_val_features.columns, index=ext_val_features.index)
-
-    train_proc = pd.concat([train_metadata, train_proc], axis=1)
-    test_proc = pd.concat([test_metadata, test_proc], axis=1)
-    ext_val_proc = pd.concat([ext_val_metadata, ext_val_proc], axis=1)
-
-    train_proc.to_csv(DATA_DIR / 'split' / f'{modality}_train_processed.csv')
-    test_proc.to_csv(DATA_DIR / 'split' / f'{modality}_test_processed.csv')
-    ext_val_proc.to_csv(DATA_DIR / 'split' / f'{modality}_ext_val_processed.csv')
+    features.loc[train_mask] = scaler.fit_transform(features[train_mask])
+    
+    test_mask = df['SET'] == 'TEST'
+    features.loc[test_mask] = scaler.transform(features[test_mask])
+    
+    ext_mask = df['SET'] == 'EXVAL'
+    features.loc[ext_mask] = scaler.transform(features[ext_mask])
+    
+    result = pd.concat([metadata, features], axis=1)
+    result.to_csv(DATA_DIR / f'{modality}_processed.csv')
 
 print("Done!")
