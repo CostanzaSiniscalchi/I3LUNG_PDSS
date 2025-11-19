@@ -1,215 +1,102 @@
 import pandas as pd
-import numpy as np
 import json
-import os
 from pathlib import Path
 
 # Get the directory containing this script
 SCRIPT_DIR = Path(__file__).parent
 DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
 
-def create_annotations(
-    outcomes_path=None,
-    rwd_path=None,
-    split_path=None,
-    features_path=None,
-    output_path=None,
-    n_sub=5,
-    use_subfolds=False,
-    val_split=0.10,
-    seed=42
-):
-    # Set default paths if not provided
-    if outcomes_path is None:
-        outcomes_path = DATA_DIR / 'outcomes.csv'
-    if rwd_path is None:
-        rwd_path = DATA_DIR / 'rwd.csv'
-    if split_path is None:
-        split_path = DATA_DIR / 'split.json'
-    if features_path is None:
-        features_path = DATA_DIR / 'features_dataset_radpy_fixed.parquet'
-    if output_path is None:
-        output_path = DATA_DIR / 'annotations.csv'
-    # Load data
-    outcomes = pd.read_csv(outcomes_path)
-    rwd = pd.read_csv(rwd_path)
-    features = pd.read_parquet(features_path)
-    
-    # Rename OS_6 and OS_24 if they exist
-    outcomes = outcomes.rename(columns={
-        'OS_6': 'os_months_6',
-        'OS_24': 'os_months_24',
-        'DEATH EVENT': 'DEATH_EVENT_OC',
-        'PROGRESSION EVENT': 'PROGRESSION_EVENT_OC',
-        'THERAPY END EVENT': 'THERAPY_END_EVENT_OC',
-        'BEST RESPONSE': 'BEST_RESPONSE',
-        'PFS MONTHS': 'PFS_MONTHS',
-        'OS MONTHS': 'OS_MONTHS',
-        'TTF MONTHS': 'TTF_MONTHS',
-    })
-    
-    with open(split_path, 'r') as f:
-        split = json.load(f)
-    
-    train_subjects = set(split['TRAIN_SET'])
-    test_subjects = set(split['TEST_SET'])
-    ext_val_subjects = set(split['EXT_VAL_SET'])
-    
-    # Filter only RWD subjects
-    rwd_subjects = set(rwd['Subject'])
-    ann = outcomes[outcomes['Subject'].isin(rwd_subjects)].copy()
-    
-    # Rename Subject to slide and patient
-    ann = ann.rename(columns={'Subject': 'slide'})
-    ann['patient'] = ann['slide']
-    
-    # Extract fold from subject (center prefix)
-    def get_center(subject):
-        for center in ['INT', 'GHD', 'VHIO', 'MH', 'SZMC', 'UOC']:
-            if subject.startswith(center):
-                return center
-        return None
-    
-    ann['FOLD'] = ann['slide'].apply(get_center)
-    
-    # Create dataset column
-    def get_dataset(subject):
-        if subject in train_subjects:
-            return 'train'
-        elif subject in test_subjects:
-            return 'test'
-        elif subject in ext_val_subjects:
-            return 'ext_val'
-        return None
-    
-    ann['dataset'] = ann['slide'].apply(get_dataset)
-    
-    # Get outcome columns (exclude slide/patient/FOLD/dataset)
-    outcome_cols = [c for c in ann.columns if c not in ['slide', 'patient', 'FOLD', 'dataset']]
-    
-    # Create dataset_ and fold_ for each outcome
-    for outcome in outcome_cols:
-        ann[f'dataset_{outcome}'] = np.where(ann[outcome].notna(), ann['dataset'], None)
-        ann[f'fold_{outcome}'] = np.where(ann[outcome].notna(), ann['FOLD'], None)
-    
-    # Create subfolds (overwrites fold_ columns) - OPTIONAL
-    if use_subfolds:
-        print("here")
-        print(use_subfolds)
-        rng = np.random.default_rng(seed)
-        for outcome in outcome_cols:
-            fold_col = f'fold_{outcome}'
-            mask = ann[fold_col].notna()
-            
-            for center, idxs in ann.loc[mask].groupby(fold_col).groups.items():
-                ids = list(idxs)
-                rng.shuffle(ids)
-                for i, split_ids in enumerate(np.array_split(ids, n_sub), start=1):
-                    ann.loc[split_ids, fold_col] = f"{center}_sub{i}"
-        print(f"Created {n_sub} subfolds per center")
-    
-    # Merge additional flags from RWD
-    rwd_info = rwd[['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO IOCT', 'IO LINE']].copy()
-    rwd_info = rwd_info.rename(columns={
-        'HISTOLOGY ADENOCARCINOMA': 'NSCLC_HISTOLOGY_ADENOCARCINOMA',
-        'HISTOLOGY SQUAMOUS': 'NSCLC_HISTOLOGY_SQUAMOUS',
-        'IO IOCT': 'IO_IOCT',
-        'PDL1 CATEGORY': 'PDL1_CATEGORY',
-        'IO LINE': 'IO_LINE'
-    })
-    
-    ann = ann.merge(rwd_info, left_on='patient', right_on='Subject', how='left')
-    ann.drop(columns=['Subject'], inplace=True)
-    
-    # Map PDL1 to low/high
-    ann['PDL1_GROUP'] = ann['PDL1_CATEGORY'].map({
-        0: 'low',
-        1: 'low',
-        2: 'high'
-    }).fillna('')
-    
-    ann.drop(columns=['PDL1_CATEGORY'], inplace=True)
-    
-    # Fill NaN in flags with empty string
-    ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ann['NSCLC_HISTOLOGY_SQUAMOUS'].fillna('')
-    ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'].fillna('')
-    ann['IO_IOCT'] = ann['IO_IOCT'].fillna('')
-    
-    # COHORT_2 flag: IO LINE == 1
-    ann['COHORT_2'] = (ann['IO_LINE'] == 1).astype(int)
-    ann.drop(columns=['IO_LINE'], inplace=True)
-    
-    # HAS_ALL_MODALITIES flag: patients with all modalities present (mod1, mod2, mod3, mod4 all not None)
-    features['HAS_ALL_MODALITIES'] = (
-        features['mod1'].notna() & 
-        features['mod2'].notna() & 
-        features['mod3'].notna() & 
-        features['mod4'].notna()
-    ).astype(int)
-    
-    all_mods_dict = dict(zip(features['Subject'], features['HAS_ALL_MODALITIES']))
-    ann['HAS_ALL_MODALITIES'] = ann['slide'].map(all_mods_dict).fillna(0).astype(int)
-    
-    print(f"Patients with all modalities: {ann['HAS_ALL_MODALITIES'].sum()}")
-    
-    # Add early stopping
-    np.random.seed(seed)
-    train_df = ann[ann['dataset'] == 'train']
+def create_feature_dataset_from_processed(
+    base_path=None,
+    rad_type: str = 'pyradiomics'
+) -> pd.DataFrame:
 
-    # Try to load from split.json, otherwise generate randomly
-    if os.path.exists(split_path):
-        with open(split_path, 'r') as f:
-            split_data = json.load(f)
-        early_stop_indices = split_data.get('EARLY_STOP_SET', [])
-        print(f"Loaded {len(early_stop_indices)} early stopping subjects from {split_path}")
-    else:
-        total_n = int(len(train_df) * val_split)
-        early_stop_indices = train_df.sample(n=total_n, random_state=seed).index.tolist()
-        print(f"Generated {total_n} early stopping subjects randomly")
+    if base_path is None:
+        base_path = DATA_DIR / 'split'
 
-    for outcome in outcome_cols:
-        fold_col = f'fold_{outcome}'
-        early_stop_col = f'early_stopping_{outcome}'
-        
-        if fold_col not in ann.columns:
-            print(f"Skipping {outcome}: missing column '{fold_col}'")
-            continue
-        
-        ann[early_stop_col] = "no"
-        
-        for idx in early_stop_indices:
-            if idx in ann.index and pd.notna(ann.at[idx, fold_col]):
-                ann.at[idx, early_stop_col] = "yes"
-        
-        print(f"Added early stopping for {outcome}")
-        
-    # Reorder columns to match expected format
-    base_cols = ['slide', 'FOLD', 'dataset'] + outcome_cols + ['patient']
+    # Load genomics exclusion lists
+    with open(DATA_DIR / 'no_genomics_train.json', 'r') as f:
+        no_gen_train = json.load(f)
+    with open(DATA_DIR / 'no_genomics_test.json', 'r') as f:
+        no_gen_test = json.load(f)
+    with open(DATA_DIR / 'no_genomics_ext_val.json', 'r') as f:
+        no_gen_ext = json.load(f)
     
-    split_cols = []
-    for outcome in outcome_cols:
-        split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
+    exclude_genomics = set(no_gen_train + no_gen_test + no_gen_ext)
     
-    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_IOCT', 'COHORT_2', 'HAS_ALL_MODALITIES']
+    dfs = []
     
-    allowed_early_outcomes = [
-    'ORR', 'CBR', 'PFS_MONTHS', 'OS_MONTHS', 'TTF_MONTHS',
-    'DEATH_EVENT_OC', 'PROGRESSION_EVENT_OC', 'THERAPY_END_EVENT_OC',
-    'BEST_RESPONSE', 'DCR', 'os_months_6', 'os_months_24'
-    ]
+    for split in ['train', 'test', 'ext_val']:
+        # Load processed data
+        rwd = pd.read_csv(Path(base_path) / f'rwd_{split}_processed.csv')
+        rad = pd.read_csv(Path(base_path) / f'{rad_type}_{split}_processed.csv')
+        dp = pd.read_csv(Path(base_path) / f'digital_pathology_{split}_processed.csv')
+        genomics = pd.read_csv(Path(base_path) / f'genomics_{split}_processed.csv')
+        
+        # Drop SET and CENTER from all modalities
+        cols_to_drop = ['Subject', 'SET', 'CENTER']
+        rwd_features = rwd.drop(columns=[c for c in cols_to_drop if c in rwd.columns])
+        rad_features = rad.drop(columns=[c for c in cols_to_drop if c in rad.columns])
+        dp_features = dp.drop(columns=[c for c in cols_to_drop if c in dp.columns])
+        gen_features = genomics.drop(columns=[c for c in cols_to_drop if c in genomics.columns])
+        
+        # Get RWD subjects (master list)
+        rwd_subjects = set(rwd['Subject'])
+        
+        # Filter other modalities to keep only RWD subjects
+        rad = rad[rad['Subject'].isin(rwd_subjects)]
+        dp = dp[dp['Subject'].isin(rwd_subjects)]
+        genomics = genomics[genomics['Subject'].isin(rwd_subjects)]
+        
+        # Create base dataframe with all RWD subjects
+        df_split = pd.DataFrame({'Subject': rwd['Subject']})
+        
+        # Add mod1 (RWD - always present)
+        df_split['mod1'] = rwd_features.apply(lambda r: r.tolist(), axis=1)
+        
+        # Add mod2 (radiomics) - None if subject not in rad
+        df_split['mod2'] = df_split['Subject'].apply(
+            lambda s: rad_features.loc[rad[rad['Subject'] == s].index].values[0].tolist() 
+            if s in rad['Subject'].values else None
+        )
+        
+        # Add mod3 (digital pathology) - None if subject not in dp
+        df_split['mod3'] = df_split['Subject'].apply(
+            lambda s: dp_features.loc[dp[dp['Subject'] == s].index].values[0].tolist() 
+            if s in dp['Subject'].values else None
+        )
+        
+        # Add mod4 (genomics) - None if subject not in genomics OR in exclusion list
+        df_split['mod4'] = df_split['Subject'].apply(
+            lambda s: gen_features.loc[genomics[genomics['Subject'] == s].index].values[0].tolist() 
+            if (s in genomics['Subject'].values and s not in exclude_genomics) else None
+        )
+        
+        dfs.append(df_split)
+    
+    # Merge all splits
+    full_df = pd.concat(dfs, ignore_index=True)
+    
+    # Null-out all-NaN lists
+    for mod in ['mod1', 'mod2', 'mod3', 'mod4']:
+        full_df[mod] = full_df[mod].apply(
+            lambda lst: None if isinstance(lst, list) and all(pd.isna(x) for x in lst) else lst
+        )
+    
+    print(f"Final shape: {full_df.shape}")
+    for mod in ['mod1', 'mod2', 'mod3', 'mod4']:
+        non_null = full_df[mod].notna().sum()
+        print(f"{mod}: {non_null} non-null entries")
+    
+    return full_df
 
-    early_cols = [f'early_stopping_{o}' for o in allowed_early_outcomes if o in outcome_cols]
-    
-    final_cols = base_cols + split_cols + flag_cols + early_cols
-    
-    ann = ann[final_cols]
-    
-    # Save
-    ann.to_csv(output_path, index=False)
-    print(f"Saved annotations to {output_path}")
-    print(f"Shape: {ann.shape}")
-    
-    return ann
+# Create both versions
+print("Creating pyradiomics version...")
+df_pyrad = create_feature_dataset_from_processed(rad_type='pyradiomics')
+df_pyrad.to_parquet(DATA_DIR / 'features_dataset_radpy_fixed.parquet', index=False)
 
-# Run with subfolds enabled
-ann = create_annotations(use_subfolds=False)
+print("\nCreating fmrad version...")
+df_fmrad = create_feature_dataset_from_processed(rad_type='fmrad')
+df_fmrad.to_parquet(DATA_DIR / 'features_dataset_fmrad.parquet', index=False)
+
+print("\nDone!")
