@@ -91,11 +91,11 @@ def create_annotations(
         print(f"Created {n_sub} subfolds per center")
     
     # Merge additional flags from RWD
-    rwd_flags = rwd[['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO IOCT', 'IO LINE']].copy()
+    rwd_flags = rwd[['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO IOCHT', 'IO LINE']].copy()
     rwd_flags = rwd_flags.rename(columns={
         'HISTOLOGY ADENOCARCINOMA': 'NSCLC_HISTOLOGY_ADENOCARCINOMA',
         'HISTOLOGY SQUAMOUS': 'NSCLC_HISTOLOGY_SQUAMOUS',
-        'IO IOCT': 'IO_IOCT',
+        'IO IOCHT': 'IO_IOCHT',
         'PDL1 CATEGORY': 'PDL1_CATEGORY',
         'IO LINE': 'IO_LINE'
     })
@@ -115,7 +115,7 @@ def create_annotations(
     # Fill NaN in flags with empty string
     ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ann['NSCLC_HISTOLOGY_SQUAMOUS'].fillna('')
     ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'].fillna('')
-    ann['IO_IOCT'] = ann['IO_IOCT'].fillna('')
+    ann['IO_IOCHT'] = ann['IO_IOCHT'].fillna('')
     
     # COHORT_2 flag: IO LINE == 1
     ann['COHORT_2'] = (ann['IO_LINE'] == 1).astype(int)
@@ -174,7 +174,7 @@ def create_annotations(
     for outcome in outcome_cols:
         split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
     
-    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_IOCT', 'COHORT_2', 'HAS_ALL_MODALITIES']
+    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_IOCHT', 'COHORT_2', 'HAS_ALL_MODALITIES']
     
     early_cols = [f'early_stopping_{o}' for o in allowed_early_outcomes if o in outcome_cols]
     

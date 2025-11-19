@@ -7,31 +7,29 @@ Place the following files in the `/data` directory under I3LUNG_PDSS before runn
 - `/data/rwd.csv`
 - `/data/genomics.csv`
 - `/data/digital_pathology.csv`
+- `/data/pyradiomics.csv`
 - `/data/fmrad.csv`
-- `/data/split.json`
+- `/data/outcomes.csv`
 - `/data/features.json`
 - `/data/no_genomics_train.json`
 - `/data/no_genomics_test.json`
 - `/data/no_genomics_ext_val.json`
 
+Each CSV file must include `Subject`, `SET`, and `CENTER` columns, where `SET` contains values: `TRAIN`, `TEST`, or `EXVAL`.
+
 ## How to Create Parquet and Annotation Files
 
-1. **Split the data**  
-   Run:  
-   `python I3LUNG_PDSS/dlif_pipeline/preprocessing/utils/split.py`  
-   This creates train, test, and uoc splits for each modality and saves them in a `split` directory in `/data`.
-
-2. **Impute and normalize the splits**  
+1. **Impute and normalize the data**  
    Run:  
    `python I3LUNG_PDSS/dlif_pipeline/preprocessing/utils/impute_and_normalize.py`  
-   This creates additional files with the `_processed` suffix in the `split` directory.
+   This creates processed versions of all modality files with the `_processed` suffix in the `/data` directory.
 
-3. **Create the Parquet files**  
+2. **Create the Parquet files**  
    Run:  
    `python I3LUNG_PDSS/dlif_pipeline/preprocessing/create_parquet.py`  
    This generates the Parquet files in the `/data` directory.
 
-4. **Create the annotation file**  
+3. **Create the annotation file**  
    Run:  
    `python I3LUNG_PDSS/dlif_pipeline/preprocessing/create_annotations.py`  
    The annotation file will be saved in `/data`.
@@ -41,7 +39,7 @@ Place the following files in the `/data` directory under I3LUNG_PDSS before runn
      `ann = create_annotations(use_subfolds=True)`
 
 These steps will produce:
-- Two Parquet files (one with `mod2 = pyrad`, one with `mod2 = fmrad`)
+- Two Parquet files (one with `mod2 = pyradiomics`, one with `mod2 = fmrad`)
 - An annotation file with outcomes and subanalysis flags
 
 Ensure all files are present before running downstream experiments.

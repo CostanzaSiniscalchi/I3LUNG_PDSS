@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import math
+import json
 from pathlib import Path
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
@@ -10,10 +11,18 @@ from typing import Tuple
 SCRIPT_DIR = Path(__file__).parent
 DATA_DIR = SCRIPT_DIR.parent.parent.parent / 'data'
 
+# Load features.json
+with open(DATA_DIR / 'features.json', 'r') as f:
+    features_dict = json.load(f)
+
 def impute_df(df: pd.DataFrame, imputer=None) -> Tuple[pd.DataFrame, IterativeImputer]:
     cols_to_impute = [col for col in df.columns if col not in ['CENTER', 'SET']]
     metadata = df[['CENTER', 'SET']].copy()
-    df_to_impute = df[cols_to_impute]
+    df_to_impute = df[cols_to_impute].copy()
+    
+    # Convert all columns to numeric, coercing errors to NaN
+    for col in df_to_impute.columns:
+        df_to_impute[col] = pd.to_numeric(df_to_impute[col], errors='coerce')
     
     categorical_features = [col for col in df_to_impute.columns if df_to_impute[col].nunique() <= 10]
 
@@ -41,7 +50,11 @@ def impute_df(df: pd.DataFrame, imputer=None) -> Tuple[pd.DataFrame, IterativeIm
 
 def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normalize: list=None, to_log_normalize: list=None) -> Tuple[pd.DataFrame, StandardScaler, list, list]:
     metadata = df[['CENTER', 'SET']].copy()
-    df_to_norm = df.drop(columns=['CENTER', 'SET'])
+    df_to_norm = df.drop(columns=['CENTER', 'SET']).copy()
+    
+    # Convert all columns to numeric
+    for col in df_to_norm.columns:
+        df_to_norm[col] = pd.to_numeric(df_to_norm[col], errors='coerce')
     
     features_names = list(df_to_norm.columns)
     if to_log_normalize is None:
@@ -55,7 +68,7 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
     for col in to_log_normalize:
         if df_to_norm[col].min() < 0:
             df_to_norm[col] = df_to_norm[col] - df_to_norm[col].min()
-    df_to_norm[to_log_normalize] = df_to_norm[to_log_normalize].map(lambda x: math.log(x + 1))
+    df_to_norm[to_log_normalize] = df_to_norm[to_log_normalize].applymap(lambda x: math.log(x + 1))
 
     if to_standard_normalize is None:
         categorical_features = [col for col in df_to_norm.columns if df_to_norm[col].nunique() <= 10]
@@ -75,6 +88,8 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
 # RWD
 print("Processing RWD...")
 rwd = pd.read_csv(DATA_DIR / 'rwd.csv', index_col='Subject')
+rwd_cols = ['SET', 'CENTER'] + [f for f in features_dict['RWD'] if f in rwd.columns]
+rwd = rwd[rwd_cols]
 
 train_mask = rwd['SET'] == 'TRAIN'
 rwd_train_imputed, rwd_imputer = impute_df(rwd[train_mask])
@@ -102,6 +117,8 @@ rwd.to_csv(DATA_DIR / 'rwd_processed.csv')
 # Genomics
 print("Processing Genomics...")
 gen = pd.read_csv(DATA_DIR / 'genomics.csv', index_col='Subject')
+gen_cols = ['SET', 'CENTER'] + [f for f in features_dict['GEN'] if f in gen.columns]
+gen = gen[gen_cols]
 
 train_mask = gen['SET'] == 'TRAIN'
 gen_train_imputed, gen_imputer = impute_df(gen[train_mask])
@@ -132,7 +149,11 @@ for modality in ['digital_pathology', 'pyradiomics', 'fmrad']:
     df = pd.read_csv(DATA_DIR / f'{modality}.csv', index_col='Subject')
     
     metadata = df[['CENTER', 'SET']].copy()
-    features = df.drop(columns=['CENTER', 'SET'])
+    features = df.drop(columns=['CENTER', 'SET']).copy()
+    
+    # Convert to numeric
+    for col in features.columns:
+        features[col] = pd.to_numeric(features[col], errors='coerce')
     
     train_mask = df['SET'] == 'TRAIN'
     scaler = StandardScaler()
