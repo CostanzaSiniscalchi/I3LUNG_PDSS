@@ -22,7 +22,7 @@ import pandas as pd
 from sklearn.utils import compute_sample_weight
 import random
 from sklearn.model_selection import GroupKFold
-from sklearn.metrics import f1_score, confusion_matrix
+from sklearn.metrics import f1_score, confusion_matrix, make_scorer
 
 # Suppress specific warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
@@ -78,7 +78,7 @@ def get_modality_folder_name(modes: List[Mode]) -> str:
     return '_'.join(sorted([m.value for m in modes]))
 
 
-def load_modality_models_config(config_path: str = 'modality_models_config.json') -> Tuple[dict, dict]:
+def load_modality_models_config(config_path: str = 'mlef_pipeline/modality_models_config.json') -> Tuple[dict, dict]:
     """Load the modality models configuration file.
     
     Returns:
@@ -212,17 +212,10 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
     """
     from sklearn.base import clone
     
-    # Initialize Series with original index to preserve Subject IDs
-    y_pred_cv = pd.Series(np.zeros(len(y)), index=y.index, name='y_pred')
+    # Initialize Series with NaN to clearly mark unprocessed folds
+    y_pred_cv = pd.Series(np.nan, index=y.index, name='y_pred')
     
-    # Store per-fold metrics for weighted std calculation
-    fold_metrics = {
-        'f1_macro': [],
-        'sensitivity': [],
-        'specificity': [],
-        'sizes': []
-    }
-    
+    # Generate predictions for each fold
     for train_idx, val_idx in cv_splits:
         # Clone model for each fold
         fold_model = clone(model)
@@ -231,6 +224,14 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
         y_train_fold = y.iloc[train_idx]
         X_val_fold = X.iloc[val_idx]
         y_val_fold = y.iloc[val_idx]
+        
+        # Check if training fold has only one class - skip if so
+        if len(np.unique(y_train_fold)) < 2:
+            print(f"  Warning: Skipping fold with only one class in training set")
+            # Set predictions to NaN for this fold
+            y_pred_cv.iloc[val_idx] = np.nan
+            # Don't include this fold in metrics
+            continue
         
         # Compute sample weights for this fold
         sample_weight = compute_sample_weight(class_weight='balanced', y=y_train_fold)
@@ -241,63 +242,80 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
         # Predict on validation fold - use .iloc to set by position
         y_pred_proba_fold = fold_model.predict_proba(X_val_fold)[:, 1]
         y_pred_cv.iloc[val_idx] = y_pred_proba_fold
-        
-        # Calculate per-fold metrics
-        y_pred_binary = (y_pred_proba_fold >= 0.5).astype(int)
-        
-        # F1 macro for this fold
-        f1_fold = f1_score(y_val_fold, y_pred_binary, average='macro', zero_division=0)
-        fold_metrics['f1_macro'].append(f1_fold)
-        
-        # Sensitivity and specificity for this fold
-        tn, fp, fn, tp = confusion_matrix(y_val_fold, y_pred_binary).ravel()
-        sensitivity_fold = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        specificity_fold = tn / (tn + fp) if (tn + fp) > 0 else 0.0
-        
-        fold_metrics['sensitivity'].append(sensitivity_fold)
-        fold_metrics['specificity'].append(specificity_fold)
-        fold_metrics['sizes'].append(len(val_idx))
     
     # Compute overall CV metrics (global across all predictions)
+    # Filter out NaN values (from skipped folds)
+    valid_mask = ~np.isnan(y_pred_cv.values)
+    
+    if not valid_mask.any():
+        # All folds were skipped - return NaN metrics
+        print("  Warning: All folds were skipped due to single-class training sets")
+        return y_pred_cv, {
+            'auc': np.nan,
+            'auc_std': np.nan,
+            'f1_macro': np.nan,
+            'f1_macro_std': np.nan,
+            'sensitivity': np.nan,
+            'sensitivity_std': np.nan,
+            'specificity': np.nan,
+            'specificity_std': np.nan
+        }
+    
+    y_valid = y.values[valid_mask]
+    y_pred_valid = y_pred_cv.values[valid_mask]
+    
     stats = Statistics()
-    auc, ci = stats.auc_roc_ci(y.values, y_pred_cv.values, alpha=0.95)
+    auc, ci = stats.auc_roc_ci(y_valid, y_pred_valid, alpha=0.95)
     auc_std = (ci[1] - ci[0]) / 2
     
-    y_pred_binary_all = (y_pred_cv.values >= 0.5).astype(int)
-    f1_macro_overall = f1_score(y.values, y_pred_binary_all, average='macro', zero_division=0)
+    # Define custom scorers for sensitivity and specificity
+    def sensitivity_score(y_true, y_pred):
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+        return tp / (tp + fn) if (tp + fn) > 0 else 0.0
     
-    tn, fp, fn, tp = confusion_matrix(y.values, y_pred_binary_all).ravel()
-    sensitivity_overall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    specificity_overall = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    def specificity_score(y_true, y_pred):
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+        return tn / (tn + fp) if (tn + fp) > 0 else 0.0
     
-    # Calculate weighted standard deviations for f1_macro, sensitivity, specificity
-    fold_sizes = np.array(fold_metrics['sizes'])
+    # Prepare sample weights for CV scoring
+    sample_weights = compute_sample_weight(class_weight='balanced', y=y)
     
-    def weighted_std(values, weights, mean_val):
-        """Calculate weighted standard deviation."""
-        values = np.array(values)
-        valid = ~np.isnan(values)
-        values_valid = values[valid]
-        weights_valid = weights[valid]
-        
-        if len(values_valid) == 0:
-            return 0.0
-        
-        var = np.average((values_valid - mean_val)**2, weights=weights_valid)
-        return np.sqrt(var)
+    # Create a function that returns fresh CV splits
+    def get_cv_splits():
+        return cv_splits
     
-    f1_macro_std = weighted_std(fold_metrics['f1_macro'], fold_sizes, f1_macro_overall)
-    sensitivity_std = weighted_std(fold_metrics['sensitivity'], fold_sizes, sensitivity_overall)
-    specificity_std = weighted_std(fold_metrics['specificity'], fold_sizes, specificity_overall)
+    # Compute weighted CV metrics using ML.get_weighted_cv
+    ml = ML()
+    
+    f1_macro_mean, f1_macro_std = ml.get_weighted_cv(
+        model, X, y, 
+        cv_getter=get_cv_splits,
+        scorer='f1_macro',
+        sample_weight=sample_weights
+    )
+    
+    sensitivity_mean, sensitivity_std = ml.get_weighted_cv(
+        model, X, y,
+        cv_getter=get_cv_splits,
+        scorer=make_scorer(sensitivity_score),
+        sample_weight=sample_weights
+    )
+    
+    specificity_mean, specificity_std = ml.get_weighted_cv(
+        model, X, y,
+        cv_getter=get_cv_splits,
+        scorer=make_scorer(specificity_score),
+        sample_weight=sample_weights
+    )
     
     return y_pred_cv, {
         'auc': auc,
         'auc_std': auc_std,
-        'f1_macro': f1_macro_overall,
+        'f1_macro': f1_macro_mean,
         'f1_macro_std': f1_macro_std,
-        'sensitivity': sensitivity_overall,
+        'sensitivity': sensitivity_mean,
         'sensitivity_std': sensitivity_std,
-        'specificity': specificity_overall,
+        'specificity': specificity_mean,
         'specificity_std': specificity_std
     }
 
@@ -402,7 +420,7 @@ def train_and_evaluate_modality(
     # 6. Setup cross-validation
     print("6. Setting up cross-validation...")
     train_folds = dl.get_loco_folds(pd.Series(train_set.index))
-    cv = GroupKFold(n_splits=len(train_folds.unique()))
+    cv = SafeGroupKFold(n_splits=len(train_folds.unique()))
     
     def get_cv_splits():
         return list(cv.split(X_train_scaled, y_train, groups=train_folds))
@@ -851,7 +869,7 @@ def main():
     print("="*80)
     print(f"Outcome: {outcome.value}")
     print(f"Subanalysis: {subanalysis.value}")
-    print(f"Default model type: {default_model_type.value}")
+    # print(f"Default model type: {default_model_type.value}")
     print(f"Feature selection: {'LASSO' if select_features else 'disabled'}")
     print(f"Output directory: {base_path.resolve()}")
     print(f"\nModalities to train ({len(modalities_to_train)}):")
