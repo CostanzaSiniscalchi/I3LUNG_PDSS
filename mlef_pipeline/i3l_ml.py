@@ -3,8 +3,8 @@ from lifelines import CoxPHFitter
 import numpy as np
 from sklearn.feature_selection import SelectFromModel
 from sklearn.linear_model import Lasso
-from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import BaseCrossValidator, KFold, GridSearchCV
+from sklearn.metrics import roc_auc_score, make_scorer
+from sklearn.model_selection import BaseCrossValidator, KFold, GridSearchCV, cross_val_score
 from sklearn.utils import compute_sample_weight
 from skopt import BayesSearchCV
 from i3l_statistics import Statistics
@@ -138,6 +138,36 @@ class ML:
         return weighted_auc
     
 
+    @staticmethod
+    def get_weighted_cv(model, X, y, cv_getter, scorer, sample_weight=None):
+        """
+        Compute weighted cross-validation score with proper handling of variable fold sizes.
+        
+        Args:
+            model: The model to evaluate
+            X: Features
+            y: Target
+            cv_getter: Function that returns CV splits
+            scorer: Scoring function or string
+            sample_weight: Optional sample weights
+        
+        Returns:
+            score_mean: Weighted mean score
+            score_std: Weighted standard deviation
+        """
+        fold_sizes = np.array([len(test_idx) for _, test_idx in cv_getter()])
+        
+        score = cross_val_score(model, X, y, scoring=scorer, cv=cv_getter(), params={'sample_weight': sample_weight})
+        score = np.array(score)
+        valid = ~np.isnan(score)
+        score_valid = score[valid]
+        weights_valid = fold_sizes[valid]
+        score_mean = np.average(score_valid, weights=weights_valid)
+        var = np.average((score_valid - score_mean)**2, weights=weights_valid)
+        score_std = np.sqrt(var)
+        
+        return score_mean, score_std
+
     def hyperparameter_tuning(self, model, param_grid, cv, X_train, y_train, sample_weight):
         n_iter = 50
         opt = BayesSearchCV(
@@ -193,7 +223,7 @@ class ML:
             print(selected_features)
         with open('mlef_pipeline/classification_config.json', 'r') as f:
             param_grids = json.load(f)
-
+        
         best_clf = self.hyperparameter_tuning(
             model=clf,
             param_grid=param_grids[f'param_grid_{model_name.value}'],
