@@ -21,6 +21,7 @@
 !helper.py
 !helper_survival.py
 !helper_survival_fairness.py
+!helper_survival_graphs.py
 !graphs_survival_analysis.ipynb
 !graphs_survival_fairness.ipynb
 !I3LUNG_PDSS/dlif_pipeline/data/**/*

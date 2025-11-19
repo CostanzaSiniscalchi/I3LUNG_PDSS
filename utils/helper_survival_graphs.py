@@ -1,0 +1,641 @@
+import itertools
+import os
+from pathlib import Path
+from typing import Iterable, List, Literal, Optional, Tuple, Union
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from lifelines import KaplanMeierFitter
+from lifelines.statistics import multivariate_logrank_test, logrank_test
+from lifelines.utils import median_survival_times
+from lifelines.plotting import add_at_risk_counts
+from matplotlib.patches import Rectangle
+from matplotlib.transforms import Bbox
+import shap
+from utils.DeLong_test import *
+
+def plot_km_combined(datasets, stats: bool=True):
+    """
+    Curve KM stratificate, con test globale + pairwise, box di annotazione
+    con bordo centrato, padding extra attorno al testo, box e testo sollevati,
+    e legenda in alto a destra con font ridotto.
+    """
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=300, facecolor='white')
+    colors = ["#5AAA46", '#D9A961', "#D15472"]
+    colors = {name: color for name, color in zip(datasets.keys(), colors)}
+    kmfs, data_dict, median_ann = [], {}, []
+    df_size = 0
+
+    for label, df in datasets.items():
+        kdf = df.dropna(subset=['TIME','EVENT'])
+        d, e = kdf['TIME'].values, kdf['EVENT'].values
+
+        kmf = KaplanMeierFitter().fit(d, e, label=label)
+        kmf.plot(ax=ax, color=colors[label], ci_show=stats,
+                 show_censors=True, legend=True)
+        kmfs.append(kmf)
+
+        lo, hi = median_survival_times(kmf.confidence_interval_).iloc[0]
+        median_ann.append(f"{label}: {kmf.median_survival_time_:.1f} m (95% CI {lo:.1f}-{hi:.1f})")
+        data_dict[label] = (d, e)
+        df_size += df.shape[0]
+    
+    all_durs = sum((list(v[0]) for v in data_dict.values()), [])
+    all_evts = sum((list(v[1]) for v in data_dict.values()), [])
+    all_grps = sum(([lbl]*len(v[0]) for lbl,v in data_dict.items()), [])
+    mv = multivariate_logrank_test(pd.Series(all_durs),
+                                   pd.Series(all_grps),
+                                   event_observed=pd.Series(all_evts))
+    chi2_glob, p_glob = mv.test_statistic, mv.p_value
+
+    comps = list(itertools.combinations(data_dict.keys(),2))
+    m = len(comps)
+    pw_rows = []
+    for g1,g2 in comps:
+        d1,e1 = data_dict[g1]
+        d2,e2 = data_dict[g2]
+        lr = logrank_test(d1, d2,
+                          event_observed_A=e1,
+                          event_observed_B=e2)
+        p_adj = min(lr.p_value * m, 1.0)
+        pw_rows.append((g1,g2, lr.test_statistic, p_adj))
+    pw_df = pd.DataFrame(pw_rows, columns=['g1','g2','chi2','p_bonferroni'])
+
+    lines = []
+    lines.extend(median_ann)
+    if stats:
+        lines.append("")
+        lines.append(f"Global log-rank: χ²={chi2_glob:.2f}, p={p_glob:.2g}")
+        for _, r in pw_df.iterrows():
+            lines.append(f"{r['g1']} vs {r['g2']}: χ²={r['chi2']:.2f}, p_adj={r['p_bonferroni']:.2g}")
+
+    text_artists = []
+    x0_text, y0_text = 0.5, 0.97
+    line_h = 0.035
+    for i, txt in enumerate(lines):
+        ta = ax.text(
+            x0_text, y0_text - i*line_h, txt,
+            transform=ax.transAxes,
+            ha='center', va='top',
+            fontsize=9, zorder=2
+        )
+        text_artists.append(ta)
+
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    bboxes = [t.get_window_extent(renderer) for t in text_artists]
+    union = Bbox.union(bboxes)
+    axes_bbox = ax.transAxes.inverted().transform_bbox(union)
+
+    pad_x, pad_y = 0.015, 0.02
+    x0 = axes_bbox.x0 - pad_x
+    y0 = axes_bbox.y0 - pad_y
+    width  = axes_bbox.width + 2*pad_x
+    height = axes_bbox.height + 2*pad_y
+
+    rect = Rectangle(
+        (x0, y0),
+        width, height,
+        transform=ax.transAxes,
+        facecolor='white',
+        edgecolor='black',
+        alpha=0.7,
+        zorder=1
+    )
+    ax.add_patch(rect)
+
+    for t in text_artists:
+        y = t.get_position()[1]
+        t.set_ha('left')
+        t.set_position((x0 + pad_x, y))
+
+    ax.legend(loc='upper right', fontsize=8)
+
+    add_at_risk_counts(*kmfs, ax=ax, labels=list(datasets.keys()), fontsize=11)
+    ax.set_xlim(0, 100)
+    ax.set_xlabel('Months')
+    ax.set_ylabel('Survival Probability')
+    ax.set_title(f'KM Plot (test set, {df_size} patients) - COX - OS')
+
+    return plt, pw_df
+
+
+def plot_cindex_results(
+    architecture: Union[Literal["MLEF", "DLIF"], Path],
+    outcome: str,                                              # e.g. OS_24, OS_6, DCR
+    analyses: Union[str, Iterable[str]],                       # e.g. "C23" or ["C2", "ADENO", ...]
+    *,
+    modality_order: Optional[List[str]] = None,                # enforce x-axis order
+    exclude_modalities: Iterable[str] = ("DP", "FMRAD", "PYRAD"),
+    title_prefix: Optional[str] = None,
+    min_bubble: float = 30,
+    max_bubble: float = 250,
+    show: bool = True,
+    save_dir: Optional[Union[str, Path]] = None,
+    dlif_base_path: Optional[Union[str, Path]] = None,         # Base path for DLIF pipeline
+    dlif_eval_type: str = "standard",                          # standard, cross_validation, or evaluation
+    dlif_feature_type: str = "hypothesis_driven",              # hypothesis_driven or data_driven
+    dlif_extraction: str = "pyrad-noimp",                      # feature extraction method
+    dlif_seed: int = 0                                         # seed number
+):
+    """
+    Expected per-analysis layout:
+
+    MLEF:
+        mlef_pipeline/results/
+         OS_24/ (or DCR/ OR OS_6/ or OS/)
+          C23/
+            RWD/
+              model_XX.pkl
+              train_set.xlsx
+              test_set.xlsx
+              prediction_CV.xlsx   (columns: Subject, y_pred, y_true)
+              results.xlsx      (metrics incl. AUC, C-INDEX)
+            RWD_DP/
+               RWD_ONLY/         (MLEF only)
+            RWD_PYRAD/
+            RWD_FMRAD/
+            RWD_DP_PYRAD/
+            RWD_DP_FMRAD/
+
+    DLIF:
+        dlif_pipeline/results/
+         C23/
+          os_months_24/ (or DCR/)
+           classification/
+            standard/ (or cross_validation/, evaluation/)
+             hypothesis_driven/ (or data_driven/)
+              pyrad-noimp/ (or other extraction methods)
+               rwd/
+                seed_0/
+                 predictions.parquet
+                 predictions_train.parquet
+                 eval_auc_ci.csv
+                 eval_classification_metrics.csv
+               rwd_dp/
+               rwd_radfm/
+               rwd_radpy/
+               rwd_radfm_dp/
+               rwd_radpy_dp/
+    """
+    metric = 'C-INDEX' if outcome == 'OS' else 'AUC'
+    # ------------------------- utilities -------------------------
+    def _parse_mean_std(val) -> Tuple[float, float]:
+        if pd.isna(val):
+            return (np.nan, np.nan)
+        if isinstance(val, (int, float, np.floating)):
+            return (float(val), 0.0)
+        s = str(val).replace("+/-", "±")
+        parts = [p.strip() for p in s.split("±")]
+        try:
+            if len(parts) == 2:
+                return (float(parts[0]), float(parts[1]))
+            return (float(parts[0]), 0.0)
+        except Exception:
+            return (np.nan, np.nan)
+
+    def _read_result_cv(results_path: Path) -> Tuple[float, float]:
+        if results_path is None or not results_path.exists():
+            return (np.nan, np.nan)
+        
+        df = pd.read_excel(results_path)
+        
+        sub = df[df['SET'] == 'CV']
+        if sub.empty:
+            return (np.nan, np.nan)
+        
+        return _parse_mean_std(sub[metric].iloc[0])
+
+    def _read_auc_dlif(auc_csv_path: Path) -> Tuple[float, float]:
+        """Read AUC from DLIF's eval_auc_ci.csv file."""
+        if auc_csv_path is None or not auc_csv_path.exists():
+            return (np.nan, np.nan)
+        try:
+            df = pd.read_csv(auc_csv_path)
+            # Expected columns: auc, ci_lower, ci_upper
+            if 'auc' in df.columns:
+                auc = float(df['auc'].iloc[0])
+                # Calculate std from CI if available
+                if 'ci_lower' in df.columns and 'ci_upper' in df.columns:
+                    ci_lower = float(df['ci_lower'].iloc[0])
+                    ci_upper = float(df['ci_upper'].iloc[0])
+                    # Approximate std from 95% CI: (upper - lower) / (2 * 1.96)
+                    std = (ci_upper - ci_lower) / (2 * 1.96)
+                    return (auc, std)
+                return (auc, 0.0)
+        except Exception:
+            pass
+        return (np.nan, np.nan)
+
+    def _read_n_train_dlif(predictions_train_path: Path) -> int:
+        """Read number of training samples from DLIF's predictions_train.parquet."""
+        if predictions_train_path is None or not predictions_train_path.exists():
+            return int(np.nan)
+        try:
+            df = pd.read_parquet(predictions_train_path)
+            return int(len(df))
+        except Exception:
+            return int(np.nan)
+
+    def _read_model_name(model_path: Path) -> str:
+        """
+        Model files are named like 'model_LR' or 'model_RF'.
+        Return the substring after the first underscore.
+        """
+        if model_path is None or not model_path.exists():
+            return "UnknownModel"
+        stem = model_path.name  # allow filenames without extensions
+        # If it has an extension, strip it
+        if "." in stem:
+            stem = stem.split(".", 1)[0]
+        if "_" in stem:
+            return stem.split("_", 1)[1] or "UnknownModel"
+        return "UnknownModel"
+
+    def _read_n_train(train_path: Path) -> int:
+        return pd.read_csv(train_path).shape[0]
+
+    def _scale_sizes(raw_sizes: Iterable[Union[int, float]]) -> np.ndarray:
+        arr = np.array(list(raw_sizes), dtype=float)
+        if arr.size == 0 or np.all(np.isnan(arr)):
+            return np.array([])
+        amin, amax = np.nanmin(arr), np.nanmax(arr)
+        if not np.isfinite(amin) or not np.isfinite(amax) or (amax - amin < 1e-9):
+            return np.full_like(arr, (min_bubble + max_bubble) / 2.0)
+        norm = (arr - amin) / (amax - amin + 1e-6)
+        return norm * (max_bubble - min_bubble) + min_bubble
+
+    def _ordered_modalities(mods: List[str]) -> List[str]:
+        filtered = [m for m in mods if m not in exclude_modalities]
+        if modality_order:
+            in_order = [m for m in modality_order if m in filtered]
+            leftovers = [m for m in filtered if m not in in_order]
+            return in_order + leftovers
+        return filtered
+
+    def _map_dlif_to_mlef_modality(dlif_name: str) -> str:
+        """
+        Map DLIF modality names to MLEF-style names.
+        DLIF: rwd, rwd_dp, rwd_radfm, rwd_radpy, rwd_radfm_dp, rwd_radpy_dp
+        MLEF: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD
+        """
+        mapping = {
+            'rwd': 'RWD',
+            'rwd_dp': 'RWD_DP',
+            'rwd_radfm': 'RWD_FMRAD',
+            'rwd_radpy': 'RWD_PYRAD',
+            'rwd_radfm_dp': 'RWD_DP_FMRAD',
+            'rwd_radpy_dp': 'RWD_DP_PYRAD',
+        }
+        return mapping.get(dlif_name.lower(), dlif_name.upper())
+
+    def _map_mlef_to_dlif_modality(mlef_name: str) -> str:
+        """
+        Map MLEF modality names to DLIF-style names.
+        """
+        mapping = {
+            'RWD': 'rwd',
+            'RWD_DP': 'rwd_dp',
+            'RWD_FMRAD': 'rwd_radfm',
+            'RWD_PYRAD': 'rwd_radpy',
+            'RWD_DP_FMRAD': 'rwd_radfm_dp',
+            'RWD_DP_PYRAD': 'rwd_radpy_dp',
+        }
+        return mapping.get(mlef_name.upper(), mlef_name.lower())
+
+    def _collect_modalities(analysis_dir: Path) -> List[str]:
+        return _ordered_modalities([p.name for p in analysis_dir.iterdir()
+                                    if p.is_dir() and p.name.upper().startswith("RWD")])
+
+    def _pair_paths(analysis_dir: Path, modality: str):
+        """
+        Robust path resolver for MLEF:
+        - accepts RWD_ONLY or rwd-only (any case)
+        - accepts files named like results(.xlsx/.xls), prediction(_CV).xlsx, train_set(.xlsx), etc.
+        - accepts files with different case
+        """
+        def find_first(dir_: Path, stems: List[str]) -> Optional[Path]:
+            if not dir_.exists():
+                return None
+            # try exact matches first
+            for st in stems:
+                for ext in ("", ".xlsx", ".xls"):
+                    p = dir_ / f"{st}{ext}"
+                    if p.exists():
+                        return p
+            # then glob by prefix (case-insensitive)
+            cand: List[Path] = []
+            for st in stems:
+                cand += list(dir_.glob(f"{st}*"))
+                cand += list(dir_.glob(f"{st.upper()}*"))
+                cand += list(dir_.glob(f"{st.lower()}*"))
+            # prefer xlsx/xls if multiple
+            cand = sorted(cand, key=lambda x: (x.suffix.lower() not in {".xlsx", ".xls"}, len(x.name)))
+            return cand[0] if cand else None
+
+        def find_subdir_any(dir_: Path, names: List[str]) -> Optional[Path]:
+            if not dir_.exists():
+                return None
+            # exact
+            for n in names:
+                p = dir_ / n
+                if p.exists() and p.is_dir():
+                    return p
+            # case-insensitive scan
+            low_targets = {n.lower(): n for n in names}
+            for p in dir_.iterdir():
+                if p.is_dir() and p.name.lower() in low_targets:
+                    return p
+            return None
+
+        mod_dir = analysis_dir / modality
+
+        paths = {
+            "mod": {
+                "results": find_first(mod_dir, ["results", "Results"]),
+                "pred":    find_first(mod_dir, ["prediction_CV", "prediction", "Prediction"]),
+                "model":   find_first(mod_dir, ["model_", "model"]),   # picks model_LR / model_RF
+                "train":   find_first(mod_dir, ["train_set", "Train_set", "train"]),
+            },
+            "rwd_only": None
+        }
+
+        if arch_name == "MLEF":
+            ro_dir = find_subdir_any(
+                mod_dir,
+                ["RWD_ONLY", "rwd-only", "Rwd_only", "RWD-ONLY"]
+            )
+            if ro_dir:
+                paths["rwd_only"] = {
+                    "results": find_first(ro_dir, ["results", "Results"]),
+                    "pred":    find_first(ro_dir, ["prediction_CV", "prediction", "Prediction"]),
+                    "model":   find_first(ro_dir, ["model_", "model"]),
+                    "train":   find_first(ro_dir, ["train_set", "Train_set", "train"]),
+                }
+        return paths
+
+    def _pair_paths_dlif(base_dir: Path, modality: str) -> dict:
+        """
+        Path resolver for DLIF architecture.
+        Returns dict with paths to DLIF files.
+        """
+        # DLIF modality directories use lowercase with underscores
+        dlif_modality = _map_mlef_to_dlif_modality(modality)
+
+        # Build path: base_dir / modality / seed_X /
+        mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
+
+        if not mod_dir.exists():
+            return {
+                "mod": {
+                    "results": None,
+                    "pred": None,
+                    "model": None,
+                    "train": None,
+                },
+                "rwd_only": None
+            }
+
+        paths = {
+            "mod": {
+                "results": mod_dir / "eval_auc_ci.csv" if (mod_dir / "eval_auc_ci.csv").exists() else None,
+                "pred": mod_dir / "predictions.parquet" if (mod_dir / "predictions.parquet").exists() else None,
+                "model": None,  # DLIF stores models differently
+                "train": mod_dir / "predictions_train.parquet" if (mod_dir / "predictions_train.parquet").exists() else None,
+            },
+            "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
+        }
+
+        return paths
+
+
+    def _compute_pvalue(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
+        """
+        Read predictions directly from prediction.xlsx files (Subject, y_pred, y_true),
+        align on Subject, then run DeLong.
+        """
+        if not (pred_mod_path and pred_ro_path and pred_mod_path.exists() and pred_ro_path.exists()):
+            return None
+        dm = pd.read_csv(pred_mod_path)
+        dr = pd.read_csv(pred_ro_path)
+        # minimal schema check
+        for col in ("Subject", "y_pred", "y_true"):
+            if col not in dm.columns:
+                return None
+        if "Subject" not in dr.columns or "y_pred" not in dr.columns:
+            return None
+
+        m = dm.rename(columns={"y_pred": "y_pred_mod"})
+        r = dr.rename(columns={"y_pred": "y_pred_ro"})
+        merged = pd.merge(m[["Subject", "y_true", "y_pred_mod"]],
+                          r[["Subject", "y_pred_ro"]],
+                          on="Subject", how="inner")
+        if merged.empty:
+            return None
+        return float(delong_test_comparison(
+            merged["y_true"].to_numpy(),
+            merged["y_pred_mod"].to_numpy(),
+            merged["y_pred_ro"].to_numpy()
+        )['p_value'])
+
+    def _plot_one(analysis: str, rows: List[dict]) -> plt.Figure:
+        modalities = [r["modality"] for r in rows]
+        X = np.arange(len(modalities))
+
+        auc_mod_mean = np.array([r[f"{metric}_mod_mean"] for r in rows], dtype=float)
+        auc_mod_std  = np.array([r[f"{metric}_mod_std"]  for r in rows], dtype=float)
+        n_train_mod  = np.array([r["n_train_mod"]  for r in rows], dtype=float)
+        sizes        = _scale_sizes(n_train_mod)
+        model_names  = [r["model_mod"] for r in rows]
+
+        fig = plt.figure(figsize=(12, 6))
+        # BLUE: modality
+        plt.plot(X, auc_mod_mean, linestyle="-", marker="o", label=f"CV {metric}", color="#1a80bb")
+        plt.scatter(X, auc_mod_mean, s=sizes, color="#1a80bb", zorder=3)
+        plt.fill_between(X, auc_mod_mean - auc_mod_std, auc_mod_mean + auc_mod_std,
+                         alpha=0.3, color="#8cc5e3", label="Confidence interval")
+
+        multimodal_better = None
+
+        if arch_name == "MLEF":
+            auc_ro_mean = np.array([r[f"{metric}_ro_mean"] for r in rows], dtype=float)
+            auc_ro_std  = np.array([r[f"{metric}_ro_std"]  for r in rows], dtype=float)
+            plt.plot(X, auc_ro_mean, linestyle="-", marker="o", label=f"CV {metric} - RWD-only matched", color="#a00000")
+            plt.scatter(X, auc_ro_mean, s=sizes, color="#a00000", zorder=3)
+            plt.fill_between(X, auc_ro_mean - auc_ro_std, auc_ro_mean + auc_ro_std,
+                             alpha=0.3, color="#d8a6a6", label="Confidence interval - RWD-only matched")
+            multimodal_better = (auc_mod_mean > auc_ro_mean)
+
+        xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})" for m, n in zip(modalities, n_train_mod)]
+        plt.xticks(X, xticks)
+
+        # --- BLUE annotations (now show stars here) ---
+        for i, (mval, mstd, mname) in enumerate(zip(auc_mod_mean, auc_mod_std, model_names)):
+            base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
+            plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
+                    fontsize=9, ha="center", color="#1a80bb")
+            # stars belong to the multimodal-vs-RWD comparison
+            star = rows[i].get("stars", "")
+            if star:
+                # nudge a bit to the right of the blue text
+                plt.text(i + 0.33, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
+
+
+        # --- RED annotations (keep values but REMOVE stars here) ---
+        if arch_name == "MLEF":
+            for i, rrow in enumerate(rows):
+                rv, rs, rname = rrow[f"{metric}_ro_mean"], rrow[f"{metric}_ro_std"], rrow["model_ro"]
+                base_y = 0.02 if multimodal_better[i] else 0.06
+                if np.isfinite(rv) and np.isfinite(rs):
+                    plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
+                            fontsize=9, ha="center", color="#a00000")
+
+        ttl = title_prefix or f"CV {metric} - {arch_name}"
+        plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
+        plt.ylabel(metric)
+        plt.ylim(0, 1)
+        plt.grid(True, linestyle="--", alpha=0.6)
+        plt.legend()
+        plt.xlim(-0.4, len(modalities) - 0.55)
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+            out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{analysis}.png"
+            plt.savefig(out, dpi=600, bbox_inches="tight")
+        if show:
+            plt.show()
+        return fig
+
+    # ------------------------- main logic -------------------------
+    if isinstance(analyses, str):
+        analyses = [analyses]
+    
+    # Normalize architecture to both string name and Path
+    if isinstance(architecture, Path):
+        arch_path = architecture
+        arch_name = architecture.name  # Get the last part of the path (e.g., "MLEF" or "DLIF")
+    else:
+        arch_path = Path(architecture)
+        arch_name = architecture
+
+    # Convert outcome to DLIF format if needed
+    def _outcome_to_dlif(outcome_str: str) -> str:
+        """Convert MLEF outcome names to DLIF format."""
+        mapping = {
+            'OS_24': 'os_months_24',
+            'OS_6': 'os_months_6',
+            'DCR': 'DCR'
+        }
+        return mapping.get(outcome_str, outcome_str)
+
+    for analysis in analyses:
+        # Build the correct path based on architecture
+        if architecture == "MLEF":
+            # MLEF: mlef_pipeline/results/outcome/analysis/ 
+            base_path = Path("mlef_pipeline/results") / outcome / analysis
+            analysis_dir = base_path
+        else:  # DLIF
+            # DLIF: dlif_pipeline/results/analysis/outcome/classification/eval_type/feature_type/extraction/
+            if dlif_base_path is None:
+                dlif_base_path = Path("dlif_pipeline/results")
+            else:
+                dlif_base_path = Path(dlif_base_path)
+
+            dlif_outcome = _outcome_to_dlif(outcome)
+            analysis_dir = (dlif_base_path / analysis / dlif_outcome / "classification" /
+                          dlif_eval_type / dlif_feature_type / dlif_extraction)
+
+        if not analysis_dir.exists():
+            continue
+
+        # Collect modalities
+        if architecture == "DLIF":
+            # For DLIF, list directories and map them to MLEF names
+            if not analysis_dir.exists():
+                continue
+            dlif_modalities = [p.name for p in analysis_dir.iterdir()
+                             if p.is_dir() and p.name.lower().startswith("rwd")]
+            modalities = [_map_dlif_to_mlef_modality(m) for m in dlif_modalities]
+            modalities = _ordered_modalities(modalities)
+        else:
+            modalities = _collect_modalities(analysis_dir)
+
+        if not modalities:
+            continue
+
+        rows: List[dict] = []
+        for mod in modalities:
+            # Get paths based on architecture
+            if architecture == "DLIF":
+                paths = _pair_paths_dlif(analysis_dir, mod)
+                # Read DLIF-specific files
+                auc_m, std_m = _read_auc_dlif(paths["mod"]["results"])
+                model_m = "MIL"  # DLIF uses MIL models
+                ntrain_m = _read_n_train_dlif(paths["mod"]["train"])
+            else:
+                paths = _pair_paths(analysis_dir, mod)
+                # modality side
+                auc_m, std_m = _read_result_cv(paths["mod"]["results"])
+                model_m = _read_model_name(paths["mod"]["model"])
+                ntrain_m = _read_n_train(paths["mod"]["train"])
+
+            row = {
+                "modality": mod,
+                f"{metric}_mod_mean": float(auc_m),
+                f"{metric}_mod_std": float(std_m) if np.isfinite(std_m) else 0.0,
+                "n_train_mod": ntrain_m,
+                "model_mod": model_m,
+            }
+
+            # paired RWD_ONLY (MLEF only) with RWD red==blue behavior
+            if arch_name == "MLEF":
+                if mod == "RWD":
+                    # enforce coincidence for RWD: red == blue; no p-value
+                    row.update({
+                        f"{metric}_ro_mean": row[f"{metric}_mod_mean"],
+                        f"{metric}_ro_std":  row[f"{metric}_mod_std"],
+                        "n_train_ro":  row["n_train_mod"],
+                        "model_ro":    row["model_mod"],
+                        "pvalue":      None,
+                        "stars":       ""
+                    })
+                else:
+                    ro = paths["rwd_only"]
+                    if ro is not None:
+                        auc_r, std_r = _read_result_cv(ro["results"])
+                        pval = _compute_pvalue(paths["mod"]["pred"], ro["pred"])
+                        row.update({
+                            f"{metric}_ro_mean": float(auc_r),
+                            f"{metric}_ro_std":  float(std_r) if np.isfinite(std_r) else 0.0,
+                            "n_train_ro":  _read_n_train(ro["train"]),
+                            "model_ro":    _read_model_name(ro["model"]),
+                            "pvalue":      pval,
+                            "stars":       p_to_stars(pval) if (pval is not None and np.isfinite(pval)) else ""
+                        })
+                    else:
+                        row.update({
+                            f"{metric}_ro_mean": np.nan,
+                            f"{metric}_ro_std":  np.nan,
+                            "n_train_ro":  np.nan,
+                            "model_ro":    "NA",
+                            "pvalue":      None,
+                            "stars":       ""
+                        })
+
+            rows.append(row)
+
+        rows = [r for r in rows if np.isfinite(r[f"{metric}_mod_mean"])]
+        if not rows:
+            continue
+        
+        _ = _plot_one(analysis, rows)
+
+
+def shap_beeswarm(model, X_train: pd.DataFrame, X_test: pd.DataFrame, mapping = {}) -> None:
+    explainer = shap.Explainer(model.predict_partial_hazard, X_train)
+    
+    shap_values = explainer(X_test)
+
+    shap_values.feature_names = [mapping.get(name, name) for name in shap_values.feature_names]
+    shap.plots.beeswarm(shap_values, show=False, max_display=20)
+
+    plt.show()

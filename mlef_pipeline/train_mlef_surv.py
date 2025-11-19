@@ -96,11 +96,11 @@ def save_datasets(output_dir: Path, train_set: pd.DataFrame, test_set: pd.DataFr
     if not ext_set.empty:
         ext_set.index.name = 'Subject'
     
-    train_with_folds.to_excel(output_dir / 'train_set.xlsx', index=True)
-    test_set.to_excel(output_dir / 'test_set.xlsx', index=True)
+    train_with_folds.to_csv(output_dir / 'train_set.csv', index=True)
+    test_set.to_csv(output_dir / 'test_set.csv', index=True)
     
     if not ext_set.empty:
-        ext_set.to_excel(output_dir / 'exval_set.xlsx', index=True)
+        ext_set.to_csv(output_dir / 'exval_set.csv', index=True)
     
     print(f"  ✓ Saved datasets to {output_dir}")
 
@@ -187,12 +187,13 @@ def train_and_evaluate_modality(
     
     # 2. Split data
     print("2. Splitting data...")
-    with open('mlef_pipeline/split.json', 'r') as f:
-        split = json.load(f)
     
-    train_set = dataset[dataset['Subject'].isin(split['TRAIN_SET'])].set_index('Subject')
-    test_set = dataset[dataset['Subject'].isin(split['TEST_SET'])].set_index('Subject')
-    ext_set = dataset[dataset['Subject'].str.startswith('UOC')].set_index('Subject')
+    train_set = dataset[dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
+    test_set = dataset[dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+    ext_set = dataset[dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+
+    train_folds = train_set['CENTER']
+    train_set = train_set.drop(columns=['CENTER'])
     
     # 3. Remove test samples with TIME > max train TIME
     print("3. Adjusting test set for survival analysis...")
@@ -258,7 +259,6 @@ def train_and_evaluate_modality(
     
     # 7. Setup cross-validation
     print("7. Setting up cross-validation...")
-    train_folds = dl.get_loco_folds(pd.Series(train_set.index))
     cv = GroupKFold(n_splits=len(train_folds.unique()))
     
     def cv_getter():
@@ -393,7 +393,7 @@ def train_and_evaluate_modality(
         'TIME': y_train['TIME'].values,
         'EVENT': y_train['EVENT'].values
     })
-    cv_predictions.to_excel(output_dir / 'prediction_CV.xlsx', index=False)
+    cv_predictions.to_csv(output_dir / 'prediction_CV.csv', index=False)
     
     test_predictions = pd.DataFrame({
         'Subject': X_test_sel.index,
@@ -401,7 +401,7 @@ def train_and_evaluate_modality(
         'TIME': y_test['TIME'].values,
         'EVENT': y_test['EVENT'].astype(bool).values
     })
-    test_predictions.to_excel(output_dir / 'prediction_TEST.xlsx', index=False)
+    test_predictions.to_csv(output_dir / 'prediction_TEST.csv', index=False)
     
     if not ext_tbl.empty:
         ext_predictions = pd.DataFrame({
@@ -410,7 +410,7 @@ def train_and_evaluate_modality(
             'TIME': y_ext['TIME'].values,
             'EVENT': y_ext['EVENT'].astype(bool).values
         })
-        ext_predictions.to_excel(output_dir / 'prediction_EXVAL.xlsx', index=False)
+        ext_predictions.to_csv(output_dir / 'prediction_EXVAL.csv', index=False)
     
     # 16. Save results
     print("16. Saving results...")
@@ -646,7 +646,7 @@ def train_rwd_matched_model(
         'TIME': y_train['TIME'].values,
         'EVENT': y_train['EVENT'].values
     })
-    cv_predictions.to_excel(output_dir / 'prediction_CV.xlsx', index=False)
+    cv_predictions.to_csv(output_dir / 'prediction_CV.csv', index=False)
     
     test_predictions = pd.DataFrame({
         'Subject': X_test_sel.index,
@@ -654,7 +654,7 @@ def train_rwd_matched_model(
         'TIME': y_test['TIME'].values,
         'EVENT': y_test['EVENT'].astype(bool).values
     })
-    test_predictions.to_excel(output_dir / 'prediction_TEST.xlsx', index=False)
+    test_predictions.to_csv(output_dir / 'prediction_TEST.csv', index=False)
     
     if not ext_tbl.empty:
         ext_predictions = pd.DataFrame({
@@ -663,7 +663,7 @@ def train_rwd_matched_model(
             'TIME': y_ext['TIME'].values,
             'EVENT': y_ext['EVENT'].astype(bool).values
         })
-        ext_predictions.to_excel(output_dir / 'prediction_EXVAL.xlsx', index=False)
+        ext_predictions.to_csv(output_dir / 'prediction_EXVAL.csv', index=False)
     
     cv_auc_std = (cindex_cv['ci'][1] - cindex_cv['ci'][0]) / 2
     test_auc_std = (cindex_test['ci'][1] - cindex_test['ci'][0]) / 2
@@ -761,7 +761,7 @@ def main():
     # Train each modality combination
     for i, modes in enumerate(modalities_to_train, 1):
         print(f"\n[{i}/{len(modalities_to_train)}] Processing {get_modality_folder_name(modes)}...")
-
+        
         try:
             # Train main model
             result = train_and_evaluate_modality(
