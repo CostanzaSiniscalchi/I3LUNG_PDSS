@@ -90,36 +90,54 @@ def create_annotations(
                     ann.loc[split_ids, fold_col] = f"{center}_sub{i}"
         print(f"Created {n_sub} subfolds per center")
     
-    # Merge additional flags from RWD
-    rwd_flags = rwd[['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO IOCHT', 'IO LINE']].copy()
-    rwd_flags = rwd_flags.rename(columns={
+    # Merge additional flags from RWD - only use columns that exist
+    flag_cols = ['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO LINE']
+    available_flag_cols = [col for col in flag_cols if col in rwd.columns]
+    
+    rwd_flags = rwd[available_flag_cols].copy()
+    
+    # Rename columns
+    rename_map = {
         'HISTOLOGY ADENOCARCINOMA': 'NSCLC_HISTOLOGY_ADENOCARCINOMA',
         'HISTOLOGY SQUAMOUS': 'NSCLC_HISTOLOGY_SQUAMOUS',
-        'IO IOCHT': 'IO_IOCHT',
         'PDL1 CATEGORY': 'PDL1_CATEGORY',
         'IO LINE': 'IO_LINE'
-    })
+    }
+    rwd_flags = rwd_flags.rename(columns={k: v for k, v in rename_map.items() if k in rwd_flags.columns})
     
     ann = ann.merge(rwd_flags, left_on='patient', right_on='Subject', how='left')
     ann.drop(columns=['Subject'], inplace=True)
     
-    # Map PDL1 to low/high
-    ann['PDL1_GROUP'] = ann['PDL1_CATEGORY'].map({
-        0: 'low',
-        1: 'low',
-        2: 'high'
-    }).fillna('')
-    
-    ann.drop(columns=['PDL1_CATEGORY'], inplace=True)
+    # Map PDL1 to low/high if column exists
+    if 'PDL1_CATEGORY' in ann.columns:
+        ann['PDL1_GROUP'] = ann['PDL1_CATEGORY'].map({
+            0: 'low',
+            1: 'low',
+            2: 'high'
+        }).fillna('')
+        ann.drop(columns=['PDL1_CATEGORY'], inplace=True)
+    else:
+        ann['PDL1_GROUP'] = ''
     
     # Fill NaN in flags with empty string
-    ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ann['NSCLC_HISTOLOGY_SQUAMOUS'].fillna('')
-    ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'].fillna('')
-    ann['IO_IOCHT'] = ann['IO_IOCHT'].fillna('')
+    if 'NSCLC_HISTOLOGY_SQUAMOUS' in ann.columns:
+        ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ann['NSCLC_HISTOLOGY_SQUAMOUS'].fillna('')
+    else:
+        ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ''
+        
+    if 'NSCLC_HISTOLOGY_ADENOCARCINOMA' in ann.columns:
+        ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'].fillna('')
+    else:
+        ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ''
     
-    # COHORT_2 flag: IO LINE == 1
-    ann['COHORT_2'] = (ann['IO_LINE'] == 1).astype(int)
-    ann.drop(columns=['IO_LINE'], inplace=True)
+    ann['IO_IOCT'] = ''  # Not available in data
+    
+    # COHORT_2 flag: IO LINE == 1 if column exists
+    if 'IO_LINE' in ann.columns:
+        ann['COHORT_2'] = (ann['IO_LINE'] == 1).astype(int)
+        ann.drop(columns=['IO_LINE'], inplace=True)
+    else:
+        ann['COHORT_2'] = 0
     
     # HAS_ALL_MODALITIES flag
     features['HAS_ALL_MODALITIES'] = (
@@ -134,7 +152,7 @@ def create_annotations(
     
     print(f"Patients with all modalities: {ann['HAS_ALL_MODALITIES'].sum()}")
     
-    # Add early stopping
+    # Add early stopping for ALL outcomes
     np.random.seed(seed)
     train_df = ann[ann['dataset'] == 'train']
     
@@ -142,16 +160,7 @@ def create_annotations(
     early_stop_indices = train_df.sample(n=total_n, random_state=seed).index.tolist()
     print(f"Generated {total_n} early stopping subjects randomly")
 
-    allowed_early_outcomes = [
-        'ORR', 'CBR', 'PFS_MONTHS', 'OS_MONTHS', 'TTF_MONTHS',
-        'DEATH_EVENT_OC', 'PROGRESSION_EVENT_OC', 'THERAPY_END_EVENT_OC',
-        'BEST_RESPONSE', 'DCR', 'os_months_6', 'os_months_24'
-    ]
-
     for outcome in outcome_cols:
-        if outcome not in allowed_early_outcomes:
-            continue
-            
         fold_col = f'fold_{outcome}'
         early_stop_col = f'early_stopping_{outcome}'
         
@@ -174,9 +183,9 @@ def create_annotations(
     for outcome in outcome_cols:
         split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
     
-    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_IOCHT', 'COHORT_2', 'HAS_ALL_MODALITIES']
+    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_IOCT', 'COHORT_2', 'HAS_ALL_MODALITIES']
     
-    early_cols = [f'early_stopping_{o}' for o in allowed_early_outcomes if o in outcome_cols]
+    early_cols = [f'early_stopping_{o}' for o in outcome_cols]
     
     final_cols = base_cols + split_cols + flag_cols + early_cols
     
