@@ -44,24 +44,31 @@ def create_feature_dataset_from_processed(
         # Create base dataframe with all RWD subjects
         df_split = pd.DataFrame({'Subject': rwd['Subject']})
         
+        # Add SET and CENTER from RWD
+        df_split['SET'] = rwd['SET']
+        df_split['CENTER'] = rwd['CENTER']
+        
+        # Columns to exclude from features
+        cols_to_exclude = ['Subject', 'SET', 'CENTER']
+        
         # Add mod1 (RWD - always present)
-        df_split['mod1'] = rwd.drop('Subject', axis=1).apply(lambda r: r.tolist(), axis=1)
+        df_split['mod1'] = rwd.drop(columns=[c for c in cols_to_exclude if c in rwd.columns]).apply(lambda r: r.tolist(), axis=1)
         
         # Add mod2 (radiomics) - None if subject not in rad
         df_split['mod2'] = df_split['Subject'].apply(
-            lambda s: rad[rad['Subject'] == s].drop('Subject', axis=1).values[0].tolist() 
+            lambda s: rad[rad['Subject'] == s].drop(columns=[c for c in cols_to_exclude if c in rad.columns]).values[0].tolist() 
             if s in rad['Subject'].values else None
         )
         
         # Add mod3 (digital pathology) - None if subject not in dp
         df_split['mod3'] = df_split['Subject'].apply(
-            lambda s: dp[dp['Subject'] == s].drop('Subject', axis=1).values[0].tolist() 
+            lambda s: dp[dp['Subject'] == s].drop(columns=[c for c in cols_to_exclude if c in dp.columns]).values[0].tolist() 
             if s in dp['Subject'].values else None
         )
         
         # Add mod4 (genomics) - None if subject not in genomics OR in exclusion list
         df_split['mod4'] = df_split['Subject'].apply(
-            lambda s: genomics[genomics['Subject'] == s].drop('Subject', axis=1).values[0].tolist() 
+            lambda s: genomics[genomics['Subject'] == s].drop(columns=[c for c in cols_to_exclude if c in genomics.columns]).values[0].tolist() 
             if (s in genomics['Subject'].values and s not in exclude_genomics) else None
         )
         
