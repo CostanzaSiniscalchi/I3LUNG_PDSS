@@ -16,3 +16,4 @@ tqdm
 triangle
 pyarrow
 openpyxl
+matplotlib

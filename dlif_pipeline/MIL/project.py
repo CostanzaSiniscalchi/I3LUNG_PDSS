@@ -60,20 +60,22 @@ class Project:
                 or the folder exists but kwargs are provided. 
  
         """ 
-        self.root = root 
-        if is_project(root) and kwargs: 
-                raise errors.ProjectError(f"Project already exists at {root}") 
-        elif is_project(root): 
-            self._load(root) 
+        self.root = root
+        if is_project(root) and kwargs:
+                raise errors.ProjectError(f"Project already exists at {root}")
+        elif is_project(root):
+            self._load(root)
         else:
             self._settings = {
             'name': 'MyProject',
-            'annotations': './annotations.csv', 
+            'annotations': './annotations.csv',
             'dataset_config': './datasets.json',
             # 'models_dir': './models',  # Supprimez cette ligne
             'eval_dir': './eval',
             'sources': ['source1']
         }
+            # Update settings with any provided kwargs
+            self._settings.update(kwargs)
  
         # Create directories, if not already made 
         # if not exists(self.models_dir): 

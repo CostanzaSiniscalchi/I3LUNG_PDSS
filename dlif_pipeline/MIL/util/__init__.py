@@ -485,7 +485,7 @@ def log_manifest(
     if filename:
         save_file = open(os.path.join(filename), 'w')
         writer = csv.writer(save_file)
-        writer.writerow(['slide', 'dataset', 'outcome_label'])
+        writer.writerow(['Subject', 'dataset', 'outcome_label'])
     if train_tfrecords or val_tfrecords:
         if train_tfrecords:
             for tfrecord in train_tfrecords:
@@ -837,7 +837,7 @@ def prepare_multimodal_mixed_bags(path: str, bags_path: str) -> None:
     Args:
         path (str): Path to dataframe file (.csv, .parquet, or .xlsx). The dataframe
             must have:
-            - A 'slide' column containing unique identifiers
+            - A 'subject' column containing unique identifiers
             - Feature columns containing arrays/lists or None/NaN values
 
     Example structure of saved .pt files:
@@ -862,20 +862,21 @@ def prepare_multimodal_mixed_bags(path: str, bags_path: str) -> None:
     except Exception as e:
         raise ValueError(f"Error reading file {path}: {str(e)}")
 
-    # Verify slide column exists
-    if 'slide' not in df.columns:
-        raise ValueError("DataFrame must contain 'slide' column")
+    # Verify subject column exists
+    if 'Subject' not in df.columns:
+        raise ValueError("DataFrame must contain 'Subject' column")
 
-    # Get feature columns (all except 'slide') and rename them
-    feature_cols = [col for col in df.columns if col != 'slide']
+    # Get feature columns (all except 'subject') and rename them
+    feature_cols = [col for col in df.columns if col != 'Subject']
     if not feature_cols:
         raise ValueError("No feature columns found in DataFrame")
     
     # Create mapping of original column names to feature1, feature2, etc.
     feature_map = {col: f'feature{i+1}' for i, col in enumerate(feature_cols)}
-    
+
     # Create output directory
-    outdir = join(dirname(path), bags_path)
+    base_dir = dirname(path) if dirname(path) else os.getcwd()
+    outdir = join(base_dir, bags_path)
     os.makedirs(outdir, exist_ok=True)
 
     # First pass: determine feature dimensions for each modality
@@ -889,7 +890,7 @@ def prepare_multimodal_mixed_bags(path: str, bags_path: str) -> None:
                     break
 
     # Process each slide with progress bar
-    slides = df.slide.unique()
+    slides = df['Subject'].unique()
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -901,7 +902,7 @@ def prepare_multimodal_mixed_bags(path: str, bags_path: str) -> None:
         task = progress.add_task("Processing slides...", total=len(slides))
         
         for slide in slides:
-            slide_data = df[df.slide == slide].iloc[0]
+            slide_data = df[df['Subject'] == slide].iloc[0]
             
             # Initialize dictionary for this slide
             slide_dict = {}

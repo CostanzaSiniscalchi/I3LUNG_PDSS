@@ -27,16 +27,27 @@ def get_datasets(P, training_type, config, fold, folds, outcome,
         train_filter[fold_col] = [f for f in folds if f != fold]
         val_filter[fold_col]   = [fold]
         if early_stop_col in annotations_df:
-            train_filter[early_stop_col] = "no"
-            val_filter[fold_col] = [f for f in folds if f != fold]
-            val_filter[early_stop_col]   = "yes"
+            # Check if there are any 'yes' values for early stopping
+            has_early_stop = (annotations_df[early_stop_col] == "yes").any()
+            if has_early_stop:
+                train_filter[early_stop_col] = "no"
+                val_filter[early_stop_col]   = "yes"
+            else:
+                print(f" Warning: {early_stop_col} column exists but has no 'yes' values. Skipping early stopping split.")
 
     elif training_type == "standard":
         if early_stop_col in annotations_df:
-            train_filter[f"dataset_{outcome}"] = "train"
-            train_filter[early_stop_col]       = "no"
-            val_filter[f"dataset_{outcome}"] = "train"
-            val_filter[early_stop_col]         = "yes"
+            # Check if there are any 'yes' values for early stopping
+            has_early_stop = (annotations_df[early_stop_col] == "yes").any()
+            if has_early_stop:
+                train_filter[f"dataset_{outcome}"] = "train"
+                train_filter[early_stop_col]       = "no"
+                val_filter[f"dataset_{outcome}"] = "train"
+                val_filter[early_stop_col]         = "yes"
+            else:
+                print(f" Warning: {early_stop_col} column exists but has no 'yes' values. Using train/test split instead.")
+                train_filter[f"dataset_{outcome}"] = "train"
+                val_filter[f"dataset_{outcome}"]   = "test"
         else:
             train_filter[f"dataset_{outcome}"] = "train"
             val_filter[f"dataset_{outcome}"]   = "test"
