@@ -368,10 +368,13 @@ def train_and_evaluate_modality(
     with open('mlef_pipeline/split.json', 'r') as f:
         split = json.load(f)
     
-    train_set = dataset[dataset['Subject'].isin(split['TRAIN_SET'])].set_index('Subject')
-    test_set = dataset[dataset['Subject'].isin(split['TEST_SET'])].set_index('Subject')
-    ext_set = dataset[dataset['Subject'].str.startswith('UOC')].set_index('Subject')
+    train_set = dataset[dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
+    test_set = dataset[dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+    ext_set = dataset[dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
     
+    train_folds = train_set['CENTER']
+    train_set = train_set.drop(columns=['CENTER'])
+
     # 3. Separate features and target
     print("3. Preparing features and target...")
     X_train, y_train = train_set.drop(columns=[outcome.value]), train_set[outcome.value]
@@ -419,7 +422,6 @@ def train_and_evaluate_modality(
     
     # 6. Setup cross-validation
     print("6. Setting up cross-validation...")
-    train_folds = dl.get_loco_folds(pd.Series(train_set.index))
     cv = SafeGroupKFold(n_splits=len(train_folds.unique()))
     
     def get_cv_splits():
@@ -448,6 +450,8 @@ def train_and_evaluate_modality(
     y_proba_cv, cv_metrics = compute_cv_predictions(
         model, X_train_final, y_train, get_cv_splits(), train_folds
     )
+    print(y_proba_cv)
+    exit()
     
     # 9. Make predictions on all sets
     print("9. Making predictions on test and external sets...")
@@ -646,9 +650,12 @@ def train_rwd_matched_model(
     with open('mlef_pipeline/split.json', 'r') as f:
         split = json.load(f)
     
-    train_set = rwd_dataset[rwd_dataset['Subject'].isin(split['TRAIN_SET'])].set_index('Subject')
-    test_set = rwd_dataset[rwd_dataset['Subject'].isin(split['TEST_SET'])].set_index('Subject')
-    ext_set = rwd_dataset[rwd_dataset['Subject'].str.startswith('UOC')].set_index('Subject')
+    train_set = rwd_dataset[rwd_dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
+    test_set = rwd_dataset[rwd_dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+    ext_set = rwd_dataset[rwd_dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+
+    train_folds = train_set['CENTER']
+    train_set = train_set.drop(columns=['CENTER'])
 
     X_train, y_train = train_set.drop(columns=[outcome.value]), train_set[outcome.value]
     X_test, y_test = test_set.drop(columns=[outcome.value]), test_set[outcome.value]
@@ -677,7 +684,6 @@ def train_rwd_matched_model(
     else:
         X_ext_scaled = X_ext
     
-    train_folds = dl.get_loco_folds(pd.Series(train_set.index))
     cv = SafeGroupKFold(n_splits=len(train_folds.unique()))
     
     def get_cv_splits():
