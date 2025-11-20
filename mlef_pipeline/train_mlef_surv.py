@@ -503,9 +503,12 @@ def train_rwd_matched_model(
     with open('mlef_pipeline/split.json', 'r') as f:
         split = json.load(f)
     
-    train_set = rwd_dataset[rwd_dataset['Subject'].isin(split['TRAIN_SET'])].set_index('Subject')
-    test_set = rwd_dataset[rwd_dataset['Subject'].isin(split['TEST_SET'])].set_index('Subject')
-    ext_set = rwd_dataset[rwd_dataset['Subject'].str.startswith('UOC')].set_index('Subject')
+    train_set = rwd_dataset[rwd_dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
+    test_set = rwd_dataset[rwd_dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+    ext_set = rwd_dataset[rwd_dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+
+    train_folds = train_set['CENTER']
+    train_set = train_set.drop(columns=['CENTER'])
     
     # Remove test samples with TIME > max train TIME
     removed = 0
@@ -553,7 +556,6 @@ def train_rwd_matched_model(
     else:
         X_ext_scaled = X_ext
     
-    train_folds = dl.get_loco_folds(pd.Series(train_set.index))
     cv = GroupKFold(n_splits=len(train_folds.unique()))
     
     def cv_getter():
