@@ -95,6 +95,9 @@ def load_modality_models_config(config_path: str = 'mlef_pipeline/modality_model
 
 def get_model_for_modality(modality_folder: str, config: dict, default_model: Model = Model.LR) -> Model:
     """Get the model type for a specific modality from the config."""
+    # Se default_model è stato passato esplicitamente, usalo sempre
+    if hasattr(default_model, "_explicit") and default_model._explicit:
+        return default_model
     model_str = config.get(modality_folder, default_model.value)
     try:
         return Model[model_str]
@@ -263,6 +266,9 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
     
     y_valid = y.values[valid_mask]
     y_pred_valid = y_pred_cv.values[valid_mask]
+
+    print(y_pred_valid)
+    exit()
     
     stats = Statistics()
     auc, ci = stats.auc_roc_ci(y_valid, y_pred_valid, alpha=0.95)
@@ -450,8 +456,6 @@ def train_and_evaluate_modality(
     y_proba_cv, cv_metrics = compute_cv_predictions(
         model, X_train_final, y_train, get_cv_splits(), train_folds
     )
-    print(y_proba_cv)
-    exit()
     
     # 9. Make predictions on all sets
     print("9. Making predictions on test and external sets...")
@@ -842,7 +846,9 @@ def main():
     # Convert string arguments to enums
     outcome = Outcome[args.outcome]
     subanalysis = Subanalysis[args.subanalysis]
+    # Se il parametro model è stato passato esplicitamente, lo segno
     default_model_type = Model[args.model]
+    default_model_type._explicit = True
     base_path = Path(args.output_dir)
     select_features = not args.no_feature_selection
     
