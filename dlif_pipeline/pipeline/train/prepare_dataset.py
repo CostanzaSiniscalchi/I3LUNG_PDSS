@@ -50,17 +50,18 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
 
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
         if isinstance(train_data, list):
-            train_data_path = [os.path.join(project_root, td.lstrip('../')) for td in train_data]
+            train_data_resolved = [os.path.normpath(os.path.join(project_root, td)) for td in train_data]
+            dfs = [pd.read_parquet(td) for td in train_data_resolved]
+            df = pd.concat(dfs, ignore_index=True)
         else:
             train_data_path = os.path.join(project_root, train_data.lstrip('../'))
-        
-        df = pd.read_parquet(train_data_path)
+            df = pd.read_parquet(train_data_path)
         
         # Drop columns of unused modalities (if they exist in the mapping)
         df = df.drop(columns=[mod_mapping[mod] for mod in excluded_mods if mod in mod_mapping], errors='ignore')
 
         # Ensure all missing values are properly handled
-        df = df.applymap(lambda x: None if isinstance(x, float) and pd.isna(x) else x)
+        df = df.map(lambda x: None if isinstance(x, float) and pd.isna(x) else x)
         df.dropna()  # This doesn't modify df in place
 
         df.to_parquet('df.parquet', index=False)

@@ -1,0 +1,36 @@
+{
+    "RWD": [
+        "SEX",
+        "ECOG PS",
+        "LDH",
+        "NLR",
+        "SMOKING CURRENT",
+        "SMOKING FORMER",
+        "SMOKING NEVER",
+        "PDL1 CATEGORY",
+        "PARENCHYMAL BRAIN METS AT IO START",
+        "LIVER METS AT IO START",
+        "BONE METS AT IO START"
+    ],
+    "GEN": [
+        "DRIVER",
+        "KRAS",
+        "P53",
+        "STK11"
+    ],
+    "additional": [
+        "DEATH EVENT", 
+        "PROGRESSION EVENT", 
+        "THERAPY END EVENT", 
+        "BEST RESPONSE", 
+        "IO LINE", 
+        "IO IOCHT",
+        "HISTOLOGY SQUAMOUS", 
+        "ORR", 
+        "DCR", 
+        "CBR", 
+        "PFS MONTHS", 
+        "OS MONTHS", 
+        "TTF MONTHS"
+    ]
+}

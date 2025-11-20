@@ -72,8 +72,8 @@ def run_training(config, mods):
     bag_path_mods = f"bags_{mod_string}"
     bag_path = os.path.join(ROOT, "bags", bag_path_mods)
 
-  
-    P = Project(ROOT)
+    annotations = config.get('annotation_file')
+    P = Project(ROOT, annotations = annotations)
 
     training_type = config["training_type"]
     folds = get_folds("cross_validation", config) if training_type == "hyperparameter_tuning" else get_folds(training_type, config)

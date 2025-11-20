@@ -2,24 +2,38 @@ import pandas as pd
 import numpy as np
 import json
 import os
+from pathlib import Path
+
+# Get the directory containing this script
+SCRIPT_DIR = Path(__file__).parent
+DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
 
 def create_annotations(
-    outcomes_path='Mil2/data/data/outcomes.csv',
-    rwd_path='Mil2/data/data/rwd.csv',
-    split_path='Mil2/data/data/split.json',
-    features_path='Mil2/data/data/features_dataset_pyrad.parquet',  # For checking modalities
-    output_path='Mil2/data/data/annotations.csv',
+    outcomes_path=None,
+    rwd_path=None,
+    features_path=None,
+    output_path=None,
     n_sub=5,
     use_subfolds=False,
     val_split=0.10,
     seed=42
 ):
+    # Set default paths if not provided
+    if outcomes_path is None:
+        outcomes_path = DATA_DIR / 'outcomes.csv'
+    if rwd_path is None:
+        rwd_path = DATA_DIR / 'rwd.csv'
+    if features_path is None:
+        features_path = DATA_DIR / 'features_dataset_radpy_fixed.parquet'
+    if output_path is None:
+        output_path = DATA_DIR / 'annotations.csv'
+    
     # Load data
     outcomes = pd.read_csv(outcomes_path)
     rwd = pd.read_csv(rwd_path)
     features = pd.read_parquet(features_path)
     
-    # Rename OS_6 and OS_24 if they exist
+    # Rename outcomes columns
     outcomes = outcomes.rename(columns={
         'OS_6': 'os_months_6',
         'OS_24': 'os_months_24',
@@ -32,13 +46,6 @@ def create_annotations(
         'TTF MONTHS': 'TTF_MONTHS',
     })
     
-    with open(split_path, 'r') as f:
-        split = json.load(f)
-    
-    train_subjects = set(split['TRAIN_SET'])
-    test_subjects = set(split['TEST_SET'])
-    ext_val_subjects = set(split['EXT_VAL_SET'])
-    
     # Filter only RWD subjects
     rwd_subjects = set(rwd['Subject'])
     ann = outcomes[outcomes['Subject'].isin(rwd_subjects)].copy()
@@ -47,28 +54,20 @@ def create_annotations(
     ann = ann.rename(columns={'Subject': 'slide'})
     ann['patient'] = ann['slide']
     
-    # Extract fold from subject (center prefix)
-    def get_center(subject):
-        for center in ['INT', 'GHD', 'VHIO', 'MH', 'SZMC', 'UOC']:
-            if subject.startswith(center):
-                return center
-        return None
+    # Get FOLD and dataset from RWD
+    rwd_info = rwd[['Subject', 'CENTER', 'SET']].copy()
+    ann = ann.merge(rwd_info, left_on='slide', right_on='Subject', how='left')
+    ann = ann.rename(columns={'CENTER': 'FOLD', 'SET': 'dataset'})
+    ann.drop(columns=['Subject'], inplace=True)
     
-    ann['FOLD'] = ann['slide'].apply(get_center)
+    # Map dataset values
+    ann['dataset'] = ann['dataset'].map({
+        'TRAIN': 'train',
+        'TEST': 'test',
+        'EXVAL': 'ext_val'
+    })
     
-    # Create dataset column
-    def get_dataset(subject):
-        if subject in train_subjects:
-            return 'train'
-        elif subject in test_subjects:
-            return 'test'
-        elif subject in ext_val_subjects:
-            return 'ext_val'
-        return None
-    
-    ann['dataset'] = ann['slide'].apply(get_dataset)
-    
-    # Get outcome columns (exclude slide/patient/FOLD/dataset)
+    # Get outcome columns
     outcome_cols = [c for c in ann.columns if c not in ['slide', 'patient', 'FOLD', 'dataset']]
     
     # Create dataset_ and fold_ for each outcome
@@ -78,8 +77,7 @@ def create_annotations(
     
     # Create subfolds (overwrites fold_ columns) - OPTIONAL
     if use_subfolds:
-        print("here")
-        print(use_subfolds)
+        print("Creating subfolds...")
         rng = np.random.default_rng(seed)
         for outcome in outcome_cols:
             fold_col = f'fold_{outcome}'
@@ -92,38 +90,56 @@ def create_annotations(
                     ann.loc[split_ids, fold_col] = f"{center}_sub{i}"
         print(f"Created {n_sub} subfolds per center")
     
-    # Merge additional flags from RWD
-    rwd_info = rwd[['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO IOCT', 'IO LINE']].copy()
-    rwd_info = rwd_info.rename(columns={
+    # Merge additional flags from RWD - only use columns that exist
+    flag_cols = ['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO LINE']
+    available_flag_cols = [col for col in flag_cols if col in rwd.columns]
+    
+    rwd_flags = rwd[available_flag_cols].copy()
+    
+    # Rename columns
+    rename_map = {
         'HISTOLOGY ADENOCARCINOMA': 'NSCLC_HISTOLOGY_ADENOCARCINOMA',
         'HISTOLOGY SQUAMOUS': 'NSCLC_HISTOLOGY_SQUAMOUS',
-        'IO IOCT': 'IO_IOCT',
         'PDL1 CATEGORY': 'PDL1_CATEGORY',
         'IO LINE': 'IO_LINE'
-    })
+    }
+    rwd_flags = rwd_flags.rename(columns={k: v for k, v in rename_map.items() if k in rwd_flags.columns})
     
-    ann = ann.merge(rwd_info, left_on='patient', right_on='Subject', how='left')
+    ann = ann.merge(rwd_flags, left_on='patient', right_on='Subject', how='left')
     ann.drop(columns=['Subject'], inplace=True)
     
-    # Map PDL1 to low/high
-    ann['PDL1_GROUP'] = ann['PDL1_CATEGORY'].map({
-        0: 'low',
-        1: 'low',
-        2: 'high'
-    }).fillna('')
-    
-    ann.drop(columns=['PDL1_CATEGORY'], inplace=True)
+    # Map PDL1 to low/high if column exists
+    if 'PDL1_CATEGORY' in ann.columns:
+        ann['PDL1_GROUP'] = ann['PDL1_CATEGORY'].map({
+            0: 'low',
+            1: 'low',
+            2: 'high'
+        }).fillna('')
+        ann.drop(columns=['PDL1_CATEGORY'], inplace=True)
+    else:
+        ann['PDL1_GROUP'] = ''
     
     # Fill NaN in flags with empty string
-    ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ann['NSCLC_HISTOLOGY_SQUAMOUS'].fillna('')
-    ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'].fillna('')
-    ann['IO_IOCT'] = ann['IO_IOCT'].fillna('')
+    if 'NSCLC_HISTOLOGY_SQUAMOUS' in ann.columns:
+        ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ann['NSCLC_HISTOLOGY_SQUAMOUS'].fillna('')
+    else:
+        ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ''
+        
+    if 'NSCLC_HISTOLOGY_ADENOCARCINOMA' in ann.columns:
+        ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'].fillna('')
+    else:
+        ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ''
     
-    # COHORT_2 flag: IO LINE == 1
-    ann['COHORT_2'] = (ann['IO_LINE'] == 1).astype(int)
-    ann.drop(columns=['IO_LINE'], inplace=True)
+    ann['IO_IOCT'] = ''  # Not available in data
     
-    # HAS_ALL_MODALITIES flag: patients with all modalities present (mod1, mod2, mod3, mod4 all not None)
+    # COHORT_2 flag: IO LINE == 1 if column exists
+    if 'IO_LINE' in ann.columns:
+        ann['COHORT_2'] = (ann['IO_LINE'] == 1).astype(int)
+        ann.drop(columns=['IO_LINE'], inplace=True)
+    else:
+        ann['COHORT_2'] = 0
+    
+    # HAS_ALL_MODALITIES flag
     features['HAS_ALL_MODALITIES'] = (
         features['mod1'].notna() & 
         features['mod2'].notna() & 
@@ -136,21 +152,13 @@ def create_annotations(
     
     print(f"Patients with all modalities: {ann['HAS_ALL_MODALITIES'].sum()}")
     
-    # Add early stopping
+    # Add early stopping for ALL outcomes
     np.random.seed(seed)
     train_df = ann[ann['dataset'] == 'train']
-
-    # Try to load from split.json, otherwise generate randomly
-    split_file = 'Mil2/data/data/split.json'
-    if os.path.exists(split_file):
-        with open(split_file, 'r') as f:
-            split_data = json.load(f)
-        early_stop_indices = split_data.get('EARLY_STOP_SET', [])
-        print(f"Loaded {len(early_stop_indices)} early stopping subjects from {split_file}")
-    else:
-        total_n = int(len(train_df) * val_split)
-        early_stop_indices = train_df.sample(n=total_n, random_state=seed).index.tolist()
-        print(f"Generated {total_n} early stopping subjects randomly")
+    
+    total_n = int(len(train_df) * val_split)
+    early_stop_indices = train_df.sample(n=total_n, random_state=seed).index.tolist()
+    print(f"Generated {total_n} early stopping subjects randomly")
 
     for outcome in outcome_cols:
         fold_col = f'fold_{outcome}'
@@ -168,7 +176,7 @@ def create_annotations(
         
         print(f"Added early stopping for {outcome}")
         
-    # Reorder columns to match expected format
+    # Reorder columns
     base_cols = ['slide', 'FOLD', 'dataset'] + outcome_cols + ['patient']
     
     split_cols = []
@@ -177,13 +185,7 @@ def create_annotations(
     
     flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_IOCT', 'COHORT_2', 'HAS_ALL_MODALITIES']
     
-    allowed_early_outcomes = [
-    'ORR', 'CBR', 'PFS_MONTHS', 'OS_MONTHS', 'TTF_MONTHS',
-    'DEATH_EVENT_OC', 'PROGRESSION_EVENT_OC', 'THERAPY_END_EVENT_OC',
-    'BEST_RESPONSE', 'DCR', 'os_months_6', 'os_months_24'
-    ]
-
-    early_cols = [f'early_stopping_{o}' for o in allowed_early_outcomes if o in outcome_cols]
+    early_cols = [f'early_stopping_{o}' for o in outcome_cols]
     
     final_cols = base_cols + split_cols + flag_cols + early_cols
     
@@ -196,5 +198,5 @@ def create_annotations(
     
     return ann
 
-# Run with subfolds enabled
+# Run
 ann = create_annotations(use_subfolds=False)
