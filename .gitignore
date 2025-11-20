@@ -25,6 +25,9 @@
 !graphs_survival_analysis.ipynb
 !graphs_survival_fairness.ipynb
 !I3LUNG_PDSS/dlif_pipeline/data/**/*
+!Metadata_Extraction.ipynb
+!data_visualization.ipynb
+!requirements.txt
 # py cache
 __pycache__/
 

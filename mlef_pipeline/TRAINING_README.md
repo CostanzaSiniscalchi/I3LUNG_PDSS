@@ -6,7 +6,6 @@ This guide explains how to use the `train_mlef.py` script to train MLEF (Machine
 
 The script trains MLEF models for different data modality combinations and saves results in a structured folder format compatible with your analysis pipeline.
 
-add what does it mean abbr
 
 ## Quick Start
 
@@ -197,7 +196,6 @@ MLEF/
 ### Prediction Files
 - **prediction_CV.xlsx** - Cross-validated predictions on training set
   - Columns: `Subject`, `y_pred` (predicted probability), `y_true` (actual label)
-
 ### Results Files
 - **results.xlsx** - Performance metrics for all data splits
   - Columns: `SET` (CV/TEST/EXVAL), `AUC` (mean ± std), `n` (sample size)
