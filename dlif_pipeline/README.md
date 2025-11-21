@@ -19,20 +19,22 @@ A deep learning pipeline for survival analysis and classification tasks using Mu
 - Conda or Miniconda
 
 ### Setup
+Run this from within the `I3LUNG_PDSS` directory
 ```bash
-# Clone repository
-git clone git@github.com:AI-ON-Laboratory/MIL.git
-cd I3LUNG_PDSS/dlif_pipeline
 # Create and activate conda environment
-conda create -n mil python=3.9
-conda activate mil
-
+conda create -n dlif python=3.9
+conda activate dlif
 # Install dependencies
-pip install -r I3LUNG_PDSS/dlif_pipeline/requirements.txt
+pip install -r dlif_pipeline/requirements.txt
 
 # Configure environment
 export MPLBACKEND=Agg  # Required for headless plotting
 ```
+
+### Data Preprocessing
+
+Before running the DLIF pipeline, run the data preprocessing pipeline by following the instructions in:
+- [`preprocessing/README.md`](preprocessing/README.md)
 
 ## Project Structure
 
@@ -44,10 +46,6 @@ I3LUNG_PDSS/
     ├── MIL/                                # Model
     ├── pipeline/                           # Training scripts
     ├── preprocessing/                      # Data preprocessing scripts
-    ├── data/                               # Data directory
-    │   ├── annotations/                    # Annotation files
-    │   ├── features_dataset_radfm.parquet # RadFM feature dataset
-    │   └── features_dataset_radpy_fixed.parquet # RadPy feature dataset
     ├── datasets.json/                      # Dataset config for MIL
     ├── bags/                               # Bag-level features
     │   ├── radfm/                          # RadFM modality bags
@@ -73,6 +71,7 @@ Configuration files are located in the `configs/` directory:
 ## Usage
 
 Before running, please make sure you prepared the required data. You can find how to prepare the required data in the dedicated README.md in the preprocessing folder.
+Run all commands from the `I3LUNG_PDSS` directory.
 
 ### Classification Tasks
 
@@ -85,27 +84,27 @@ Performs leave-one-center-out cross-validation across multiple centers:
 - SZMC
 - VHIO
 ```bash
-python pipeline/train.py \
+python dlif_pipeline/pipeline/train.py \
   --config configs/00-config-classification-cv.yaml \
-  --base_dir ./results
+  --base_dir dlif_pipeline/results
 ```
 
 #### 2. Standard Training
 
 Trains on all data from the above sites and evaluates on held-out data from each site:
 ```bash
-python pipeline/train.py \
-  --config configs/01-config-classification-standard.yaml \
-  --base_dir ./results
+python dlif_pipeline/pipeline/train.py \
+  --config dlif_pipeline/configs/01-config-classification-standard.yaml \
+  --base_dir dlif_pipeline/results
 ```
 
 #### 3. External Validation
 
 Evaluates on external held-out center (UOC):
 ```bash
-python pipeline/train.py \
-  --config configs/02-config-classification-eval.yaml \
-  --base_dir ./results
+python dlif_pipeline/pipeline/train.py \
+  --config dlif_pipeline/configs/02-config-classification-eval.yaml \
+  --base_dir dlif_pipeline/results
 ```
 
 ### Survival Tasks
@@ -114,46 +113,46 @@ Use the same commands with survival configuration files:
 
 #### 1. Cross-Validation
 ```bash
-python pipeline/train.py \
-  --config configs/00-config-survival-cv.yaml \
-  --base_dir ./results
+python dlif_pipeline/pipeline/train.py \
+  --config dlif_pipeline/configs/00-config-survival-cv.yaml \
+  --base_dir dlif_pipeline/results
 ```
 
 #### 2. Standard Training
 ```bash
-python pipeline/train.py \
-  --config configs/01-config-survival-standard.yaml \
-  --base_dir ./results
+python dlif_pipeline/pipeline/train.py \
+  --config dlif_pipeline/configs/01-config-survival-standard.yaml \
+  --base_dir dlif_pipeline/results
 ```
 
 #### 3. External Validation
 ```bash
-python pipeline/train.py \
-  --config configs/02-config-survival-eval.yaml \
-  --base_dir ./results
+python dlif_pipeline/pipeline/train.py \
+  --config dlif_pipeline/configs/02-config-survival-eval.yaml \
+  --base_dir dlif_pipeline/results
 ```
 
 ### Calculate Metrics
 
 ```bash
-python pipeline/metrics/compute_metrics_from_config.py \
-  --config configs/00-config-classification-cv.yaml \
-  --base_dir ./results
-python pipeline/metrics/compute_metrics_from_config.py \
-  --config configs/01-config-classification-standard.yaml \
-  --base_dir ./results
+python dlif_pipeline/pipeline/metrics/compute_metrics_from_config.py \
+  --config dlif_pipeline/configs/00-config-classification-cv.yaml \
+  --base_dir dlif_pipeline/results
+python dlif_pipeline/pipeline/metrics/compute_metrics_from_config.py \
+  --config dlif_pipeline/configs/01-config-classification-standard.yaml \
+  --base_dir dlif_pipeline/results
 ```
 
 ### Create Plots
 
 ```
 bash
-python pipeline/plotting/plot_from_config.py \
-  --config configs/00-config-classification-cv.yaml \
-  --base_dir ./results
-python pipeline/plotting/plot_from_config.p \
-  --config configs/01-config-classification-standard.yaml \
-  --base_dir ./results
+python dlif_pipeline/pipeline/plotting/plot_from_config.py \
+  --config dlif_pipeline/configs/00-config-classification-cv.yaml \
+  --base_dir dlif_pipeline/results
+python dlif_pipeline/pipeline/plotting/plot_from_config.p \
+  --config dlif_pipeline/configs/01-config-classification-standard.yaml \
+  --base_dir dlif_pipeline/results
 ```
 
 ## Output Structure
