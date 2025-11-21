@@ -138,6 +138,7 @@ python dlif_pipeline/pipeline/train.py \
 python dlif_pipeline/pipeline/metrics/compute_metrics_from_config.py \
   --config dlif_pipeline/configs/00-config-classification-cv.yaml \
   --base_dir dlif_pipeline/results
+
 python dlif_pipeline/pipeline/metrics/compute_metrics_from_config.py \
   --config dlif_pipeline/configs/01-config-classification-standard.yaml \
   --base_dir dlif_pipeline/results
@@ -150,6 +151,7 @@ bash
 python dlif_pipeline/pipeline/plotting/plot_from_config.py \
   --config dlif_pipeline/configs/00-config-classification-cv.yaml \
   --base_dir dlif_pipeline/results
+
 python dlif_pipeline/pipeline/plotting/plot_from_config.p \
   --config dlif_pipeline/configs/01-config-classification-standard.yaml \
   --base_dir dlif_pipeline/results
@@ -160,34 +162,33 @@ python dlif_pipeline/pipeline/plotting/plot_from_config.p \
 Training outputs are organized hierarchically in the results directory:
 ```
 results/
-└── cohort2/
-    └── mil/
-        └── os_months_24/
-            └── classification/                     # or 'survival'
-                └── cross_validation/               # or 'standard'/'evaluation'
-                    └── hypothesis_driven/
-                        └── pyrad-noimp/
-                            └── rwd_radpy/
-                                └── seed_0/
-                                    ├── attention/
-                                    │   └── attention_weights.npz          # Raw attention weights
-                                    ├── eval/                              # Test set evaluation
-                                    │   └── 00000-mb_attention_mil/
-                                    │       ├── attention/
-                                    │       │   └── attention_weights.npz
-                                    │       ├── mil_params.json            # Model configuration
-                                    │       ├── predictions.parquet        # Test predictions
-                                    │       └── scores_test.csv            # Test metrics (survival only)
-                                    ├── models/
-                                    │   └── best_valid.pth                 # Best model checkpoint
-                                    ├── eval_cindex_ci.csv                 # C-index with CI (survival only)
-                                    ├── eval_auc_ci.csv                    # AUC with CI (classification only)
-                                    ├── eval_classification_metrics.csv    # F1, sensitivity, specificity (classification only)
-                                    ├── history.csv                        # Training history per epoch
-                                    ├── mil_params.json                    # Model hyperparameters
-                                    ├── predictions_train.parquet          # Training predictions
-                                    ├── predictions.parquet                # Test predictions
-                                    └── slide_manifest.csv                 # Slide-level metadata
+└── C23/
+    └── os_months_24/
+        └── classification/                     # or 'survival'
+            └── cross_validation/               # or 'standard'/'evaluation'
+                └── hypothesis_driven/
+                    └── pyrad-noimp/
+                        └── rwd_radpy/
+                            └── seed_0/
+                                ├── attention/
+                                │   └── attention_weights.npz          # Raw attention weights
+                                ├── eval/                              # Test set evaluation
+                                │   └── 00000-mb_attention_mil/
+                                │       ├── attention/
+                                │       │   └── attention_weights.npz
+                                │       ├── mil_params.json            # Model configuration
+                                │       ├── predictions.parquet        # Test predictions
+                                │       └── scores_test.csv            # Test metrics (survival only)
+                                ├── models/
+                                │   └── best_valid.pth                 # Best model checkpoint
+                                ├── eval_cindex_ci.csv                 # C-index with CI (survival only)
+                                ├── eval_auc_ci.csv                    # AUC with CI (classification only)
+                                ├── eval_classification_metrics.csv    # F1, sensitivity, specificity (classification only)
+                                ├── history.csv                        # Training history per epoch
+                                ├── mil_params.json                    # Model hyperparameters
+                                ├── predictions_train.parquet          # Training predictions
+                                ├── predictions.parquet                # Test predictions
+                                └── slide_manifest.csv                 # Slide-level metadata
 ```
 
 ### Key Output Files
