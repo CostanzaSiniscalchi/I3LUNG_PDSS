@@ -5,7 +5,7 @@ This script trains MLEF (Multi-Level Early Fusion) models for different modality
 It saves models, datasets, predictions, and results in a structured folder format.
 
 Usage:
-    python train_mlef.py --outcome OS_6 --subanalysis C23
+    python mlef_pipeline/train_mlef.py --outcome OS_6 --subanalysis C23
 """
 
 import os
@@ -266,9 +266,6 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
     
     y_valid = y.values[valid_mask]
     y_pred_valid = y_pred_cv.values[valid_mask]
-
-    print(y_pred_valid)
-    exit()
     
     stats = Statistics()
     auc, ci = stats.auc_roc_ci(y_valid, y_pred_valid, alpha=0.95)
@@ -517,7 +514,7 @@ def train_and_evaluate_modality(
         'y_pred': (y_pred_test >= 0.5).astype(int),
         'y_true': y_test.values
     })
-    test_predictions.to_csv(output_dir / 'prediction_TEST.xlsx', index=False)
+    test_predictions.to_csv(output_dir / 'prediction_TEST.csv', index=False)
     
     # Save EXVAL predictions (if available)
     if not X_ext_final.empty:
@@ -824,7 +821,7 @@ def train_rwd_matched_model(
 def main():
     parser = argparse.ArgumentParser(description='Train MLEF models for different modality combinations')
     parser.add_argument('--outcome', type=str, default='OS_6',
-                        choices=['OS_6', 'OS_24'],
+                        choices=['OS_6', 'OS_24', 'DCR'],
                         help='Target outcome to predict (default: OS_6)')
     parser.add_argument('--subanalysis', type=str, default='C23',
                         choices=['C23', 'C2', 'IO_ONLY', 'IO_CHT', 'LOW_PDL1', 
@@ -834,7 +831,7 @@ def main():
                         help='Modalities to train (default: all combinations). '
                              'Options: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD')
     parser.add_argument('--model', type=str, default='LR',
-                        choices=['LR', 'RF', 'XGB'],
+                        choices=['LR', 'RF'],
                         help='Model type to train (default: LR)')
     parser.add_argument('--no-feature-selection', action='store_true',
                         help='Disable feature selection')

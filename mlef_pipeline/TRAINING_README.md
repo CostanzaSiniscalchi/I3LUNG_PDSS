@@ -103,39 +103,39 @@ When no `--modalities` argument is provided, the script trains these combination
 1. **Train with configuration file (recommended):**
 ```bash
 # Uses models specified in modality_models_config.json
-python train_mlef.py --outcome OS_6 --subanalysis C23
+python mlef_pipeline/train_mlef.py --outcome OS_6 --subanalysis C23
 ```
 
 2. **Train for OS_24 outcome:**
 ```bash
-python train_mlef.py --outcome OS_24 --subanalysis C23
+python mlef_pipeline/train_mlef.py --outcome OS_24 --subanalysis C23
 ```
 
 3. **Train specific modalities only:**
 ```bash
 # Only trains RWD, RWD_DP, and RWD_PYRAD
-python train_mlef.py --outcome OS_6 --subanalysis C23 --modalities RWD RWD_DP RWD_PYRAD
+python mlef_pipeline/train_mlef.py --outcome OS_6 --subanalysis C23 --modalities RWD RWD_DP RWD_PYRAD
 ```
 
 4. **Override default model (for unconfigured modalities):**
 ```bash
 # Uses RF as default for any modality not in config
-python train_mlef.py --outcome OS_6 --subanalysis C23 --model RF
+python mlef_pipeline/train_mlef.py --outcome OS_6 --subanalysis C23 --model RF
 ```
 
 5. **Train for different subanalysis:**
 ```bash
-python train_mlef.py --outcome OS_6 --subanalysis IO_ONLY
+python mlef_pipeline/train_mlef.py --outcome OS_6 --subanalysis IO_ONLY
 ```
 
 6. **Disable feature selection:**
 ```bash
-python train_mlef.py --outcome OS_6 --subanalysis C23 --no-feature-selection
+python mlef_pipeline/train_mlef.py --outcome OS_6 --subanalysis C23 --no-feature-selection
 ```
 
 7. **Custom output directory:**
 ```bash
-python train_mlef.py --outcome OS_6 --subanalysis C23 --output-dir ./results
+python mlef_pipeline/train_mlef.py --outcome OS_6 --subanalysis C23 --output-dir ./results
 ```
 
 ## Output Structure
