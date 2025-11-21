@@ -268,7 +268,6 @@ def compute_cv_predictions(model, X: pd.DataFrame, y: pd.Series, cv_splits,
     y_pred_valid = y_pred_cv.values[valid_mask]
 
     print(y_pred_valid)
-    exit()
     
     stats = Statistics()
     auc, ci = stats.auc_roc_ci(y_valid, y_pred_valid, alpha=0.95)
