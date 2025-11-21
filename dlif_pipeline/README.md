@@ -29,7 +29,7 @@ conda create -n mil python=3.9
 conda activate mil
 
 # Install dependencies
-pip install -r requirements.txt
+pip install -r I3LUNG_PDSS/dlif_pipeline/requirements.txt
 
 # Configure environment
 export MPLBACKEND=Agg  # Required for headless plotting
