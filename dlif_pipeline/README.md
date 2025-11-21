@@ -22,8 +22,7 @@ A deep learning pipeline for survival analysis and classification tasks using Mu
 ```bash
 # Clone repository
 git clone git@github.com:AI-ON-Laboratory/MIL.git
-cd MIL
-
+cd I3LUNG_PDSS/dlif_pipeline
 # Create and activate conda environment
 conda create -n mil python=3.9
 conda activate mil
