@@ -15,7 +15,6 @@ Place the following files in the `I3LUNG_PDSS/data` directory before running the
 - `/data/no_genomics_test.json`
 - `/data/no_genomics_ext_val.json`
 
-Each CSV file must include `Subject`, `SET`, and `CENTER` columns, where `SET` contains values: `TRAIN`, `TEST`, or `EXVAL`.
 
 ## How to Create Parquet and Annotation Files
 

@@ -1,27 +1,32 @@
 # I3LUNG_PDSS
 
-## Introduction
-
 ### Abstract
 
-[Abstract to be added]
+Despite a decade of immunotherapy, treatment selection in non-small cell lung cancer (NSCLC) relies on subgroup analyses and clinical scores. I3LUNG (NCT05537922) is the largest international, real-world, multimodal, AI-based trial, enrolling 2365 patients across six countries. We integrated real-world data (RWD), CT images, digital pathology, and genomics into machine learning early-fusion and deep-learning intermediate-fusion models. Multimodal models achieved AUCs up to 0.86, outperforming PD-L1, ECOG PS, NLR, LDH (all p<0.01) and LIPI score. Expert and non-expert physicians improved predictions using the explainable AI tool. The I3LUNG tool is currently under prospective validation in >2,000 patients.
 
----
+This repository contains all necessary to replicate these results.
 
 ## How to Run
 
 ### Prerequisites
 
-Before running either pipeline, you must place your data in the following directory:
+Before running either pipeline, ensure the `I3LUNG_PDSS/data/` directory contains:
 
-```
-I3LUNG_PDSS/data/
-```
+**Required CSV files:**
+- `rwd.csv`
+- `genomics.csv`
+- `digital_pathology.csv`
+- `pyradiomics.csv`
+- `fmrad.csv`
+- `outcomes.csv`
 
-Ensure this directory exists and contains all necessary data files before proceeding.
+**Required JSON files:**
+- `features.json`
+- `no_genomics_train.json`
+- `no_genomics_test.json`
+- `no_genomics_ext_val.json`
 
 ---
-
 ### Pipelines
 
 The I3LUNG_PDSS repository contains two main pipelines for analysis:
@@ -56,7 +61,6 @@ These notebooks can be run independently to generate visualizations and analyze 
 ---
 
 ## Repository Structure
-
 ```
 I3LUNG_PDSS/
 ├── mlef_pipeline/               # Machine Learning Early Fusion pipeline
