@@ -147,9 +147,11 @@ def plot_cindex_results(
           C23/
             RWD/
               model_XX.pkl
-              train_set.xlsx
-              test_set.xlsx
-              prediction_CV.xlsx   (columns: Subject, y_pred, y_true)
+              train_set.csv
+              test_set.csv
+              prediction_CV.csv   (columns: Subject, y_pred, y_true)
+              prediction_TEST.csv
+              prediction_EXVAL.csv
               results.xlsx      (metrics incl. AUC, C-INDEX)
             RWD_DP/
                RWD_ONLY/         (MLEF only)

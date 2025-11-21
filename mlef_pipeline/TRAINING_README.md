@@ -143,44 +143,51 @@ python train_mlef.py --outcome OS_6 --subanalysis C23 --output-dir ./results
 The script creates the following folder structure:
 
 ```
-MLEF/
-  C23/                          # Subanalysis name
-    RWD/
-      model_LR.pkl              # Trained model
-      train_set.xlsx            # Training data (with FOLD column)
-      test_set.xlsx             # Test data
-      exval_set.xlsx            # External validation data (if available)
-      prediction_CV.xlsx        # CV predictions (Subject, y_pred, y_true) add
-      results.xlsx              # Performance metrics (CV, TEST, EXVAL AUCs)
-    
-    RWD_DP/
-      model_LR.pkl
-      train_set.xlsx
-      test_set.xlsx
-      exval_set.xlsx
-      prediction_CV.xlsx
-      results.xlsx
-      rwd-only/                 # RWD-matched baseline model
+mlef_pipeline/results/
+  OS_24/                          #outcome
+    C23/                          # Subanalysis name
+      RWD/
+        model_LR.pkl              # Trained model
+        train_set.csv             # Training data (with FOLD column)
+        test_set.csv              # Test data
+        exval_set.csv             # External validation data (if available)
+        prediction_CV.csv         # CV predictions (Subject, y_pred, y_true)
+        prediction_TEST.csv       # test predictions (Subject, y_pred, y_true)
+        prediction_EXVAL.csv      # exval predictions (Subject, y_pred, y_true) 
+        results.xlsx              # Performance metrics (CV, TEST, EXVAL AUCs)
+      
+      RWD_DP/
         model_LR.pkl
-        train_set.xlsx
-        test_set.xlsx
-        exval_set.xlsx
-        prediction_CV.xlsx
+        train_set.csv 
+        test_set.csv 
+        exval_set.csv 
+        prediction_CV.csv 
+        prediction_TEST.csv 
+        prediction_EXVAL.csv 
         results.xlsx
-    
-    RWD_FMRAD/
-      ... (same structure as RWD_DP)
-    
-    RWD_PYRAD/
-      ... (same structure as RWD_DP)
-    
-    RWD_DP_FMRAD/
-      ... (same structure as RWD_DP)
-    
-    RWD_DP_PYRAD/
-      ... (same structure as RWD_DP)
-    
-    training_summary.xlsx       # Summary of all training runs
+        rwd-only/                 # RWD-matched baseline model
+          model_LR.pkl
+          train_set.csv 
+          test_set.csv 
+          exval_set.csv 
+          prediction_CV.csv 
+          prediction_TEST.csv 
+          prediction_EXVAL.csv 
+          results.xlsx
+      
+      RWD_FMRAD/
+        ... (same structure as RWD_DP)
+      
+      RWD_PYRAD/
+        ... (same structure as RWD_DP)
+      
+      RWD_DP_FMRAD/
+        ... (same structure as RWD_DP)
+      
+      RWD_DP_PYRAD/
+        ... (same structure as RWD_DP)
+      
+      training_summary.xlsx       # Summary of all training runs
 ```
 
 ## Output Files Description
@@ -189,16 +196,20 @@ MLEF/
 - **model_LR.pkl / model_RF.pkl** - Trained scikit-learn model (pickled)
 
 ### Dataset Files
-- **train_set.xlsx** - Training set with features, outcome, and FOLD column for cross-validation
-- **test_set.xlsx** - Held-out test set
-- **exval_set.xlsx** - External validation set (UOC center data, if available)
+- **train_set.csv** - Training set with features, outcome, and FOLD column for cross-validation
+- **test_set.csv** - Held-out test set
+- **exval_set.csv** - External validation set (UOC center data, if available)
 
 ### Prediction Files
-- **prediction_CV.xlsx** - Cross-validated predictions on training set
+- **prediction_CV.csv** - Cross-validated predictions on training set
+  - Columns: `Subject`, `y_pred` (predicted probability), `y_true` (actual label)
+- **prediction_TEST.csv** - predictions on test set
+  - Columns: `Subject`, `y_pred` (predicted probability), `y_true` (actual label)
+- **prediction_EXVAL.csv** - predictions on exval set
   - Columns: `Subject`, `y_pred` (predicted probability), `y_true` (actual label)
 ### Results Files
 - **results.xlsx** - Performance metrics for all data splits
-  - Columns: `SET` (CV/TEST/EXVAL), `AUC` (mean ± std), `n` (sample size)
+  - Columns: `SET` (CV/TEST/EXVAL), `AUC` (mean ± std), `F1_MACRO`, `SENSITIVITY`, `SPECIFICITY`, `n` (sample size)
 - **training_summary.xlsx** - Summary table of all trained models in the run
 
 ## Training Process
@@ -206,7 +217,7 @@ MLEF/
 For each modality combination, the script performs:
 
 1. **Data Loading** - Loads and merges modalities via early fusion
-2. **Data Splitting** - Uses predefined train/test/external splits from `split.json`
+2. **Data Splitting** - Uses predefined train/test/external splits from `SET` column
 3. **Imputation** - Fills missing values using iterative imputation
 4. **Normalization** - Log-transforms skewed features and standardizes
 5. **Feature Selection** - LASSO-based selection targeting 15±10 features (optional)
@@ -331,7 +342,6 @@ The script requires:
 
 
 Data files needed in `mlef_pipeline/`:
-- `split.json` - Train/test split definitions
 - `submodel_features.json` - Features to exclude
 
 Data files needed in `../data/` (relative to mlef_pipeline):

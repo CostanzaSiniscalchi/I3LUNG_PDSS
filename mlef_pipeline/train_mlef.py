@@ -151,11 +151,11 @@ def save_datasets(output_dir: Path, train_set: pd.DataFrame, test_set: pd.DataFr
     train_with_folds = train_set.copy()
     train_with_folds['FOLD'] = train_folds.values
     
-    train_with_folds.to_excel(output_dir / 'train_set.xlsx', index=True)
-    test_set.to_excel(output_dir / 'test_set.xlsx', index=True)
+    train_with_folds.to_csv(output_dir / 'train_set.csv', index=True)
+    test_set.to_csv(output_dir / 'test_set.csv', index=True)
     
     if not ext_set.empty:
-        ext_set.to_excel(output_dir / 'exval_set.xlsx', index=True)
+        ext_set.to_csv(output_dir / 'exval_set.csv', index=True)
     
     print(f"  ✓ Saved datasets to {output_dir}")
 
@@ -508,7 +508,7 @@ def train_and_evaluate_modality(
         'y_pred': (y_proba_cv.values >= 0.5).astype(int),
         'y_true': y_train.values
     })
-    cv_predictions.to_excel(output_dir / 'prediction_CV.xlsx', index=False)
+    cv_predictions.to_csv(output_dir / 'prediction_CV.csv', index=False)
     
     # Save TEST predictions
     test_predictions = pd.DataFrame({
@@ -517,7 +517,7 @@ def train_and_evaluate_modality(
         'y_pred': (y_pred_test >= 0.5).astype(int),
         'y_true': y_test.values
     })
-    test_predictions.to_excel(output_dir / 'prediction_TEST.xlsx', index=False)
+    test_predictions.to_csv(output_dir / 'prediction_TEST.xlsx', index=False)
     
     # Save EXVAL predictions (if available)
     if not X_ext_final.empty:
@@ -527,7 +527,7 @@ def train_and_evaluate_modality(
             'y_pred': (y_pred_ext >= 0.5).astype(int),
             'y_true': y_ext.values
         })
-        exval_predictions.to_excel(output_dir / 'prediction_EXVAL.xlsx', index=False)
+        exval_predictions.to_csv(output_dir / 'prediction_EXVAL.csv', index=False)
 
     # 13. Save results
     print("13. Saving results...")
@@ -743,7 +743,7 @@ def train_rwd_matched_model(
         'y_pred': (y_proba_cv >= 0.5).astype(int),
         'y_true': y_train
     })
-    cv_predictions.to_excel(output_dir / 'prediction_CV.xlsx', index=False)
+    cv_predictions.to_csv(output_dir / 'prediction_CV.csv', index=False)
     
     # Save TEST predictions
     test_predictions = pd.DataFrame({
@@ -752,7 +752,7 @@ def train_rwd_matched_model(
         'y_pred': (y_pred_test >= 0.5).astype(int),
         'y_true': y_test.values
     })
-    test_predictions.to_excel(output_dir / 'prediction_TEST.xlsx', index=False)
+    test_predictions.to_csv(output_dir / 'prediction_TEST.csv', index=False)
 
     exval_predictions = pd.DataFrame({
         'Subject': X_ext_final.index,
@@ -760,7 +760,7 @@ def train_rwd_matched_model(
         'y_pred': (y_pred_ext >= 0.5).astype(int),
         'y_true': y_ext.values
     })
-    exval_predictions.to_excel(output_dir / 'prediction_EXVAL.xlsx', index=False)
+    exval_predictions.to_csv(output_dir / 'prediction_EXVAL.csv', index=False)
     
     results = pd.DataFrame({
         'SET': ['CV', 'TEST', 'EXVAL'],
