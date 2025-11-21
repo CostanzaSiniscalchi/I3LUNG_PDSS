@@ -42,14 +42,17 @@ The expected directory structure is as follows:
 I3LUNG_PDSS/
 └── dlif_pipeline/                          # This repository
     ├── configs/                            # Configuration files
+    ├── MIL/                                # Model
     ├── pipeline/                           # Training scripts
+    ├── preprocessing/                      # Data preprocessing scripts
     ├── data/                               # Data directory
     │   ├── annotations/                    # Annotation files
     │   ├── features_dataset_radfm.parquet # RadFM feature dataset
     │   └── features_dataset_radpy_fixed.parquet # RadPy feature dataset
+    ├── datasets.json/                      # Dataset config for MIL
     ├── bags/                               # Bag-level features
-    │   ├── radfm/                         # RadFM modality bags
-    │   └── radpy/                         # RadPy modality bags
+    │   ├── radfm/                          # RadFM modality bags
+    │   └── radpy/                          # RadPy modality bags
     ├── results/                            # Training outputs (auto-generated)
     └── README.md
 ```
@@ -69,6 +72,8 @@ Configuration files are located in the `configs/` directory:
 - `02-config-survival-eval.yaml` - External validation configuration
 
 ## Usage
+
+Before running, please make sure you prepared the required data. You can find how to prepare the required data in the dedicated README.md in the preprocessing folder.
 
 ### Classification Tasks
 
