@@ -85,7 +85,7 @@ Performs leave-one-center-out cross-validation across multiple centers:
 - VHIO
 ```bash
 python dlif_pipeline/pipeline/train.py \
-  --config configs/00-config-classification-cv.yaml \
+  --config dlif_pipeline/configs/00-config-classification-cv.yaml \
   --base_dir dlif_pipeline/results
 ```
 
