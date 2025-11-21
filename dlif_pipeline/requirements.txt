@@ -2,9 +2,6 @@ fastai
 matplotlib
 packaging
 pandas
-plotly
-python-dotenv
-PyYAML
 rich
 scikit_learn
 scikit_survival
@@ -16,4 +13,3 @@ tqdm
 triangle
 pyarrow
 openpyxl
-matplotlib
