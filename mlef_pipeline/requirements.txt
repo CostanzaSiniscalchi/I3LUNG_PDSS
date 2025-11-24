@@ -5,3 +5,6 @@ lifelines
 scikit-optimize
 scikit-survival
 openpyxl
+seaborn
+shap
+pyarrow

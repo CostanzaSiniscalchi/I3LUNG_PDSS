@@ -8,6 +8,48 @@ import shap
 from sklearn.linear_model import LogisticRegression
 from pathlib import Path
 from typing import Iterable, Optional, Union, List, Tuple, Literal, Dict
+from sklearn.metrics import confusion_matrix
+
+
+ # Convert outcome to DLIF format if needed
+def outcome_to_dlif(outcome_str: str) -> str:
+    """Convert MLEF outcome names to DLIF format."""
+    mapping = {
+        'OS_24': 'os_months_24',
+        'OS_6': 'os_months_6',
+        'DCR': 'DCR'
+    }
+    return mapping.get(outcome_str, outcome_str)
+
+def map_dlif_to_mlef_modality(dlif_name: str) -> str:
+    """
+    Map DLIF modality names to MLEF-style names.
+    DLIF: rwd, rwd_dp, rwd_radfm, rwd_radpy, rwd_radfm_dp, rwd_radpy_dp
+    MLEF: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD
+    """
+    mapping = {
+        'rwd': 'RWD',
+        'rwd_dp': 'RWD_DP',
+        'rwd_radfm': 'RWD_FMRAD',
+        'rwd_radpy': 'RWD_PYRAD',
+        'rwd_radfm_dp': 'RWD_DP_FMRAD',
+        'rwd_radpy_dp': 'RWD_DP_PYRAD',
+    }
+    return mapping.get(dlif_name.lower(), dlif_name.upper())
+
+def map_mlef_to_dlif_modality(mlef_name: str) -> str:
+    """
+    Map MLEF modality names to DLIF-style names.
+    """
+    mapping = {
+        'RWD': 'rwd',
+        'RWD_DP': 'rwd_dp',
+        'RWD_FMRAD': 'rwd_radfm',
+        'RWD_PYRAD': 'rwd_radpy',
+        'RWD_DP_FMRAD': 'rwd_radfm_dp',
+        'RWD_DP_PYRAD': 'rwd_radpy_dp',
+    }
+    return mapping.get(mlef_name.upper(), mlef_name.lower())
 
 
 def delong_test_comparison(y_true, y_pred1, y_pred2, alpha=0.05):
@@ -89,9 +131,33 @@ def plot_auc_results(
     dlif_eval_type: str = "standard",                          # standard, cross_validation, or evaluation
     dlif_feature_type: str = "hypothesis_driven",              # hypothesis_driven or data_driven
     dlif_extraction: str = "pyrad-noimp",                      # feature extraction method
-    dlif_seed: int = 0                                         # seed number
+    dlif_seed: int = 0,                                         # seed number
+    use_preds: bool = True                                      # whether to use prediction files for p-value computation
 ):
     """
+    Plot AUC results comparing different modalities for MLEF or DLIF architectures.
+
+    Args:
+        architecture: Either "MLEF" or "DLIF" (or a Path for custom locations)
+        outcome: Outcome to analyze (e.g., 'OS_24', 'OS_6', 'DCR')
+        analyses: Analysis name(s) to process (e.g., "C23" or ["C2", "C23"])
+        modality_order: Optional list to enforce specific order of modalities on x-axis
+        exclude_modalities: Modalities to exclude from the plot
+        title_prefix: Optional prefix for the plot title
+        min_bubble: Minimum bubble size for scatter plot
+        max_bubble: Maximum bubble size for scatter plot
+        show: Whether to display the plot
+        save_dir: Optional directory to save the plot
+        dlif_base_path: Base path for DLIF pipeline results (only used for DLIF)
+        dlif_eval_type: DLIF evaluation type ('standard', 'cross_validation', or 'evaluation')
+        dlif_feature_type: DLIF feature type ('hypothesis_driven' or 'data_driven')
+        dlif_extraction: DLIF feature extraction method (e.g., 'pyrad-noimp')
+        dlif_seed: DLIF random seed number
+        use_preds: If True, compute p-values by reading prediction files and running DeLong test.
+                   If False, skip p-value computation and stars will not be shown on the plot.
+                   This is useful when prediction files are not available or when you only
+                   want to visualize AUC metrics without statistical comparisons.
+
     Expected per-analysis layout:
 
     MLEF:
@@ -100,10 +166,13 @@ def plot_auc_results(
           C23/
             RWD/
               model_XX.pkl
-              train_set.xlsx
-              test_set.xlsx
-              prediction_CV.xlsx   (columns: Subject, y_pred, y_true)
-              results.xlsx      (metrics incl. CV AUC)
+              train_set.xlsx/.csv
+              test_set.xlsx/.csv
+              exval_set.csv
+              prediction_CV.xlsx/.csv   (columns: Subject, y_pred, y_true)
+              prediction_EXVAL.csv
+              prediction_TEST.csv
+              results.xlsx/.csv      (metrics incl. CV AUC)
             RWD_DP/
                RWD_ONLY/         (MLEF only)
             RWD_PYRAD/
@@ -111,7 +180,7 @@ def plot_auc_results(
             RWD_DP_PYRAD/
             RWD_DP_FMRAD/
 
-    DLIF:
+    DLIF (when use_preds=False):
         dlif_pipeline/results/
          C23/
           os_months_24/ (or DCR/)
@@ -130,6 +199,21 @@ def plot_auc_results(
                rwd_radpy/
                rwd_radfm_dp/
                rwd_radpy_dp/
+
+    DLIF (when use_preds=True):
+        dlif_pipeline/preds/
+         os_months_24/ (or DCR/)
+          classification/
+           standard/ (or cross_validation/)
+            rwd/
+             predictions.parquet
+             predictions_train.parquet
+             eval_auc_ci.csv
+            rwd_dp/
+            rwd_radfm/
+            rwd_radpy/
+            rwd_radfm_dp/
+            rwd_radpy_dp/
     """
 
     # ------------------------- utilities -------------------------
@@ -150,7 +234,14 @@ def plot_auc_results(
     def _read_auc_cv(results_path: Path) -> Tuple[float, float]:
         if results_path is None or not results_path.exists():
             return (np.nan, np.nan)
-        df = pd.read_excel(results_path)
+        # Try to read as Excel first, then CSV
+        try:
+            if results_path.suffix.lower() in ['.xlsx', '.xls']:
+                df = pd.read_excel(results_path)
+            else:
+                df = pd.read_csv(results_path)
+        except Exception:
+            return (np.nan, np.nan)
         # 1) direct 'CV AUC'
         for col in df.columns:
             if str(col).strip().upper() in ("CV AUC", "CV_AUC", "AUC_CV", "AUC_cv"):
@@ -192,15 +283,15 @@ def plot_auc_results(
             pass
         return (np.nan, np.nan)
 
-    def _read_n_train_dlif(predictions_train_path: Path) -> int:
+    def _read_n_train_dlif(predictions_train_path: Path) -> float:
         """Read number of training samples from DLIF's predictions_train.parquet."""
         if predictions_train_path is None or not predictions_train_path.exists():
-            return int(np.nan)
+            return np.nan
         try:
             df = pd.read_parquet(predictions_train_path)
             return int(len(df))
         except Exception:
-            return int(np.nan)
+            return np.nan
 
     def _read_model_name(model_path: Path) -> str:
         """
@@ -217,23 +308,34 @@ def plot_auc_results(
             return stem.split("_", 1)[1] or "UnknownModel"
         return "UnknownModel"
 
-    def _read_n_train(train_path: Path) -> int:
+    def _read_n_train(train_path: Path) -> float:
         if train_path is None or not train_path.exists():
-            return int(np.nan)
+            return np.nan
         try:
-            return int(pd.read_excel(train_path).shape[0])
+            if train_path.suffix.lower() in ['.xlsx', '.xls']:
+                return int(pd.read_excel(train_path).shape[0])
+            else:
+                return int(pd.read_csv(train_path).shape[0])
         except Exception:
-            return int(np.nan)
+            return np.nan
 
     def _scale_sizes(raw_sizes: Iterable[Union[int, float]]) -> np.ndarray:
         arr = np.array(list(raw_sizes), dtype=float)
-        if arr.size == 0 or np.all(np.isnan(arr)):
+        if arr.size == 0:
             return np.array([])
+        # If all values are NaN, return default size for all
+        if np.all(np.isnan(arr)):
+            return np.full(arr.shape, (min_bubble + max_bubble) / 2.0)
         amin, amax = np.nanmin(arr), np.nanmax(arr)
+        # If min/max are not finite or range is too small, use default size
         if not np.isfinite(amin) or not np.isfinite(amax) or (amax - amin < 1e-9):
-            return np.full_like(arr, (min_bubble + max_bubble) / 2.0)
+            return np.full(arr.shape, (min_bubble + max_bubble) / 2.0)
+        # Normalize and scale, handling NaN values
         norm = (arr - amin) / (amax - amin + 1e-6)
-        return norm * (max_bubble - min_bubble) + min_bubble
+        scaled = norm * (max_bubble - min_bubble) + min_bubble
+        # Replace NaN values with default size
+        scaled[np.isnan(scaled)] = (min_bubble + max_bubble) / 2.0
+        return scaled
 
     def _ordered_modalities(mods: List[str]) -> List[str]:
         filtered = [m for m in mods if m not in exclude_modalities]
@@ -243,36 +345,6 @@ def plot_auc_results(
             return in_order + leftovers
         return filtered
 
-    def _map_dlif_to_mlef_modality(dlif_name: str) -> str:
-        """
-        Map DLIF modality names to MLEF-style names.
-        DLIF: rwd, rwd_dp, rwd_radfm, rwd_radpy, rwd_radfm_dp, rwd_radpy_dp
-        MLEF: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD
-        """
-        mapping = {
-            'rwd': 'RWD',
-            'rwd_dp': 'RWD_DP',
-            'rwd_radfm': 'RWD_FMRAD',
-            'rwd_radpy': 'RWD_PYRAD',
-            'rwd_radfm_dp': 'RWD_DP_FMRAD',
-            'rwd_radpy_dp': 'RWD_DP_PYRAD',
-        }
-        return mapping.get(dlif_name.lower(), dlif_name.upper())
-
-    def _map_mlef_to_dlif_modality(mlef_name: str) -> str:
-        """
-        Map MLEF modality names to DLIF-style names.
-        """
-        mapping = {
-            'RWD': 'rwd',
-            'RWD_DP': 'rwd_dp',
-            'RWD_FMRAD': 'rwd_radfm',
-            'RWD_PYRAD': 'rwd_radpy',
-            'RWD_DP_FMRAD': 'rwd_radfm_dp',
-            'RWD_DP_PYRAD': 'rwd_radpy_dp',
-        }
-        return mapping.get(mlef_name.upper(), mlef_name.lower())
-
     def _collect_modalities(analysis_dir: Path) -> List[str]:
         return _ordered_modalities([p.name for p in analysis_dir.iterdir()
                                     if p.is_dir() and p.name.upper().startswith("RWD")])
@@ -281,15 +353,15 @@ def plot_auc_results(
         """
         Robust path resolver for MLEF:
         - accepts RWD_ONLY or rwd-only (any case)
-        - accepts files named like results(.xlsx/.xls), prediction(_CV).xlsx, train_set(.xlsx), etc.
+        - accepts files named like results(.xlsx/.xls/.csv), prediction(_CV)(.xlsx/.csv), train_set(.xlsx/.csv), etc.
         - accepts files with different case
         """
         def find_first(dir_: Path, stems: List[str]) -> Optional[Path]:
             if not dir_.exists():
                 return None
-            # try exact matches first
+            # try exact matches first (check both xlsx and csv extensions)
             for st in stems:
-                for ext in ("", ".xlsx", ".xls"):
+                for ext in ("", ".xlsx", ".xls", ".csv"):
                     p = dir_ / f"{st}{ext}"
                     if p.exists():
                         return p
@@ -299,8 +371,8 @@ def plot_auc_results(
                 cand += list(dir_.glob(f"{st}*"))
                 cand += list(dir_.glob(f"{st.upper()}*"))
                 cand += list(dir_.glob(f"{st.lower()}*"))
-            # prefer xlsx/xls if multiple
-            cand = sorted(cand, key=lambda x: (x.suffix.lower() not in {".xlsx", ".xls"}, len(x.name)))
+            # prefer xlsx/xls/csv if multiple
+            cand = sorted(cand, key=lambda x: (x.suffix.lower() not in {".xlsx", ".xls", ".csv"}, len(x.name)))
             return cand[0] if cand else None
 
         def find_subdir_any(dir_: Path, names: List[str]) -> Optional[Path]:
@@ -352,8 +424,13 @@ def plot_auc_results(
         # DLIF modality directories use lowercase with underscores
         dlif_modality = _map_mlef_to_dlif_modality(modality)
 
-        # Build path: base_dir / modality / seed_X /
-        mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
+        # Build path based on whether we're using preds or results directory
+        if use_preds:
+            # Simpler structure: base_dir / modality /
+            mod_dir = base_dir / dlif_modality
+        else:
+            # Full structure: base_dir / modality / seed_X /
+            mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
 
         if not mod_dir.exists():
             return {
@@ -381,13 +458,58 @@ def plot_auc_results(
 
     def _compute_pvalue(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
         """
-        Read predictions directly from prediction.xlsx files (Subject, y_pred, y_true),
+        Read predictions directly from prediction files (Subject, y_pred, y_true),
         align on Subject, then run DeLong.
+        Supports both .xlsx, .csv, and .parquet files.
         """
+        if not use_preds:
+            return None
+
         if not (pred_mod_path and pred_ro_path and pred_mod_path.exists() and pred_ro_path.exists()):
             return None
-        dm = pd.read_excel(pred_mod_path)
-        dr = pd.read_excel(pred_ro_path)
+        try:
+            # Read modality predictions
+            if pred_mod_path.suffix.lower() == '.parquet':
+                dm = pd.read_parquet(pred_mod_path)
+            elif pred_mod_path.suffix.lower() in ['.xlsx', '.xls']:
+                dm = pd.read_excel(pred_mod_path)
+            else:
+                dm = pd.read_csv(pred_mod_path)
+
+            # Read RWD-only predictions
+            if pred_ro_path.suffix.lower() == '.parquet':
+                dr = pd.read_parquet(pred_ro_path)
+            elif pred_ro_path.suffix.lower() in ['.xlsx', '.xls']:
+                dr = pd.read_excel(pred_ro_path)
+            else:
+                dr = pd.read_csv(pred_ro_path)
+        except Exception:
+            return None
+
+        # For parquet files (DLIF format), need to handle different column structure
+        if pred_mod_path.suffix.lower() == '.parquet':
+            # DLIF uses 'slide' instead of 'Subject' and needs softmax conversion
+            if 'y_pred0' in dm.columns and 'y_pred1' in dm.columns:
+                exp_pred0 = np.exp(dm['y_pred0'])
+                exp_pred1 = np.exp(dm['y_pred1'])
+                dm['y_pred'] = exp_pred1 / (exp_pred0 + exp_pred1)
+            elif 'pred' in dm.columns:
+                dm['y_pred'] = dm['pred']
+
+            if 'slide' in dm.columns:
+                dm = dm.rename(columns={'slide': 'Subject'})
+
+        if pred_ro_path.suffix.lower() == '.parquet':
+            if 'y_pred0' in dr.columns and 'y_pred1' in dr.columns:
+                exp_pred0 = np.exp(dr['y_pred0'])
+                exp_pred1 = np.exp(dr['y_pred1'])
+                dr['y_pred'] = exp_pred1 / (exp_pred0 + exp_pred1)
+            elif 'pred' in dr.columns:
+                dr['y_pred'] = dr['pred']
+
+            if 'slide' in dr.columns:
+                dr = dr.rename(columns={'slide': 'Subject'})
+
         # minimal schema check
         for col in ("Subject", "y_pred", "y_true"):
             if col not in dm.columns:
@@ -421,7 +543,10 @@ def plot_auc_results(
         fig = plt.figure(figsize=(12, 6))
         # BLUE: modality
         plt.plot(X, auc_mod_mean, linestyle="-", marker="o", label="CV AUC", color="#1a80bb")
-        plt.scatter(X, auc_mod_mean, s=sizes, color="#1a80bb", zorder=3)
+        if len(sizes) > 0:
+            plt.scatter(X, auc_mod_mean, s=sizes, color="#1a80bb", zorder=3)
+        else:
+            plt.scatter(X, auc_mod_mean, s=100, color="#1a80bb", zorder=3)
         plt.fill_between(X, auc_mod_mean - auc_mod_std, auc_mod_mean + auc_mod_std,
                          alpha=0.3, color="#8cc5e3", label="Confidence interval")
 
@@ -431,7 +556,10 @@ def plot_auc_results(
             auc_ro_mean = np.array([r["auc_ro_mean"] for r in rows], dtype=float)
             auc_ro_std  = np.array([r["auc_ro_std"]  for r in rows], dtype=float)
             plt.plot(X, auc_ro_mean, linestyle="-", marker="o", label="CV AUC - RWD-only matched", color="#a00000")
-            plt.scatter(X, auc_ro_mean, s=sizes, color="#a00000", zorder=3)
+            if len(sizes) > 0:
+                plt.scatter(X, auc_ro_mean, s=sizes, color="#a00000", zorder=3)
+            else:
+                plt.scatter(X, auc_ro_mean, s=100, color="#a00000", zorder=3)
             plt.fill_between(X, auc_ro_mean - auc_ro_std, auc_ro_mean + auc_ro_std,
                              alpha=0.3, color="#d8a6a6", label="Confidence interval - RWD-only matched")
             multimodal_better = (auc_mod_mean > auc_ro_mean)
@@ -478,7 +606,7 @@ def plot_auc_results(
     # ------------------------- main logic -------------------------
     if isinstance(analyses, str):
         analyses = [analyses]
-    
+
     # Normalize architecture to both string name and Path
     if isinstance(architecture, Path):
         arch_path = architecture
@@ -487,32 +615,34 @@ def plot_auc_results(
         arch_path = Path(architecture)
         arch_name = architecture
 
-    # Convert outcome to DLIF format if needed
-    def _outcome_to_dlif(outcome_str: str) -> str:
-        """Convert MLEF outcome names to DLIF format."""
-        mapping = {
-            'OS_24': 'os_months_24',
-            'OS_6': 'os_months_6',
-            'DCR': 'DCR'
-        }
-        return mapping.get(outcome_str, outcome_str)
-
     for analysis in analyses:
         # Build the correct path based on architecture
         if architecture == "MLEF":
-            # MLEF: mlef_pipeline/results/outcome/analysis/ 
-            base_path = Path("mlef_pipeline/MLEF") / outcome / analysis
+            # MLEF: mlef_pipeline/results/outcome/analysis/
+            base_path = Path("mlef_pipeline/results") / outcome / analysis
             analysis_dir = base_path
         else:  # DLIF
-            # DLIF: dlif_pipeline/results/analysis/outcome/classification/eval_type/feature_type/extraction/
-            if dlif_base_path is None:
-                dlif_base_path = Path("dlif_pipeline/results")
-            else:
-                dlif_base_path = Path(dlif_base_path)
+            if use_preds:
+                # When use_preds=True, use simpler preds directory structure
+                # dlif_pipeline/preds/{outcome}/classification/standard/
+                if dlif_base_path is None:
+                    dlif_base_path = Path("dlif_pipeline/preds")
+                else:
+                    dlif_base_path = Path(dlif_base_path)
 
-            dlif_outcome = _outcome_to_dlif(outcome)
-            analysis_dir = (dlif_base_path / analysis / dlif_outcome / "classification" /
-                          dlif_eval_type / dlif_feature_type / dlif_extraction)
+                dlif_outcome = outcome_to_dlif(outcome)
+                analysis_dir = dlif_base_path / dlif_outcome / "classification" / dlif_eval_type
+            else:
+                # When use_preds=False, use full results directory structure
+                # dlif_pipeline/results/analysis/outcome/classification/eval_type/feature_type/extraction/
+                if dlif_base_path is None:
+                    dlif_base_path = Path("dlif_pipeline/results")
+                else:
+                    dlif_base_path = Path(dlif_base_path)
+
+                dlif_outcome = outcome_to_dlif(outcome)
+                analysis_dir = (dlif_base_path / analysis / dlif_outcome / "classification" /
+                              dlif_eval_type / dlif_feature_type / dlif_extraction)
 
         if not analysis_dir.exists():
             continue
@@ -864,11 +994,171 @@ def plot_radar_charts(
 
 def shap_beeswarm(model, X_train: pd.DataFrame, X_test: pd.DataFrame, mapping = {}) -> None:
     if isinstance(model, LogisticRegression):
-        explainer = shap.Explainer(model.predict_proba, X_train) 
+        explainer = shap.Explainer(model.predict_proba, X_train)
     else:
-        explainer = shap.Explainer(model, X_train) 
+        explainer = shap.Explainer(model, X_train)
     shap_values = explainer(X_test)
     shap_values.feature_names = [mapping.get(name, name) for name in shap_values.feature_names]
     shap.plots.beeswarm(shap_values[:,:,1], show=False, max_display=20)
 
 plt.show()
+
+
+def generate_dlif_metric_files(
+    preds_base_path: Union[str, Path] = "dlif_pipeline/preds",
+    outcomes: Optional[List[str]] = None,
+    modalities: Optional[List[str]] = None,
+    task: str = "classification",
+    training_type: str = "standard",
+    overwrite: bool = False
+) -> None:
+    """
+    Generate evaluation metric files (eval_auc_ci.csv, eval_classification_metrics.csv)
+    from prediction parquet files in the preds directory.
+
+    This function enables plotting and analysis using the pre-computed predictions
+    from the paper without needing to retrain models. Since deep learning model
+    reproducibility can be challenging and system-dependent, we provide these
+    prediction files for recreating the exact plots from the paper.
+
+    Args:
+        preds_base_path: Path to the preds directory containing prediction parquet files
+        outcomes: List of outcomes to process (e.g., ['DCR', 'os_months_24']).
+                 If None, processes all outcomes found.
+        modalities: List of modalities to process (e.g., ['rwd', 'rwd_dp']).
+                   If None, processes all modalities found.
+        task: Task type ('classification' or 'survival')
+        training_type: Training type ('standard', 'cross_validation', or 'evaluation')
+        overwrite: If True, regenerate files even if they already exist
+
+    Example:
+        >>> # Generate metrics for all outcomes and modalities
+        >>> generate_dlif_metric_files()
+
+        >>> # Generate metrics for specific outcome
+        >>> generate_dlif_metric_files(outcomes=['DCR'])
+
+        >>> # Regenerate all metrics (overwrite existing)
+        >>> generate_dlif_metric_files(overwrite=True)
+    """
+    preds_base_path = Path(preds_base_path)
+
+    if not preds_base_path.exists():
+        raise FileNotFoundError(f"Preds directory not found: {preds_base_path}")
+
+    # Helper function to compute classification metrics
+    def _compute_classification_metrics(y_true, y_pred):
+        """Compute F1, specificity, and sensitivity from predictions."""
+        y_pred_binary = (y_pred >= 0.5).astype(int)
+        cm = confusion_matrix(y_true, y_pred_binary, labels=[0, 1])
+        tn, fp, fn, tp = cm.ravel()
+
+        # Compute metrics
+        sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = sensitivity
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+
+        return {
+            'f1': f1,
+            'specificity': specificity,
+            'sensitivity': sensitivity
+        }
+
+    # Find all outcome directories
+    if outcomes is None:
+        outcome_dirs = [d for d in preds_base_path.iterdir() if d.is_dir()]
+    else:
+        outcome_dirs = [preds_base_path / outcome for outcome in outcomes]
+
+    total_processed = 0
+    total_skipped = 0
+
+    for outcome_dir in outcome_dirs:
+        if not outcome_dir.exists():
+            print(f"⚠️  Outcome directory not found: {outcome_dir}")
+            continue
+
+        outcome_name = outcome_dir.name
+        print(f"\n📊 Processing outcome: {outcome_name}")
+
+        # Navigate to task/training_type
+        task_dir = outcome_dir / task / training_type
+        if not task_dir.exists():
+            print(f"  ⚠️  Task directory not found: {task_dir}")
+            continue
+
+        # Find all modality directories
+        if modalities is None:
+            modality_dirs = [d for d in task_dir.iterdir() if d.is_dir() and d.name.startswith('rwd')]
+        else:
+            modality_dirs = [task_dir / mod for mod in modalities]
+
+        for modality_dir in modality_dirs:
+            if not modality_dir.exists():
+                continue
+
+            modality_name = modality_dir.name
+            pred_file = modality_dir / "predictions.parquet"
+
+            if not pred_file.exists():
+                print(f"  ⚠️  No predictions.parquet found in {modality_dir}")
+                continue
+
+            # Check if metric files already exist
+            auc_file = modality_dir / "eval_auc_ci.csv"
+            metrics_file = modality_dir / "eval_classification_metrics.csv"
+
+            if not overwrite and auc_file.exists() and metrics_file.exists():
+                print(f"  ⏭️  {modality_name}: Metrics already exist (use overwrite=True to regenerate)")
+                total_skipped += 1
+                continue
+
+            try:
+                # Read predictions
+                predictions = pd.read_parquet(pred_file)
+
+                # Convert logits to probabilities using softmax
+                if 'y_pred0' in predictions.columns and 'y_pred1' in predictions.columns:
+                    # Apply softmax: exp(logit) / sum(exp(logits))
+                    exp_pred0 = np.exp(predictions['y_pred0'])
+                    exp_pred1 = np.exp(predictions['y_pred1'])
+                    predictions['pred'] = exp_pred1 / (exp_pred0 + exp_pred1)
+                elif 'pred' not in predictions.columns:
+                    print(f"  ❌ {modality_name}: Missing prediction columns")
+                    continue
+
+                y_true = predictions['y_true'].values
+                y_pred = predictions['pred'].values
+
+                # Compute AUC with DeLong CI
+                auc, ci = auc_roc_ci(y_true, y_pred, 0.95)
+
+                # Compute classification metrics
+                metrics = _compute_classification_metrics(y_true, y_pred)
+
+                # Save AUC results
+                with open(auc_file, 'w') as f:
+                    f.write('auc,ci_lower,ci_upper\n')
+                    f.write(f'{auc:.6f},{ci[0]:.6f},{ci[1]:.6f}\n')
+
+                # Save classification metrics
+                with open(metrics_file, 'w') as f:
+                    f.write('f1,specificity,sensitivity\n')
+                    f.write(f'{metrics["f1"]:.6f},{metrics["specificity"]:.6f},{metrics["sensitivity"]:.6f}\n')
+
+                print(f"  ✅ {modality_name}: AUC={auc:.4f} [{ci[0]:.4f}, {ci[1]:.4f}], "
+                      f"F1={metrics['f1']:.4f}, Sens={metrics['sensitivity']:.4f}, Spec={metrics['specificity']:.4f}")
+                total_processed += 1
+
+            except Exception as e:
+                print(f"  ❌ {modality_name}: Error - {str(e)}")
+                continue
+
+    print(f"\n{'='*60}")
+    print(f"✨ Summary: Processed {total_processed} modality/outcome combinations")
+    if total_skipped > 0:
+        print(f"⏭️  Skipped {total_skipped} (already exist)")
+    print(f"{'='*60}")
