@@ -100,10 +100,13 @@ def plot_auc_results(
           C23/
             RWD/
               model_XX.pkl
-              train_set.xlsx
-              test_set.xlsx
-              prediction_CV.xlsx   (columns: Subject, y_pred, y_true)
-              results.xlsx      (metrics incl. CV AUC)
+              train_set.xlsx/.csv
+              test_set.xlsx/.csv
+              exval_set.csv
+              prediction_CV.xlsx/.csv   (columns: Subject, y_pred, y_true)
+              prediction_EXVAL.csv
+              prediction_TEST.csv
+              results.xlsx/.csv      (metrics incl. CV AUC)
             RWD_DP/
                RWD_ONLY/         (MLEF only)
             RWD_PYRAD/
@@ -150,7 +153,14 @@ def plot_auc_results(
     def _read_auc_cv(results_path: Path) -> Tuple[float, float]:
         if results_path is None or not results_path.exists():
             return (np.nan, np.nan)
-        df = pd.read_excel(results_path)
+        # Try to read as Excel first, then CSV
+        try:
+            if results_path.suffix.lower() in ['.xlsx', '.xls']:
+                df = pd.read_excel(results_path)
+            else:
+                df = pd.read_csv(results_path)
+        except Exception:
+            return (np.nan, np.nan)
         # 1) direct 'CV AUC'
         for col in df.columns:
             if str(col).strip().upper() in ("CV AUC", "CV_AUC", "AUC_CV", "AUC_cv"):
@@ -221,7 +231,10 @@ def plot_auc_results(
         if train_path is None or not train_path.exists():
             return int(np.nan)
         try:
-            return int(pd.read_excel(train_path).shape[0])
+            if train_path.suffix.lower() in ['.xlsx', '.xls']:
+                return int(pd.read_excel(train_path).shape[0])
+            else:
+                return int(pd.read_csv(train_path).shape[0])
         except Exception:
             return int(np.nan)
 
@@ -281,15 +294,15 @@ def plot_auc_results(
         """
         Robust path resolver for MLEF:
         - accepts RWD_ONLY or rwd-only (any case)
-        - accepts files named like results(.xlsx/.xls), prediction(_CV).xlsx, train_set(.xlsx), etc.
+        - accepts files named like results(.xlsx/.xls/.csv), prediction(_CV)(.xlsx/.csv), train_set(.xlsx/.csv), etc.
         - accepts files with different case
         """
         def find_first(dir_: Path, stems: List[str]) -> Optional[Path]:
             if not dir_.exists():
                 return None
-            # try exact matches first
+            # try exact matches first (check both xlsx and csv extensions)
             for st in stems:
-                for ext in ("", ".xlsx", ".xls"):
+                for ext in ("", ".xlsx", ".xls", ".csv"):
                     p = dir_ / f"{st}{ext}"
                     if p.exists():
                         return p
@@ -299,8 +312,8 @@ def plot_auc_results(
                 cand += list(dir_.glob(f"{st}*"))
                 cand += list(dir_.glob(f"{st.upper()}*"))
                 cand += list(dir_.glob(f"{st.lower()}*"))
-            # prefer xlsx/xls if multiple
-            cand = sorted(cand, key=lambda x: (x.suffix.lower() not in {".xlsx", ".xls"}, len(x.name)))
+            # prefer xlsx/xls/csv if multiple
+            cand = sorted(cand, key=lambda x: (x.suffix.lower() not in {".xlsx", ".xls", ".csv"}, len(x.name)))
             return cand[0] if cand else None
 
         def find_subdir_any(dir_: Path, names: List[str]) -> Optional[Path]:
@@ -381,13 +394,27 @@ def plot_auc_results(
 
     def _compute_pvalue(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
         """
-        Read predictions directly from prediction.xlsx files (Subject, y_pred, y_true),
+        Read predictions directly from prediction files (Subject, y_pred, y_true),
         align on Subject, then run DeLong.
+        Supports both .xlsx and .csv files.
         """
         if not (pred_mod_path and pred_ro_path and pred_mod_path.exists() and pred_ro_path.exists()):
             return None
-        dm = pd.read_excel(pred_mod_path)
-        dr = pd.read_excel(pred_ro_path)
+        try:
+            # Read modality predictions
+            if pred_mod_path.suffix.lower() in ['.xlsx', '.xls']:
+                dm = pd.read_excel(pred_mod_path)
+            else:
+                dm = pd.read_csv(pred_mod_path)
+
+            # Read RWD-only predictions
+            if pred_ro_path.suffix.lower() in ['.xlsx', '.xls']:
+                dr = pd.read_excel(pred_ro_path)
+            else:
+                dr = pd.read_csv(pred_ro_path)
+        except Exception:
+            return None
+
         # minimal schema check
         for col in ("Subject", "y_pred", "y_true"):
             if col not in dm.columns:
@@ -501,7 +528,7 @@ def plot_auc_results(
         # Build the correct path based on architecture
         if architecture == "MLEF":
             # MLEF: mlef_pipeline/results/outcome/analysis/ 
-            base_path = Path("mlef_pipeline/MLEF") / outcome / analysis
+            base_path = Path("mlef_pipeline/results") / outcome / analysis
             analysis_dir = base_path
         else:  # DLIF
             # DLIF: dlif_pipeline/results/analysis/outcome/classification/eval_type/feature_type/extraction/
