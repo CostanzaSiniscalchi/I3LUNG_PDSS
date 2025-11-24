@@ -7,3 +7,4 @@ scikit-survival
 openpyxl
 seaborn
 shap
+pyarrow
