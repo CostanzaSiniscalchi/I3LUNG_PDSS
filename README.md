@@ -46,6 +46,8 @@ The DLIF pipeline implements deep learning approaches with intermediate fusion o
 
 In addition to the two main pipelines, the repository includes several Jupyter notebooks for data visualization and analysis:
 
+All of the notebooks can be run with the `mlef` conda environment.
+
 - **`data_visualization.ipynb`** - General data visualization and exploration
 - **`graphs_classification.ipynb`** - Visualization of classification results
 - **`graphs_survival_analysis.ipynb`** - Visualization of survival analysis results
