@@ -422,7 +422,7 @@ def plot_auc_results(
         Returns dict with paths to DLIF files.
         """
         # DLIF modality directories use lowercase with underscores
-        dlif_modality = _map_mlef_to_dlif_modality(modality)
+        dlif_modality = map_mlef_to_dlif_modality(modality)
 
         # Build path based on whether we're using preds or results directory
         if use_preds:
@@ -654,7 +654,7 @@ def plot_auc_results(
                 continue
             dlif_modalities = [p.name for p in analysis_dir.iterdir()
                              if p.is_dir() and p.name.lower().startswith("rwd")]
-            modalities = [_map_dlif_to_mlef_modality(m) for m in dlif_modalities]
+            modalities = [map_dlif_to_mlef_modality(m) for m in dlif_modalities]
             modalities = _ordered_modalities(modalities)
         else:
             modalities = _collect_modalities(analysis_dir)
