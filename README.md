@@ -2,11 +2,9 @@
 
 ## Introduction
 
-### Abstract
-
-[Abstract to be added]
-
----
+<p align="center">
+	<img src="images/I3LUNG_Overview.png" alt="I3LUNG Overview" width="600"/>
+</p>
 
 ## How to Run
 

@@ -3,6 +3,7 @@
 !.gitignore
 !*/
 !dlif_pipeline/**/*
+!images/**/*
 !rwd_features.json
 !classification_config.json
 !data_curation.py
