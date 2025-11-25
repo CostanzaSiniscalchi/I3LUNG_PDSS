@@ -9,6 +9,8 @@ from sklearn.linear_model import LogisticRegression
 from pathlib import Path
 from typing import Iterable, Optional, Union, List, Tuple, Literal, Dict
 from sklearn.metrics import confusion_matrix
+from itertools import combinations
+import seaborn as sns
 
 
  # Convert outcome to DLIF format if needed
