@@ -39,22 +39,6 @@ The RWD modality itself doesn't have a `rwd-only/` subfolder (it would be redund
 
 #### Configuring RWD-Only Models
 
-You can specify different models for RWD-only analyses in the configuration file:
-
-```json
-{
-    "models": {
-        "RWD_DP": "RF"
-    },
-    "rwd_only_models": {
-        "RWD_DP": "LR"
-    }
-}
-```
-
-This configuration trains:
-- Main RWD_DP model with Random Forest
-- RWD-only matched model with Logistic Regression
 
 #### Different Models for Main vs RWD-Only
 If you want different models:
