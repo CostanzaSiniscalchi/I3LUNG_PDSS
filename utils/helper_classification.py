@@ -1162,3 +1162,1060 @@ def generate_dlif_metric_files(
     if total_skipped > 0:
         print(f"⏭️  Skipped {total_skipped} (already exist)")
     print(f"{'='*60}")
+
+#-------------------------- Fairness Functions -------------------------
+
+def load_predictions_and_data(outcome, base_path='mlef_pipeline/results'):
+    """
+    Load predictions and test data for a specific outcome.
+    
+    Parameters:
+    -----------
+    outcome : str
+        Outcome name (e.g., 'DCR', 'OS6', 'OS24')
+    base_path : str
+        Base directory path (default: 'mlef_pipeline/results')
+    
+    Returns:
+    --------
+    tuple : (predictions_df, test_df)
+        - predictions_df: DataFrame with columns [Subject, y_true, y_pred]
+        - test_df: DataFrame with columns [Subject, SEX], ordered by predictions_df
+    """
+    # Load predictions from CSV
+    pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_TEST.csv')
+    predictions_df = pd.read_csv(pred_path)
+    
+    # Load RWD data
+    rwd_path = 'data/rwd.csv'
+    rwd_df = pd.read_csv(rwd_path)
+    
+    # Match subjects from predictions with RWD data
+    # Keep only Subject and SEX columns, in the same order as predictions
+    test_df = predictions_df[['Subject']].merge(
+        rwd_df[['Subject', 'CENTER','SEX', 'RACE']], 
+        on='Subject', 
+        how='left'
+    )
+    
+    # Set Subject as index
+    test_df = test_df.set_index('Subject')
+    
+    print(f"Loaded predictions for {outcome}:")
+    print(f"  Samples: {len(predictions_df)}")
+    print(f"  Columns in test data: {test_df.shape[1]} ({', '.join(test_df.columns)})")
+    print(f"  Subject order preserved: {(predictions_df['Subject'].values == test_df.index.values).all()}")
+    
+    return predictions_df, test_df
+
+def compute_tpr_fpr(y_true, y_pred):
+    """
+    Compute True Positive Rate and False Positive Rate.
+    
+    Parameters:
+    -----------
+    y_true : array-like
+        True labels
+    y_pred : array-like
+        Predicted labels (binary)
+    
+    Returns:
+    --------
+    tuple : (tpr, fpr)
+    """
+    cm = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = cm.ravel()
+    tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
+    fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+    return tpr, fpr
+
+
+def compute_metrics_by_center(y_true, y_pred, test_folds):
+    """
+    Compute TPR and FPR for each center.
+    
+    Parameters:
+    -----------
+    y_true : pd.Series
+        True labels
+    y_pred : array-like
+        Predicted probabilities
+    test_folds : pd.Series
+        Center assignment for each sample
+    
+    Returns:
+    --------
+    pd.DataFrame : TPR and FPR by center
+    """
+    tpr_fpr = {}
+    for site in test_folds.unique():
+        if site is None:
+            continue
+        indices = test_folds == site
+        tpr, fpr = compute_tpr_fpr(y_true[indices], y_pred[indices])
+        tpr_fpr[site] = {'TPR': tpr, 'FPR': fpr}
+    return pd.DataFrame(tpr_fpr).T
+
+def _rate_by_group_conditional(df, group_col, cond_col, cond_val, pred_col='pred'):
+    """Per-group rate Pr(pred==1 | cond_col==cond_val, group=g) and denominators."""
+    sub = df[df[cond_col] == cond_val]
+    if sub.empty:
+        raise ValueError(f"No rows with {cond_col}=={cond_val}.")
+    denom = sub.groupby(group_col).size().rename('denom')
+    numer = sub[sub[pred_col] == 1].groupby(group_col).size().reindex(denom.index, fill_value=0)
+    rate = (numer / denom).rename('rate')
+    out = pd.concat([rate, denom], axis=1).reset_index().rename(columns={group_col: 'group'})
+    return out
+
+
+def _weighted_var_stat(rates_df):
+    """Omnibus stat: sum w_g * (r_g - rbar)^2, w_g=denom."""
+    w = rates_df['denom'].to_numpy()
+    r = rates_df['rate'].to_numpy()
+    if w.sum() == 0:
+        return 0.0
+    rbar = np.average(r, weights=w)
+    return float(np.sum(w * (r - rbar)**2))
+
+
+def _range_stat(rates_df):
+    """Range statistic: max - min rate."""
+    r = rates_df['rate'].to_numpy()
+    return float(r.max() - r.min())
+
+
+def _permute_groups_within_condition(df, group_col, cond_col, cond_val, rng):
+    """Shuffle group labels only within rows where cond_col==cond_val."""
+    sub_idx = df.index[df[cond_col] == cond_val]
+    if len(sub_idx) == 0:
+        return df
+    shuffled = df.loc[sub_idx, group_col].to_numpy().copy()
+    rng.shuffle(shuffled)
+    out = df.copy()
+    out.loc[sub_idx, group_col] = shuffled
+    return out
+
+
+def permutation_test_two_groups(
+    df,
+    group_col='group',
+    groups=('A', 'B'),
+    pred_col='pred',
+    actual_col='actual',
+    n_perms=1000,
+    n_boot=1000,
+    ci_level=0.95,
+    random_state=42
+):
+    """
+    Perform permutation test for TPR and FPR between two groups.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Data with columns: group_col, pred_col, actual_col
+    group_col : str
+        Column name for groups
+    groups : tuple
+        Two group values to compare
+    pred_col : str
+        Column name for predictions (0/1)
+    actual_col : str
+        Column name for actual labels (0/1)
+    n_perms : int
+        Number of permutations
+    n_boot : int
+        Number of bootstrap iterations for CIs
+    ci_level : float
+        Confidence interval level
+    random_state : int
+        Random seed
+    
+    Returns:
+    --------
+    dict : Results for TPR and FPR
+    """
+    a, b = groups
+    rng = np.random.default_rng(random_state)
+
+    def _obs_and_p(cond_val):
+        sub = df[df[actual_col] == cond_val]
+        if sub.empty:
+            raise ValueError(f"No rows with {actual_col}=={cond_val}.")
+        
+        def _rate(g):
+            gsub = sub[sub[group_col] == g]
+            if gsub.empty:
+                return np.nan, 0
+            denom = len(gsub)
+            numer = (gsub[pred_col] == 1).sum()
+            return numer/denom, denom
+
+        def _bootstrap_ci(g):
+            gsub = sub[sub[group_col] == g]
+            if gsub.empty or len(gsub) < 2:
+                return np.nan, np.nan
+            
+            preds = gsub[pred_col].to_numpy()
+            boot_rates = np.empty(n_boot)
+            
+            for i in range(n_boot):
+                sample_idx = rng.choice(len(preds), size=len(preds), replace=True)
+                boot_rates[i] = preds[sample_idx].mean()
+            
+            alpha = 1 - ci_level
+            lower = np.percentile(boot_rates, 100 * alpha / 2)
+            upper = np.percentile(boot_rates, 100 * (1 - alpha / 2))
+            return lower, upper
+
+        rA, nA = _rate(a)
+        rB, nB = _rate(b)
+        if np.isnan(rA) or np.isnan(rB):
+            raise ValueError(f"One of the groups {groups} has no data under condition {cond_val}.")
+        obs_diff = rA - rB
+
+        ci_A_lower, ci_A_upper = _bootstrap_ci(a)
+        ci_B_lower, ci_B_upper = _bootstrap_ci(b)
+
+        # Permutation test
+        diffs = np.empty(n_perms, dtype=float)
+        labels = sub[group_col].to_numpy()
+        
+        for i in range(n_perms):
+            shuffled = labels.copy()
+            rng.shuffle(shuffled)
+            A_idx = (shuffled == a)
+            B_idx = (shuffled == b)
+            rA_p = (sub[pred_col].to_numpy()[A_idx].mean() if A_idx.any() else np.nan)
+            rB_p = (sub[pred_col].to_numpy()[B_idx].mean() if B_idx.any() else np.nan)
+            diffs[i] = rA_p - rB_p
+
+        p_two_sided = (np.sum(np.abs(diffs) >= abs(obs_diff)) + 1) / (n_perms + 1)
+        
+        return {
+            'rate_A': rA, 'n_A': nA,
+            'ci_A': (ci_A_lower, ci_A_upper),
+            'rate_B': rB, 'n_B': nB,
+            'ci_B': (ci_B_lower, ci_B_upper),
+            'obs_diff': obs_diff,
+            'p_value': p_two_sided
+        }
+
+    out_tpr = _obs_and_p(cond_val=1)
+    out_fpr = _obs_and_p(cond_val=0)
+
+    return {'TPR': out_tpr, 'FPR': out_fpr}
+
+
+def omnibus_and_pairs(
+    df,
+    group_col='group',
+    pred_col='pred',
+    actual_col='actual',
+    cond_val=1,
+    n_perms=1000,
+    n_boot=1000,
+    ci_level=0.95,
+    random_state=42,
+    stat='weighted_var',
+    use_maxT=True
+):
+    """
+    Omnibus test + pairwise comparisons with max-T correction.
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Data with columns: group_col, pred_col, actual_col
+    group_col : str
+        Column name for groups
+    pred_col : str
+        Column name for predictions (0/1)
+    actual_col : str
+        Column name for actual labels (0/1)
+    cond_val : int
+        Condition value (1 for TPR, 0 for FPR)
+    n_perms : int
+        Number of permutations
+    n_boot : int
+        Number of bootstrap iterations
+    ci_level : float
+        Confidence interval level
+    random_state : int
+        Random seed
+    stat : str
+        Statistic type ('weighted_var' or 'range')
+    use_maxT : bool
+        Use max-T correction for pairwise tests
+    
+    Returns:
+    --------
+    dict : Results including omnibus p-value and pairwise comparisons
+    """
+    rng = np.random.default_rng(random_state)
+
+    # Observed rates
+    obs_rates = _rate_by_group_conditional(df, group_col, actual_col, cond_val, pred_col)
+    if stat == 'weighted_var':
+        obs_stat = _weighted_var_stat(obs_rates)
+    elif stat == 'range':
+        obs_stat = _range_stat(obs_rates)
+    else:
+        raise ValueError("stat must be 'weighted_var' or 'range'.")
+
+    # Bootstrap CIs
+    def _bootstrap_ci_group(group_name):
+        sub = df[df[actual_col] == cond_val]
+        gsub = sub[sub[group_col] == group_name]
+        
+        if gsub.empty or len(gsub) < 2:
+            return np.nan, np.nan
+        
+        preds = gsub[pred_col].to_numpy()
+        boot_rates = np.empty(n_boot)
+        
+        for i in range(n_boot):
+            sample_idx = rng.choice(len(preds), size=len(preds), replace=True)
+            boot_rates[i] = preds[sample_idx].mean()
+        
+        alpha = 1 - ci_level
+        lower = np.percentile(boot_rates, 100 * alpha / 2)
+        upper = np.percentile(boot_rates, 100 * (1 - alpha / 2))
+        return lower, upper
+
+    ci_lower = []
+    ci_upper = []
+    for g in obs_rates['group']:
+        lower, upper = _bootstrap_ci_group(g)
+        ci_lower.append(lower)
+        ci_upper.append(upper)
+    
+    obs_rates['ci_lower'] = ci_lower
+    obs_rates['ci_upper'] = ci_upper
+
+    groups = obs_rates['group'].tolist()
+    pairs = list(combinations(groups, 2))
+    rate_map = dict(zip(obs_rates['group'], obs_rates['rate']))
+    obs_pair_diffs = {pair: abs(rate_map[pair[0]] - rate_map[pair[1]]) for pair in pairs}
+
+    # Permutation nulls
+    stat_null = np.empty(n_perms, dtype=float)
+    max_pair_null = np.empty(n_perms, dtype=float) if use_maxT else None
+
+    for i in range(n_perms):
+        perm_df = _permute_groups_within_condition(df, group_col, actual_col, cond_val, rng)
+        perm_rates = _rate_by_group_conditional(perm_df, group_col, actual_col, cond_val, pred_col)
+        stat_null[i] = _weighted_var_stat(perm_rates) if stat == 'weighted_var' else _range_stat(perm_rates)
+
+        if use_maxT:
+            prm_map = dict(zip(perm_rates['group'], perm_rates['rate']))
+            max_pair_null[i] = max(abs(prm_map[a] - prm_map[b]) for a, b in pairs)
+
+    p_omni = (np.sum(stat_null >= obs_stat) + 1) / (n_perms + 1)
+
+    results = {
+        'observed_rates': obs_rates.sort_values('group').reset_index(drop=True),
+        'omnibus_stat': obs_stat,
+        'omnibus_pvalue': p_omni,
+    }
+
+    if use_maxT:
+        pair_rows = []
+        for (a, b), d in obs_pair_diffs.items():
+            p_adj = (np.sum(max_pair_null >= d) + 1) / (n_perms + 1)
+            pair_rows.append({'group_a': a, 'group_b': b, 'abs_diff': d, 'pvalue_maxT': p_adj})
+        results['pairwise'] = pd.DataFrame(pair_rows).sort_values(['pvalue_maxT', 'abs_diff'], ascending=[True, False])
+
+    results['null_stat'] = stat_null
+    if use_maxT:
+        results['null_max_pair_diff'] = max_pair_null
+
+    return results
+
+
+def permutation_fairness_TPR(df, **kw):
+    """K-group omnibus + pairwise (maxT) for TPR (condition on actual=1)."""
+    return omnibus_and_pairs(df, cond_val=1, **kw)
+
+
+def permutation_fairness_FPR(df, **kw):
+    """K-group omnibus + pairwise (maxT) for FPR (condition on actual=0)."""
+    return omnibus_and_pairs(df, cond_val=0, **kw)
+
+def _collect_bar_positions(ax, hue_order):
+    """Extract bar positions and heights from seaborn plot."""
+    xticks = np.array(ax.get_xticks())
+    xlabels = [t.get_text() for t in ax.get_xticklabels()]
+    groups = {lab: [] for lab in xlabels}
+
+    for p in ax.patches:
+        xc = p.get_x() + p.get_width()/2.0
+        h = p.get_height()
+        cat_idx = np.argmin(np.abs(xticks - xc))
+        groups[xlabels[cat_idx]].append((xc, h))
+
+    pos = {}
+    tops = {}
+    group_top = {}
+    for outcome, bars in groups.items():
+        bars = sorted(bars, key=lambda z: z[0])
+        group_top[outcome] = max([h for _, h in bars]) if bars else 0.0
+        for i, center in enumerate(hue_order):
+            if i < len(bars):
+                pos[(outcome, center)] = bars[i][0]
+                tops[(outcome, center)] = bars[i][1]
+    return pos, tops, group_top, xlabels
+
+
+def _bracket(ax, x1, x2, y, h=0.01, star="*", lw=1.0, ls=":"):
+    """Draw significance bracket."""
+    ax.plot([x1, x1, x2, x2], [y, y+h, y+h, y],
+            color="k", linewidth=lw, linestyle=ls, clip_on=False)
+    ax.text((x1 + x2) / 2.0, y + h, star, ha="center", va="bottom",
+            fontsize=12, fontweight="bold")
+
+
+def _pairwise_df_to_matrix(pairwise_df, centers=None, pcol='pvalue_maxT', outcome=None):
+    """Convert pairwise p-value table to symmetric matrix."""
+    if pairwise_df is None or pairwise_df.empty:
+        return pd.DataFrame()
+
+    if centers is None:
+        centers = sorted(pd.unique(pairwise_df[['group_a', 'group_b']].values.ravel()))
+
+    mat = pd.DataFrame(np.ones((len(centers), len(centers))), index=centers, columns=centers)
+    np.fill_diagonal(mat.values, 0.0)
+
+    for _, row in pairwise_df.iterrows():
+        a, b = row['group_a'], row['group_b']
+        p = row.get(pcol, row.iloc[-1])
+        if a in mat.index and b in mat.columns:
+            mat.loc[a, b] = p
+            mat.loc[b, a] = p
+
+    if outcome is not None:
+        mat['outcome'] = outcome
+
+    return mat
+
+
+def annotate_pairwise_significance(ax, pairwise_df, hue_order, alpha=0.05):
+    """
+    Annotate significant pairwise differences on grouped barplot.
+    
+    Parameters:
+    -----------
+    ax : matplotlib Axes
+        Plot axes
+    pairwise_df : pd.DataFrame
+        Pairwise comparison results
+    hue_order : list
+        Order of groups in plot
+    alpha : float
+        Significance threshold
+    """
+    pos, tops, group_top, outcomes_on_plot = _collect_bar_positions(ax, hue_order)
+    centers = list(hue_order)
+
+    y0, y1 = ax.get_ylim()
+    step = (y1 - y0) * 0.06
+    bump = (y1 - y0) * 0.08
+    tick_extra = (y1 - y0) * 0.08
+
+    max_needed = y1
+
+    for outcome in outcomes_on_plot:
+        block = pairwise_df[pairwise_df["outcome"] == outcome].drop(columns=["outcome"]).copy()
+        block = block.reindex(index=centers, columns=centers)
+
+        sig_pairs = []
+        for i in range(len(centers)):
+            for j in range(i+1, len(centers)):
+                p = block.iloc[i, j]
+                if pd.notna(p) and p < alpha:
+                    sig_pairs.append((centers[i], centers[j], p))
+
+        if not sig_pairs:
+            continue
+
+        base_y = group_top[outcome] + bump
+        for k, (c1, c2, p) in enumerate(sig_pairs):
+            x1 = pos[(outcome, c1)]
+            x2 = pos[(outcome, c2)]
+            y = base_y + k * step
+            _bracket(ax, x1, x2, y, h=step*0.35, star=p_to_stars(p))
+
+        max_needed = max(max_needed, base_y + len(sig_pairs)*step + tick_extra)
+
+    ax.set_ylim(y0, max_needed)
+
+
+def plot_fairness_by_center(
+    center_fairness,
+    pairwise_tpr,
+    pairwise_fpr,
+    metric='TPR',
+    center_order=['INT', 'GHD', 'VHIO', 'SZMC', 'MH'],
+    center_colors=None,
+    patients_per_outcome=None,
+    outcome_thresholds=None,
+    figsize=(14, 6)
+):
+    """
+    Plot TPR or FPR by center with statistical annotations.
+    
+    Parameters:
+    -----------
+    center_fairness : pd.DataFrame
+        Fairness metrics by center
+    pairwise_tpr/fpr : pd.DataFrame
+        Pairwise comparison results
+    metric : str
+        'TPR' or 'FPR'
+    center_order : list
+        Order of centers
+    center_colors : dict
+        Color mapping for centers
+    patients_per_outcome : dict
+        Patient counts per center/outcome
+    outcome_thresholds : dict
+        Reference thresholds per outcome
+    figsize : tuple
+        Figure size
+    save_path : str, optional
+        Path to save figure
+    """
+    if center_colors is None:
+        center_colors = {
+            'INT': '#08306B', 'GHD': '#2171B5', 'VHIO': '#4292C6',
+            'SZMC': '#6BAED6', 'MH': '#9ECAE1'
+        }
+    
+    plt.figure(figsize=figsize)
+    
+    # Prepare data
+    center_fairness = center_fairness[center_fairness.index.isin(center_order)].copy()
+    center_fairness['center'] = pd.Categorical(center_fairness.index, categories=center_order, ordered=True)
+    
+    # Create plot
+    ax = sns.barplot(
+        x='outcome',
+        y=metric,
+        hue='center',
+        data=center_fairness,
+        palette=center_colors,
+        width=0.9,
+        edgecolor='k',
+        linewidth=0.3
+    )
+    
+    if metric == 'FPR':
+        for patch in ax.patches:
+            patch.set_hatch('\\\\')
+    
+    # Add error bars
+    outcomes = center_fairness['outcome'].unique()
+    centers = center_order
+    
+    x_positions = []
+    y_values = []
+    yerr_lower = []
+    yerr_upper = []
+    
+    group_width = 0.9
+    bar_width = group_width / len(centers)
+    
+    for i, outcome in enumerate(outcomes):
+        for j, center in enumerate(centers):
+            sub = center_fairness.loc[
+                (center_fairness['outcome'] == outcome) &
+                (center_fairness['center'] == center)
+            ]
+            if not sub.empty:
+                val = sub[metric].values[0]
+                ci_low = sub[f'{metric}_ci_lower'].values[0]
+                ci_up = sub[f'{metric}_ci_upper'].values[0]
+                
+                x_pos = i + (j - (len(centers) - 1) / 2) * bar_width
+                
+                x_positions.append(x_pos)
+                y_values.append(val)
+                yerr_lower.append(val - ci_low)
+                yerr_upper.append(ci_up - val)
+    
+    ax.errorbar(
+        x_positions, y_values,
+        yerr=[yerr_lower, yerr_upper],
+        fmt='none',
+        ecolor='black',
+        capsize=3,
+        capthick=1,
+        elinewidth=1,
+        zorder=10
+    )
+    
+    # Add value labels
+    if patients_per_outcome is not None:
+        label_offset = 0.02
+        for container in ax.containers:
+            try:
+                if len(container.patches) == 0:
+                    continue
+                rgb = np.array(container.patches[0].get_facecolor()[:3])
+                palette_rgb = {name: np.array(plt.matplotlib.colors.to_rgb(col)) 
+                              for name, col in center_colors.items()}
+                center_name = min(palette_rgb, key=lambda name: np.linalg.norm(palette_rgb[name] - rgb))
+                
+                xlabels = [t.get_text() for t in ax.get_xticklabels()]
+                
+                for i, patch in enumerate(container):
+                    outcome_lbl = xlabels[i] if i < len(xlabels) else None
+                    if outcome_lbl and center_name:
+                        outcome_data = center_fairness[
+                            (center_fairness['outcome'] == outcome_lbl) &
+                            (center_fairness['center'] == center_name)
+                        ]
+                        if not outcome_data.empty:
+                            val = outcome_data[metric].values[0]
+                            ci_lower = outcome_data[f'{metric}_ci_lower'].values[0]
+                            ci_upper = outcome_data[f'{metric}_ci_upper'].values[0]
+                            n = patients_per_outcome.get(outcome_lbl, {}).get(center_name)
+                            
+                            bar_x = patch.get_x() + patch.get_width() / 2
+                            bar_y = val + (ci_upper - val) + label_offset
+                            
+                            ax.text(bar_x, bar_y, f"{val:.2f} ± {ci_upper - val:.2f}\n(n. {n})",
+                                    ha='center', va='bottom', fontsize=8, color='black')
+            except Exception as e:
+                print(f"Failed to add labels: {e}")
+    
+    # Add thresholds
+    if outcome_thresholds is not None:
+        xticks = np.array(ax.get_xticks())
+        xlabels = [t.get_text() for t in ax.get_xticklabels()]
+        bars_by_outcome = {lab: [] for lab in xlabels}
+        for p in ax.patches:
+            xc = p.get_x() + p.get_width() / 2.0
+            idx = int(np.argmin(np.abs(xticks - xc)))
+            if 0 <= idx < len(xlabels):
+                bars_by_outcome[xlabels[idx]].append(p)
+        
+        for outcome in xlabels:
+            threshold = outcome_thresholds.get(outcome, 0.5)
+            bars = bars_by_outcome.get(outcome, [])
+            if not bars:
+                continue
+            start_x = min(b.get_x() for b in bars)
+            end_x = max(b.get_x() + b.get_width() for b in bars)
+            ax.plot([start_x, end_x], [threshold, threshold], 
+                    color='black', linestyle='--', linewidth=0.8, alpha=0.7)
+    
+    # Annotate significance
+    pairwise_data = pairwise_tpr if metric == 'TPR' else pairwise_fpr
+    annotate_pairwise_significance(ax, pairwise_data, hue_order=center_order, alpha=0.05)
+    
+    # Formatting
+    direction = '↑ higher is better' if metric == 'TPR' else '↓ lower is better'
+    plt.ylabel(f'{metric} - {direction}')
+    plt.title(f'{metric} by Center and Outcome (with 95% CI)', pad=20)
+    plt.ylim(0, 1.4)
+    plt.yticks(np.arange(0, 1.1, 0.2))
+    plt.legend(title='Center', loc='upper left')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_fairness_by_group(
+    fairness_df,
+    metric='TPR',
+    group_col='Sex',
+    group_colors=None,
+    patients_per_outcome=None,
+    outcome_thresholds=None,
+    figsize=(6, 7)
+):
+    """
+    Plot TPR or FPR by demographic group (sex/race).
+    
+    Parameters:
+    -----------
+    fairness_df : pd.DataFrame
+        Fairness results by group
+    metric : str
+        'TPR' or 'FPR'
+    group_col : str
+        Column name for groups ('Sex' or 'Race')
+    group_colors : list
+        Colors for groups
+    patients_per_outcome : dict
+        Patient counts per group/outcome
+    outcome_thresholds : dict
+        Reference thresholds per outcome
+    figsize : tuple
+        Figure size
+    save_path : str, optional
+        Path to save figure
+    """
+    if group_colors is None:
+        group_colors = ["#E78FD4", "#7BB8E0"] if group_col == 'Sex' else ["#1E52A0", '#4292C6']
+    
+    plt.figure(figsize=figsize)
+    
+    # Filter and prepare data
+    df_plot = fairness_df[fairness_df["Metric"] == metric].copy()
+    df_plot[["ci_low", "ci_up"]] = pd.DataFrame(
+        df_plot["CI"].apply(lambda t: t if isinstance(t, (tuple, list, np.ndarray)) and len(t) == 2 
+                           else (np.nan, np.nan)).tolist(),
+        index=df_plot.index
+    )
+    
+    # Create plot
+    ax = sns.barplot(
+        x='outcome',
+        y='Value',
+        hue=group_col,
+        data=df_plot,
+        palette=group_colors,
+        width=0.8,
+        edgecolor='k',
+        linewidth=0.2
+    )
+    
+    if metric == 'FPR':
+        for patch in ax.patches:
+            patch.set_hatch('\\\\')
+    
+    # Add error bars
+    outcomes = df_plot['outcome'].unique()
+    groups = df_plot[group_col].unique()
+    
+    x_positions = []
+    y_values = []
+    yerr_lower = []
+    yerr_upper = []
+    
+    group_width = 0.8
+    bar_width = group_width / len(groups)
+    
+    for i, outcome in enumerate(outcomes):
+        for j, group in enumerate(groups):
+            sub = df_plot[
+                (df_plot['outcome'] == outcome) & (df_plot[group_col] == group)
+            ]
+            if not sub.empty:
+                val = sub['Value'].values[0]
+                ci_low = sub['ci_low'].values[0]
+                ci_up = sub['ci_up'].values[0]
+                
+                x_pos = i + (j - (len(groups) - 1) / 2) * bar_width
+                
+                x_positions.append(x_pos)
+                y_values.append(val)
+                yerr_lower.append(val - ci_low)
+                yerr_upper.append(ci_up - val)
+    
+    if x_positions:
+        ax.errorbar(
+            x_positions, y_values,
+            yerr=[yerr_lower, yerr_upper],
+            fmt='none',
+            ecolor='black',
+            capsize=3,
+            capthick=1,
+            elinewidth=1,
+            zorder=10
+        )
+    
+    # Add value labels
+    if patients_per_outcome is not None:
+        label_offset = 0.02
+        for container in ax.containers:
+            try:
+                if len(container.patches) == 0:
+                    continue
+                rgb = np.array(container.patches[0].get_facecolor()[:3])
+                palette_rgb = {name: np.array(plt.matplotlib.colors.to_rgb(col)) 
+                              for name, col in zip(groups, group_colors)}
+                group_name = min(palette_rgb, key=lambda name: np.linalg.norm(palette_rgb[name] - rgb))
+                
+                xlabels = [t.get_text() for t in ax.get_xticklabels()]
+                
+                for i, patch in enumerate(container):
+                    outcome_lbl = xlabels[i] if i < len(xlabels) else None
+                    if outcome_lbl and group_name:
+                        outcome_data = df_plot[
+                            (df_plot['outcome'] == outcome_lbl) &
+                            (df_plot[group_col] == group_name)
+                        ]
+                        if not outcome_data.empty:
+                            val = outcome_data['Value'].values[0]
+                            ci_lower = outcome_data['ci_low'].values[0]
+                            ci_upper = outcome_data['ci_up'].values[0]
+                            n = patients_per_outcome.get(outcome_lbl, {}).get(group_name)
+                            
+                            bar_x = patch.get_x() + patch.get_width() / 2
+                            bar_y = val + (ci_upper - val) + label_offset
+                            
+                            ax.text(bar_x, bar_y, f"{val:.2f} ± {ci_upper - val:.2f}\n(n. {n})",
+                                    ha='center', va='bottom', fontsize=8, color='black')
+            except Exception as e:
+                print(f"Failed to add labels: {e}")
+    
+    # Add thresholds
+    if outcome_thresholds is not None:
+        xticks = np.array(ax.get_xticks())
+        xlabels = [t.get_text() for t in ax.get_xticklabels()]
+        bars_by_outcome = {lab: [] for lab in xlabels}
+        for p in ax.patches:
+            xc = p.get_x() + p.get_width() / 2.0
+            idx = int(np.argmin(np.abs(xticks - xc)))
+            if 0 <= idx < len(xlabels):
+                bars_by_outcome[xlabels[idx]].append(p)
+        
+        for outcome in xlabels:
+            threshold = outcome_thresholds.get(outcome, 0.5)
+            bars = bars_by_outcome.get(outcome, [])
+            if not bars:
+                continue
+            start_x = min(b.get_x() for b in bars)
+            end_x = max(b.get_x() + b.get_width() for b in bars)
+            ax.plot([start_x, end_x], [threshold, threshold], 
+                    color='black', linestyle='--', linewidth=0.8, alpha=0.7)
+    
+    # Formatting
+    direction = '↑ higher is better' if metric == 'TPR' else '↓ lower is better'
+    plt.ylabel(f'{metric} - {direction}')
+    plt.title(f'{metric} by {group_col} and Outcome (with 95% CI)', pad=20)
+    plt.ylim(0, 1.3)
+    plt.yticks(np.arange(0, 1.1, 0.2))
+    
+    # Legend
+    handles, labels = ax.get_legend_handles_labels()
+    if metric == 'FPR':
+        for h in handles:
+            h.set_hatch('')
+    plt.legend(handles, labels, title=group_col, loc='upper left')
+    
+    plt.tight_layout()
+    
+    plt.show()
+
+def analyze_outcome_fairness(
+    outcome,
+    outcome_name,
+    base_path='mlef_pipeline/results',
+    n_perms=1000,
+    random_state=42
+):
+    """
+    Complete fairness analysis for a single outcome.
+    
+    Parameters:
+    -----------
+    outcome : str
+        Outcome folder name (e.g., 'DCR', 'OS6', 'OS24')
+    outcome_name : str
+        Display name for outcome (e.g., 'OS 24')
+    base_path : str
+        Base directory path where predictions are stored
+    n_perms : int
+        Number of permutations for tests
+    random_state : int
+        Random seed
+    
+    Returns:
+    --------
+    dict : Results including fairness metrics and test results
+    """
+    print(f"\n{'='*60}")
+    print(f"Analyzing {outcome_name}")
+    print(f"{'='*60}\n")
+    
+    # Load predictions and data
+    predictions_df, test = load_predictions_and_data(outcome, base_path)
+    
+    # Extract predictions
+    y_test = predictions_df['y_true'].values
+    y_pred = predictions_df['y_pred'].values
+    
+    # Overall performance
+    auc = roc_auc_score(y_test, y_pred)
+    tpr, fpr = compute_tpr_fpr(y_test, y_pred)
+    print(f"Overall Test Performance:")
+    print(f"  AUC: {auc:.3f}")
+    print(f"  TPR (threshold): {tpr:.3f}")
+    print(f"  FPR (threshold): {fpr:.3f}\n")
+    
+    # Fairness by center
+    print("Analyzing fairness by center...")
+    test_folds = test['CENTER']
+    
+    # Compute patient counts per center
+    patients_per_center = test_folds.value_counts().to_dict()
+    print(f"Patients per center: {patients_per_center}")
+    
+    # Check if SEX exists
+    gender_col = 'SEX'
+    sex_data = test[gender_col]
+    
+    # Compute patient counts per sex
+    patients_per_sex = sex_data.value_counts().to_dict()
+    print(f"Patients per sex: {patients_per_sex}\n")
+    
+    # Prepare data for permutation tests
+    df_outcome = pd.DataFrame({
+        'center': test_folds,
+        'sex': sex_data,
+        'pred': (y_pred).astype(int),
+        'actual': y_test
+    })
+    
+    # Sex-based fairness (test set)
+    if gender_col is not None:
+        print("\nSex-based fairness analysis (test set)...")
+        try:
+            sex_fair = permutation_test_two_groups(
+                df_outcome, 
+                group_col='sex', 
+                groups=df_outcome['sex'].unique(), 
+                n_perms=n_perms, 
+                random_state=random_state
+            )
+            
+            print(f"  TPR - Female: {sex_fair['TPR']['rate_A']:.3f}, Male: {sex_fair['TPR']['rate_B']:.3f}, p={sex_fair['TPR']['p_value']:.4f}")
+            print(f"  FPR - Female: {sex_fair['FPR']['rate_A']:.3f}, Male: {sex_fair['FPR']['rate_B']:.3f}, p={sex_fair['FPR']['p_value']:.4f}")
+        except Exception as e:
+            print(f"  Warning: Sex-based analysis failed: {e}")
+            sex_fair = None
+    else:
+        sex_fair = None
+    
+    # Center-based fairness
+    print("\nCenter-based fairness analysis...")
+    tpr_out = permutation_fairness_TPR(
+        df_outcome, 
+        group_col='center', 
+        n_perms=n_perms, 
+        stat='weighted_var', 
+        random_state=random_state
+    )
+    
+    fpr_out = permutation_fairness_FPR(
+        df_outcome, 
+        group_col='center', 
+        n_perms=n_perms, 
+        stat='weighted_var', 
+        random_state=random_state
+    )
+    
+    print(f"  TPR omnibus p-value: {tpr_out['omnibus_pvalue']:.4f}")
+    print(f"  FPR omnibus p-value: {fpr_out['omnibus_pvalue']:.4f}")
+    
+    
+    return {
+        'outcome_name': outcome_name,
+        'predictions': predictions_df,
+        'test': test,
+        'auc': auc,
+        'overall_tpr': tpr,
+        'overall_fpr': fpr,
+        'threshold_tpr': tpr,
+        'threshold_fpr': fpr,
+        'patients_per_center': patients_per_center,
+        'patients_per_sex': patients_per_sex,
+        'sex_fairness': sex_fair,
+        'tpr_by_center': tpr_out,
+        'fpr_by_center': fpr_out
+    }
+
+
+def create_fairness_summary(results_dict):
+    """
+    Create summary DataFrames from multiple outcome analyses.
+    
+    Parameters:
+    -----------
+    results_dict : dict
+        Dictionary with outcome names as keys and analysis results as values
+    
+    Returns:
+    --------
+    tuple : (sex_fairness_df, center_fairness_df, pairwise_tpr, pairwise_fpr)
+    """
+    sex_fairness = pd.DataFrame(columns=['Metric', 'Sex', 'Value', 'CI', 'p-value', 'outcome'])
+    center_fairness_list = []
+    pairwise_tpr_list = []
+    pairwise_fpr_list = []
+    
+    for outcome_name, results in results_dict.items():
+        # Sex fairness
+        for metric, values in results['sex_fairness'].items():
+            ciA = values.get('ci_A')
+            ciB = values.get('ci_B')
+            ciA_rounded = (round(float(ciA[0]), 2), round(float(ciA[1]), 2)) if isinstance(ciA, (tuple, list, np.ndarray)) and len(ciA) == 2 else ciA
+            ciB_rounded = (round(float(ciB[0]), 2), round(float(ciB[1]), 2)) if isinstance(ciB, (tuple, list, np.ndarray)) and len(ciB) == 2 else ciB
+            
+            sex_fairness.loc[len(sex_fairness)] = {
+                'Metric': metric,
+                'Sex': 'Female',
+                'Value': values['rate_A'],
+                'CI': ciA_rounded,
+                'p-value': values['p_value'],
+                'outcome': outcome_name
+            }
+            sex_fairness.loc[len(sex_fairness)] = {
+                'Metric': metric,
+                'Sex': 'Male',
+                'Value': values['rate_B'],
+                'CI': ciB_rounded,
+                'p-value': values['p_value'],
+                'outcome': outcome_name
+            }
+        
+        # Center fairness
+        tpr_rates = results['tpr_by_center']['observed_rates'].rename(
+            columns={'group': 'center', 'rate': 'TPR', 'denom': 'TPR_denom'}
+        )
+        fpr_rates = results['fpr_by_center']['observed_rates'].rename(
+            columns={'group': 'center', 'rate': 'FPR', 'denom': 'FPR_denom'}
+        )
+        
+        tpr_rates['TPR_ci_lower'] = round(tpr_rates['ci_lower'], 2)
+        tpr_rates['TPR_ci_upper'] = round(tpr_rates['ci_upper'], 2)
+        fpr_rates['FPR_ci_lower'] = round(fpr_rates['ci_lower'], 2)
+        fpr_rates['FPR_ci_upper'] = round(fpr_rates['ci_upper'], 2)
+        
+        center_df = pd.merge(
+            tpr_rates[['center', 'TPR', 'TPR_ci_lower', 'TPR_ci_upper']],
+            fpr_rates[['center', 'FPR', 'FPR_ci_lower', 'FPR_ci_upper']],
+            on='center',
+            how='outer'
+        ).set_index('center').sort_index()
+        
+        center_df['outcome'] = outcome_name
+        center_df['TPR_omnibus_p'] = results['tpr_by_center'].get('omnibus_pvalue', np.nan)
+        center_df['FPR_omnibus_p'] = results['fpr_by_center'].get('omnibus_pvalue', np.nan)
+        
+        center_fairness_list.append(center_df)
+        
+        # Pairwise matrices
+        centers = center_df.index.tolist()
+        pairwise_tpr = _pairwise_df_to_matrix(
+            results['tpr_by_center'].get('pairwise', pd.DataFrame()), 
+            centers=centers, 
+            outcome=outcome_name
+        )
+        pairwise_fpr = _pairwise_df_to_matrix(
+            results['fpr_by_center'].get('pairwise', pd.DataFrame()), 
+            centers=centers, 
+            outcome=outcome_name
+        )
+        
+        pairwise_tpr_list.append(pairwise_tpr)
+        pairwise_fpr_list.append(pairwise_fpr)
+    
+    center_fairness = pd.concat(center_fairness_list, axis=0).sort_index()
+    pairwise_tpr = pd.concat(pairwise_tpr_list, axis=0)
+    pairwise_fpr = pd.concat(pairwise_fpr_list, axis=0)
+    
+    return sex_fairness, center_fairness, pairwise_tpr, pairwise_fpr

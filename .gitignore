@@ -18,7 +18,7 @@
 !graphs_classification.ipynb
 !graphs_i3lung.ipynb
 !DeLong_test.py
-!helper.py
+!helper_classification.py
 !helper_survival.py
 !helper_survival_fairness.py
 !helper_survival_graphs.py
