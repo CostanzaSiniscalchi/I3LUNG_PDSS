@@ -450,6 +450,11 @@ def train_and_evaluate_modality(
     
     # 8. Compute cross-validation predictions
     print("8. Computing CV predictions...")
+    # use GroupKFold with centers as groups
+    cv = GroupKFold(n_splits=len(train_folds.unique()))
+    def get_cv_splits():
+        return list(cv.split(X_train_scaled, y_train, groups=train_folds))
+    
     y_proba_cv, cv_metrics = compute_cv_predictions(
         model, X_train_final, y_train, get_cv_splits(), train_folds
     )
