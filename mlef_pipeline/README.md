@@ -14,7 +14,18 @@ conda create -n mlef python=3.11
 conda activate mlef
 pip install -r mlef_pipeline/requirements.txt
 ```
+## Training Process
 
+For both analysis (classification and survival) the training process is the following:
+
+1. **Data Loading** - Loads and merges modalities via early fusion
+2. **Data Splitting** - Uses predefined train/test/external splits
+3. **Imputation** - Fills missing values using iterative imputation
+4. **Normalization** - Log-transforms skewed features and standardizes
+5. **Feature Selection** (optional) - LASSO/CoxNet based selection targeting 15±10 features 
+6. **Model Training** - Bayesian hyperparameter optimization with 5-fold LOCO-CV
+7. **Evaluation** - Computes AUC/C-index with 95% CI on CV, test, and external sets
+8. **Saving** - Exports model, datasets, predictions, and metrics
 ## Classification analysis
 
 
@@ -195,19 +206,6 @@ mlef_pipeline/
 - **results.xlsx** - Performance metrics for all data splits
   - Columns: `SET` (CV/TEST/EXVAL), `AUC` (mean ± std), `n` (sample size)
 - **training_summary.xlsx** - Summary table of all trained models in the run
-
-## Training Process
-
-For each modality combination, the script performs:
-
-1. **Data Loading** - Loads and merges modalities via early fusion
-2. **Data Splitting** - Uses predefined train/test/external splits from `split.json`
-3. **Imputation** - Fills missing values using iterative imputation
-4. **Normalization** - Log-transforms skewed features and standardizes
-5. **Feature Selection** - LASSO-based selection targeting 15±10 features (optional)
-6. **Model Training** - Bayesian hyperparameter optimization with 5-fold LOCO-CV
-7. **Evaluation** - Computes AUC with 95% CI on CV, test, and external sets
-8. **Saving** - Exports model, datasets, predictions, and metrics
 
 ### Training Output
 
