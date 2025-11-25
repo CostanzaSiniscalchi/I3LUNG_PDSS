@@ -1,14 +1,11 @@
 # MLEF Model Training Guide
 
-This guide explains how to use the `train_mlef.py` script to train MLEF (Machine Learning Early Fusion) models.
+This guide explains how to use the [`train_mlef.py`](#classification-analysis) and [`train_mlef_surv.py`](#survival-analysis) script to train MLEF (Machine Learning Early Fusion) classification and survival models.
 
 ## Overview
 
 The script trains MLEF models for different data modality combinations and saves results in a structured folder format compatible with your analysis pipeline.
-
-## Quick Start
-
-### Configure environment
+## Configure environment
 
 Run the following from the `mlef_pipeline` directory:
 
@@ -17,6 +14,9 @@ conda create -n mlef python=3.11
 conda activate mlef
 pip install -r mlef_pipeline/requirements.txt
 ```
+
+## Classification analysis
+
 
 ### Step 1: Configure Models (Optional)
 
@@ -439,6 +439,39 @@ If you see `Warning: Invalid model 'XYZ'`:
 - The script is safe to interrupt - just restart to continue with remaining modalities
 - Configuration changes take effect immediately on next run
 
+## Survival Analysis
+
+To train survival models (CoxPH) for Overall Survival (OS), use the `train_mlef_surv.py` script.
+
+### Usage
+
+```bash
+python mlef_pipeline/train_mlef_surv.py --subanalysis C23
+```
+
+### Command-Line Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--subanalysis` | str | `C23` | Subgroup: `C23`, `C2`, `IO_ONLY`, `IO_CHT`, `LOW_PDL1`, `HIGH_PDL1`, `SQUAMOUS`, `ADENOCARCINOMA` |
+| `--modalities` | list | all | Modalities to train: `RWD`, `RWD_DP`, `RWD_FMRAD`, `RWD_PYRAD`, `RWD_DP_FMRAD`, `RWD_DP_PYRAD` |
+| `--no-feature-selection` | flag | False | Disable automatic feature selection (CoxNet) |
+| `--output-dir` | str | `mlef_pipeline` | Base output directory |
+
+### Output Structure
+
+Results are saved in `mlef_pipeline/results/OS/`:
+
+```
+mlef_pipeline/results/
+  OS/
+    C23/
+      RWD/
+        model_COX.pkl             # Trained CoxPH model
+        prediction_CV.csv         # CV predictions (risk scores)
+        results.xlsx              # C-Index metrics
+        ...
+```
 
 ## Citation
 

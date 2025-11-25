@@ -890,7 +890,7 @@ def main():
     for modes in modalities_to_train:
         modality_folder = get_modality_folder_name(modes)
         model_for_modality = get_model_for_modality(modality_folder, modality_models_config, default_model_type)
-        if modality_folder != 'RWD':
+        if modality_folder != 'RWD' and len(modes) > 1:
             rwd_only_model = get_rwd_only_model_for_modality(modality_folder, rwd_only_models_config, 
                                                                model_for_modality, default_model_type)
             print(f"  - {modality_folder} (Model: {model_for_modality.value}, RWD-only: {rwd_only_model.value})")
@@ -923,7 +923,7 @@ def main():
             all_results.append(result)
             
             # Train RWD-matched model if not RWD-only
-            if modality_folder != 'RWD':
+            if len(modes) > 1:
                 # Get the model type for RWD-only analysis
                 rwd_only_model_type = get_rwd_only_model_for_modality(
                     modality_folder, rwd_only_models_config, model_type, default_model_type
