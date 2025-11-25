@@ -180,7 +180,7 @@ def compute_metrics_with_ci(y_true: np.ndarray, y_pred_proba: np.ndarray,
     auc_std = (ci[1] - ci[0]) / 2
     
     # Convert probabilities to binary predictions
-    y_pred_binary = (y_pred_proba >= threshold).astype(int)
+    y_pred_binary = np.where(np.isnan(y_pred_proba), np.nan, (y_pred_proba >= threshold).astype(int))
     
     # Calculate F1 macro
     f1_macro = f1_score(y_true, y_pred_binary, average='macro', zero_division=0)
@@ -502,7 +502,7 @@ def train_and_evaluate_modality(
     cv_predictions = pd.DataFrame({
         'Subject': y_proba_cv.index,  # Now y_pred_cv is a Series with the correct index
         'y_proba': y_proba_cv.values,
-        'y_pred': (y_proba_cv.values >= 0.5).astype(int),
+        'y_pred': np.where(~y_proba_cv.isna(), (y_proba_cv >= 0.5).astype(int), np.nan),
         'y_true': y_train.values
     })
     cv_predictions.to_csv(output_dir / 'prediction_CV.csv', index=False)
@@ -511,7 +511,7 @@ def train_and_evaluate_modality(
     test_predictions = pd.DataFrame({
         'Subject': X_test_final.index,
         'y_proba': y_pred_test,
-        'y_pred': (y_pred_test >= 0.5).astype(int),
+        'y_pred': np.where(~pd.isna(y_pred_test), (y_pred_test >= 0.5).astype(int), np.nan),
         'y_true': y_test.values
     })
     test_predictions.to_csv(output_dir / 'prediction_TEST.csv', index=False)
@@ -521,7 +521,7 @@ def train_and_evaluate_modality(
         exval_predictions = pd.DataFrame({
             'Subject': X_ext_final.index,
             'y_proba': y_pred_ext,
-            'y_pred': (y_pred_ext >= 0.5).astype(int),
+            'y_pred': np.where(~pd.isna(y_pred_ext), (y_pred_ext >= 0.5).astype(int), np.nan),
             'y_true': y_ext.values
         })
         exval_predictions.to_csv(output_dir / 'prediction_EXVAL.csv', index=False)
@@ -737,7 +737,7 @@ def train_rwd_matched_model(
     cv_predictions = pd.DataFrame({
         'Subject': X_train_final.index,
         'y_proba': y_proba_cv,
-        'y_pred': (y_proba_cv >= 0.5).astype(int),
+        'y_pred': np.where(~y_proba_cv.isna(), (y_proba_cv >= 0.5).astype(int), np.nan),
         'y_true': y_train
     })
     cv_predictions.to_csv(output_dir / 'prediction_CV.csv', index=False)
@@ -746,7 +746,7 @@ def train_rwd_matched_model(
     test_predictions = pd.DataFrame({
         'Subject': X_test_final.index,
         'y_proba': y_pred_test,
-        'y_pred': (y_pred_test >= 0.5).astype(int),
+        'y_pred': np.where(~pd.isna(y_pred_test), (y_pred_test >= 0.5).astype(int), np.nan),
         'y_true': y_test.values
     })
     test_predictions.to_csv(output_dir / 'prediction_TEST.csv', index=False)
@@ -754,7 +754,7 @@ def train_rwd_matched_model(
     exval_predictions = pd.DataFrame({
         'Subject': X_ext_final.index,
         'y_proba': y_pred_ext,
-        'y_pred': (y_pred_ext >= 0.5).astype(int),
+        'y_pred': np.where(~pd.isna(y_pred_ext), (y_pred_ext >= 0.5).astype(int), np.nan),
         'y_true': y_ext.values
     })
     exval_predictions.to_csv(output_dir / 'prediction_EXVAL.csv', index=False)

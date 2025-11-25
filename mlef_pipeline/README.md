@@ -12,7 +12,7 @@ Run the following from the `mlef_pipeline` directory:
 ```bash
 conda create -n mlef python=3.11
 conda activate mlef
-pip install -r requirements.txt
+pip install -r mlef_pipeline/requirements.txt
 ```
 
 ## Classification analysis
