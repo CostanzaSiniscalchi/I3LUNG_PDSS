@@ -11,6 +11,9 @@ from typing import Iterable, Optional, Union, List, Tuple, Literal, Dict
 from sklearn.metrics import confusion_matrix
 from itertools import combinations
 import seaborn as sns
+from lifelines import KaplanMeierFitter
+from lifelines.utils import median_survival_times
+from lifelines.plotting import add_at_risk_counts
 
 
  # Convert outcome to DLIF format if needed
@@ -926,7 +929,7 @@ def plot_radar_charts(
         ax.tick_params(axis='x', pad=42)
         
         ax.set_ylim(0, 1)
-        ax.set_title(f'{title_prefix} - {metric} Comparison', pad=25, fontsize=14)
+        ax.set_title(f'{title_prefix} - {metric} Comparison', pad=60, fontsize=14)
         
         # --- Annotations ---
         colors = ['#811850', '#156ba9', "#477439"]
@@ -2221,3 +2224,53 @@ def create_fairness_summary(results_dict):
     pairwise_fpr = pd.concat(pairwise_fpr_list, axis=0)
     
     return sex_fairness, center_fairness, pairwise_tpr, pairwise_fpr
+
+
+def plot_km_combined(target, train_set, test_set, uoc_set, title):
+    # Create a single axis for the combined plot
+    fig, ax = plt.subplots(figsize=(8, 4))
+    
+    # Define custom colors for each dataset
+    colors = {'TRAIN': '#511635', 'TEST': '#1f77b4', 'EXVAL': '#800080'}
+    
+    # Container to hold datasets
+    datasets = {
+        'TRAIN': train_set,
+        'TEST': test_set,
+        'EXVAL': uoc_set
+    }
+    
+    # Collect median annotations
+    median_annotations = []
+    kmfs = []
+    for label, dataset in datasets.items():
+        kdf = dataset.dropna(subset=['OS MONTHS', 'DEATH EVENT'])
+        kmf = KaplanMeierFitter()
+        kmf.fit(kdf['OS MONTHS'], kdf['DEATH EVENT'], label=label)
+        
+        # Plot the curve using the dataset-specific color.
+        kmf.plot(ax=ax, color=colors[label], show_censors=True, ci_show=True)
+        kmfs.append(kmf)
+
+        # Calculate median OS and its CI.
+        median_target = kmf.median_survival_time_
+        median_ci = median_survival_times(kmf.confidence_interval_)
+        lower_bound = median_ci.iloc[0, 0]
+        upper_bound = median_ci.iloc[0, 1]
+        print(f"{label} - Median {target}: {median_target} months")
+        print(f"95% CI: {lower_bound} - {upper_bound} months")
+        
+        # Add median annotation to the list
+        median_annotations.append(f"{label}: {median_target:.1f} mo (95% CI: {lower_bound:.1f}-{upper_bound:.1f})")
+    
+    # Add median annotations at the top of the axes
+    ax.text(0.5, 0.95, "\n".join(median_annotations),
+            transform=ax.transAxes, color="black", fontsize=15,
+            horizontalalignment='center', verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5))
+    # Add at-risk counts below the plot
+    add_at_risk_counts(*kmfs, ax=ax, labels=list(datasets.keys()), rows_to_show=["At risk"], fontsize=15)
+    ax.set_xlim(0, 100)
+    ax.set_xlabel('Months')
+    ax.set_ylabel('OS Probability')
+    ax.set_title(title)
+    plt.show()
