@@ -12,7 +12,7 @@ imp: noimp  # noimp/imp
 seed: [0]
 
 use_early_stopping: true
-prepare_dataset: false
+prepare_dataset: true
 
 train_df: [ "../data/features_dataset_radpy_fixed.parquet", "../data/features_dataset_fmrad.parquet" ]
 annotation_file: ../data/annotations.csv
