@@ -545,7 +545,7 @@ def analyze_fairness_by_site(predictions, sites, n_boot=1000, seed=42):
     Parameters:
     -----------
     predictions : pd.DataFrame
-        DataFrame with Subject, EVENT, TIME, risk_score columns
+        DataFrame with Subject, CENTER, EVENT, TIME, risk_score columns
     sites : list
         List of site prefixes (e.g., ['INT', 'GHD', ...])
     
@@ -560,7 +560,7 @@ def analyze_fairness_by_site(predictions, sites, n_boot=1000, seed=42):
     group_results = {}
     
     for site in sites:
-        site_data = predictions[predictions['Subject'].str.startswith(site)]
+        site_data = predictions[predictions['CENTER']==site]
         
         if len(site_data) == 0:
             print(f"\nWarning: No patients found for site {site}")
@@ -617,7 +617,7 @@ def analyze_fairness_by_race(predictions, clinical_data, n_boot=1000, seed=42):
     predictions : pd.DataFrame
         DataFrame with Subject, EVENT, TIME, risk_score columns
     clinical_data : pd.DataFrame
-        DataFrame with Subject and race indicator columns
+        DataFrame with Subject and RACE column
     
     Returns:
     --------
@@ -627,20 +627,18 @@ def analyze_fairness_by_race(predictions, clinical_data, n_boot=1000, seed=42):
     print("C-INDEX BY RACE (External Validation)")
     print("="*60)
     
-    race_cols = {
-        'RACE BLACK OR AFRICAN AMERICAN': 'BLACK OR AFRICAN AMERICAN',
-        'RACE WHITE': 'WHITE'
-    }
+    if 'RACE' not in clinical_data.columns:
+        print("\nWarning: RACE column not found in clinical data")
+        return pd.DataFrame(), pd.DataFrame(), None
     
+    # Merge predictions with clinical data to get race information
+    merged = predictions.merge(clinical_data[['Subject', 'RACE']], on='Subject', how='inner')
+    
+    race_labels = ['WHITE', 'BLACK OR AFRICAN AMERICAN']
     group_results = {}
     
-    for race_col, label in race_cols.items():
-        if race_col not in clinical_data.columns:
-            print(f"\nWarning: Column {race_col} not found in clinical data")
-            continue
-        
-        subjects = clinical_data.loc[clinical_data[race_col] == 1, 'Subject']
-        race_data = predictions[predictions['Subject'].isin(subjects)]
+    for label in race_labels:
+        race_data = merged[merged['RACE'] == label]
         
         if len(race_data) == 0:
             print(f"\nWarning: No patients found for race {label}")
@@ -665,7 +663,7 @@ def analyze_fairness_by_race(predictions, clinical_data, n_boot=1000, seed=42):
         n_boot=n_boot,
         seed=seed
     )
-    print(f"\nOverall                        (n={overall['n']:3d}): {format_cindex(overall)}")
+    print(f"\nOverall (n={overall['n']:3d}): {format_cindex(overall)}")
     
     # Summary DataFrame
     per_group = pd.DataFrame([{
