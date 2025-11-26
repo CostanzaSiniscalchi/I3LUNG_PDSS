@@ -64,9 +64,9 @@ Configuration files are located in the `configs/` directory:
 - `02-config-classification-eval.yaml` - External validation configuration
 
 ### Survival Tasks
-- `00-config-survival-cv.yaml` - Cross-validation configuration
-- `01-config-survival-standard.yaml` - Standard training configuration
-- `02-config-survival-eval.yaml` - External validation configuration
+- `03-config-survival-cv.yaml` - Cross-validation configuration
+- `04-config-survival-standard.yaml` - Standard training configuration
+- `05-config-survival-eval.yaml` - External validation configuration
 
 ## Usage
 
