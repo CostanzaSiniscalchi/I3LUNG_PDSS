@@ -513,23 +513,23 @@ def plot_auc_results(
                 dr = dr.rename(columns={'slide': 'Subject'})
 
         # minimal schema check
-        for col in ("Subject", "y_pred", "y_true"):
+        for col in ("Subject", "y_proba", "y_true"):
             if col not in dm.columns:
                 return None
-        if "Subject" not in dr.columns or "y_pred" not in dr.columns:
+        if "Subject" not in dr.columns or "y_proba" not in dr.columns:
             return None
 
-        m = dm.rename(columns={"y_pred": "y_pred_mod"})
-        r = dr.rename(columns={"y_pred": "y_pred_ro"})
-        merged = pd.merge(m[["Subject", "y_true", "y_pred_mod"]],
-                          r[["Subject", "y_pred_ro"]],
+        m = dm.rename(columns={"y_proba": "y_proba_mod"})
+        r = dr.rename(columns={"y_proba": "y_proba_ro"})
+        merged = pd.merge(m[["Subject", "y_true", "y_proba_mod"]],
+                          r[["Subject", "y_proba_ro"]],
                           on="Subject", how="inner")
         if merged.empty:
             return None
         return float(delong_test_comparison(
             merged["y_true"].to_numpy(),
-            merged["y_pred_mod"].to_numpy(),
-            merged["y_pred_ro"].to_numpy()
+            merged["y_proba_mod"].to_numpy(),
+            merged["y_proba_ro"].to_numpy()
         )['p_value'])
 
     def _plot_one(analysis: str, rows: List[dict]) -> plt.Figure:
@@ -611,10 +611,8 @@ def plot_auc_results(
 
     # Normalize architecture to both string name and Path
     if isinstance(architecture, Path):
-        arch_path = architecture
         arch_name = architecture.name  # Get the last part of the path (e.g., "MLEF" or "DLIF")
     else:
-        arch_path = Path(architecture)
         arch_name = architecture
 
     for analysis in analyses:

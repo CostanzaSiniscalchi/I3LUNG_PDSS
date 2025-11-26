@@ -236,35 +236,6 @@ class ML:
         return best_clf
     
 
-    def train_survival_model(self, dataset: pd.DataFrame, model_name: Model, cv: BaseCrossValidator, select_features: bool=True):
-        """
-        Train a survival analysis model with optional feature selection and hyperparameter tuning.
-
-        Parameters:
-        X (pd.DataFrame): Feature set.
-        y (pd.DataFrame): Target variable with survival time and event indicator.
-        model (str): Model type.
-        cv: Cross-validation strategy.
-        select_features (bool): Whether to perform feature selection using Lasso.
-        Returns:
-        The trained model.
-        """
-
-        match model_name:
-            case Model.COX:
-                cph = CoxPHFitter(penalizer=0.5)
-            case _:
-                raise ValueError(f"Unsupported survival model: {model_name}")
-
-        if select_features:
-            selected_features = self.lasso_selection(X, y['OS MONTHS'], target_features=15, tolerance=10)
-            X = X[selected_features]
-
-        cph.fit(dataset, duration_col='TIME', event_col='EVENT')
-
-        return cph
-    
-
     @staticmethod
     def make_weighted_cindex_scorer(N):
         
