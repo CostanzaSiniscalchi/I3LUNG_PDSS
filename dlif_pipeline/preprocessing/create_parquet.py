@@ -42,7 +42,8 @@ def create_feature_dataset_from_processed(
     gen_features = genomics.drop(columns=[c for c in cols_to_drop if c in genomics.columns])
     
     # Create base dataframe
-    df = pd.DataFrame({'Subject': rwd.index})
+    df = pd.DataFrame(index=rwd.index)
+    df['Subject'] = df.index
     
     # Add mod1 (RWD - always present)
     df['mod1'] = rwd_features.apply(lambda r: r.tolist(), axis=1)
