@@ -1,17 +1,53 @@
 {
-    "models": {
-        "RWD": "RF",
-        "RWD_DP": "LR",
-        "RWD_FMRAD": "LR",
-        "RWD_PYRAD": "LR",
-        "RWD_DP_FMRAD": "LR",
-        "RWD_DP_PYRAD": "LR"
+    "DCR": {
+        "models": {
+            "RWD": "LR",
+            "RWD_DP": "LR",
+            "RWD_FMRAD": "LR",
+            "RWD_PYRAD": "LR",
+            "RWD_DP_FMRAD": "LR",
+            "RWD_DP_PYRAD": "LR"
+        },
+        "rwd_only_models": {
+            "RWD_DP": "LR",
+            "RWD_FMRAD": "LR",
+            "RWD_PYRAD": "LR",
+            "RWD_DP_FMRAD": "LR",
+            "RWD_DP_PYRAD": "LR"
+        }
     },
-    "rwd_only_models": {
-        "RWD_DP": "LR",
-        "RWD_FMRAD": "LR",
-        "RWD_PYRAD": "LR",
-        "RWD_DP_FMRAD": "LR",
-        "RWD_DP_PYRAD": "LR"
+    "OS_6": {
+        "models": {
+            "RWD": "LR",
+            "RWD_DP": "LR",
+            "RWD_FMRAD": "LR",
+            "RWD_PYRAD": "LR",
+            "RWD_DP_FMRAD": "LR",
+            "RWD_DP_PYRAD": "LR"
+        },
+        "rwd_only_models": {
+            "RWD_DP": "LR",
+            "RWD_FMRAD": "LR",
+            "RWD_PYRAD": "LR",
+            "RWD_DP_FMRAD": "LR",
+            "RWD_DP_PYRAD": "LR"
+        }
+    },
+    "OS_24": {
+        "models": {
+            "RWD": "RF",
+            "RWD_DP": "LR",
+            "RWD_FMRAD": "LR",
+            "RWD_PYRAD": "LR",
+            "RWD_DP_FMRAD": "LR",
+            "RWD_DP_PYRAD": "LR"
+        },
+        "rwd_only_models": {
+            "RWD_DP": "LR",
+            "RWD_FMRAD": "LR",
+            "RWD_PYRAD": "LR",
+            "RWD_DP_FMRAD": "LR",
+            "RWD_DP_PYRAD": "LR"
+        }
     }
 }

@@ -78,7 +78,7 @@ def get_modality_folder_name(modes: List[Mode]) -> str:
     return '_'.join(sorted([m.value for m in modes]))
 
 
-def load_modality_models_config(config_path: str = 'mlef_pipeline/modality_models_config.json') -> Tuple[dict, dict]:
+def load_modality_models_config(outcome: str, config_path: str = 'mlef_pipeline/modality_models_config.json') -> Tuple[dict, dict]:
     """Load the modality models configuration file.
     
     Returns:
@@ -87,18 +87,20 @@ def load_modality_models_config(config_path: str = 'mlef_pipeline/modality_model
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
+            config = config.get(outcome.value, {})
         return config.get('models', {}), config.get('rwd_only_models', {})
     except FileNotFoundError:
         print(f"Warning: Config file {config_path} not found. Using default model.")
         return {}, {}
 
 
-def get_model_for_modality(modality_folder: str, config: dict, default_model: Model = Model.LR) -> Model:
+def get_model_for_modality(modality_folder: str, config: dict, default_model: Model = Model.LR.value) -> Model:
     """Get the model type for a specific modality from the config."""
     # Se default_model è stato passato esplicitamente, usalo sempre
     if hasattr(default_model, "_explicit") and default_model._explicit:
+        print("EXPLICIT")
         return default_model
-    model_str = config.get(modality_folder, default_model.value)
+    model_str = config.get(modality_folder, default_model)
     try:
         return Model[model_str]
     except KeyError:
@@ -107,7 +109,7 @@ def get_model_for_modality(modality_folder: str, config: dict, default_model: Mo
 
 
 def get_rwd_only_model_for_modality(modality_folder: str, rwd_only_config: dict, 
-                                     parent_model: Model, default_model: Model = Model.LR) -> Model:
+                                     parent_model: Model) -> Model:
     """Get the model type for RWD-only analysis from the config.
     
     Args:
@@ -399,6 +401,7 @@ def train_and_evaluate_modality(
     # 4. Imputation
     print("4. Imputing missing values...")
 
+    print(X_train.shape)
     X_train_imputed, imputer = dl.impute_df(X_train)
     X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer)
     X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
@@ -406,7 +409,6 @@ def train_and_evaluate_modality(
     # 5. Normalization
     print("5. Normalizing features...")
     X_train_scaled, scaler, to_standard_normalize, to_log_normalize = dl.normalize(X_train_imputed)
-
     
     if not X_ext.empty:
         X_ext_scaled, _, _, _ = dl.normalize(
@@ -652,10 +654,6 @@ def train_rwd_matched_model(
     output_dir = base_path / 'results' / outcome.value / subanalysis.value / modality_folder / 'rwd-only'
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Follow same pipeline as main training
-    with open('mlef_pipeline/split.json', 'r') as f:
-        split = json.load(f)
-    
     train_set = rwd_dataset[rwd_dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
     test_set = rwd_dataset[rwd_dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
     ext_set = rwd_dataset[rwd_dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
@@ -835,7 +833,7 @@ def main():
     parser.add_argument('--modalities', type=str, nargs='+', default=None,
                         help='Modalities to train (default: all combinations). '
                              'Options: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD')
-    parser.add_argument('--model', type=str, default='LR',
+    parser.add_argument('--model', type=str, default=None,
                         choices=['LR', 'RF'],
                         help='Model type to train (default: LR)')
     parser.add_argument('--no-feature-selection', action='store_true',
@@ -849,13 +847,16 @@ def main():
     outcome = Outcome[args.outcome]
     subanalysis = Subanalysis[args.subanalysis]
     # Se il parametro model è stato passato esplicitamente, lo segno
-    default_model_type = Model[args.model]
-    default_model_type._explicit = True
+    if args.model is not None:
+        default_model_type = Model[args.model]
+        default_model_type._explicit = True
+    else:
+        default_model_type = None
     base_path = Path(args.output_dir)
     select_features = not args.no_feature_selection
     
     # Load modality models configuration
-    modality_models_config, rwd_only_models_config = load_modality_models_config()
+    modality_models_config, rwd_only_models_config = load_modality_models_config(outcome)
     
     # Determine which modalities to train
     if args.modalities:
@@ -892,7 +893,7 @@ def main():
         model_for_modality = get_model_for_modality(modality_folder, modality_models_config, default_model_type)
         if modality_folder != 'RWD' and len(modes) > 1:
             rwd_only_model = get_rwd_only_model_for_modality(modality_folder, rwd_only_models_config, 
-                                                               model_for_modality, default_model_type)
+                                                               model_for_modality)
             print(f"  - {modality_folder} (Model: {model_for_modality.value}, RWD-only: {rwd_only_model.value})")
         else:
             print(f"  - {modality_folder} (Model: {model_for_modality.value})")
@@ -926,7 +927,7 @@ def main():
             if len(modes) > 1:
                 # Get the model type for RWD-only analysis
                 rwd_only_model_type = get_rwd_only_model_for_modality(
-                    modality_folder, rwd_only_models_config, model_type, default_model_type
+                    modality_folder, rwd_only_models_config, model_type
                 )
                 print(f"Training RWD-only with model: {rwd_only_model_type.value}")
                 
