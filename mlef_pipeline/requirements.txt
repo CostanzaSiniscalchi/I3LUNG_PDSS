@@ -8,3 +8,6 @@ openpyxl
 seaborn
 shap
 pyarrow
+venny4py
+PyComplexHeatmap
+lifelines

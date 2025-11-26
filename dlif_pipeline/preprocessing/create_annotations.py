@@ -50,15 +50,11 @@ def create_annotations(
     rwd_subjects = set(rwd['Subject'])
     ann = outcomes[outcomes['Subject'].isin(rwd_subjects)].copy()
     
-    # Rename Subject to slide and patient
-    ann = ann.rename(columns={'Subject': 'slide'})
-    ann['patient'] = ann['slide']
     
     # Get FOLD and dataset from RWD
     rwd_info = rwd[['Subject', 'CENTER', 'SET']].copy()
-    ann = ann.merge(rwd_info, left_on='slide', right_on='Subject', how='left')
+    ann = ann.merge(rwd_info, on='Subject', how='left')  # merge su Subject direttamente
     ann = ann.rename(columns={'CENTER': 'FOLD', 'SET': 'dataset'})
-    ann.drop(columns=['Subject'], inplace=True)
     
     # Map dataset values
     ann['dataset'] = ann['dataset'].map({
@@ -68,8 +64,8 @@ def create_annotations(
     })
     
     # Get outcome columns
-    outcome_cols = [c for c in ann.columns if c not in ['slide', 'patient', 'FOLD', 'dataset']]
-    
+    outcome_cols = [c for c in ann.columns if c not in ['Subject', 'FOLD', 'dataset']]
+
     # Create dataset_ and fold_ for each outcome
     for outcome in outcome_cols:
         ann[f'dataset_{outcome}'] = np.where(ann[outcome].notna(), ann['dataset'], None)
@@ -105,8 +101,7 @@ def create_annotations(
     }
     rwd_flags = rwd_flags.rename(columns={k: v for k, v in rename_map.items() if k in rwd_flags.columns})
     
-    ann = ann.merge(rwd_flags, left_on='patient', right_on='Subject', how='left')
-    ann.drop(columns=['Subject'], inplace=True)
+    ann = ann.merge(rwd_flags, on='Subject', how='left')  # merge su Subject
     
     # Map PDL1 to low/high if column exists
     if 'PDL1_CATEGORY' in ann.columns:
@@ -130,7 +125,11 @@ def create_annotations(
     else:
         ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ''
     
-    ann['IO_IOCT'] = ''  # Not available in data
+    # Riempi IO_CHT solo se non esiste
+    if 'IO_CHT' not in ann.columns:
+        ann['IO_CHT'] = ''
+    else:
+        ann['IO_CHT'] = ann['IO_CHT'].fillna('')
     
     # COHORT_2 flag: IO LINE == 1 if column exists
     if 'IO_LINE' in ann.columns:
@@ -148,7 +147,8 @@ def create_annotations(
     ).astype(int)
     
     all_mods_dict = dict(zip(features['Subject'], features['HAS_ALL_MODALITIES']))
-    ann['HAS_ALL_MODALITIES'] = ann['slide'].map(all_mods_dict).fillna(0).astype(int)
+    ann['HAS_ALL_MODALITIES'] = ann['Subject'].map(all_mods_dict).fillna(0).astype(int)
+
     
     print(f"Patients with all modalities: {ann['HAS_ALL_MODALITIES'].sum()}")
     
@@ -176,14 +176,18 @@ def create_annotations(
         
         print(f"Added early stopping for {outcome}")
         
-    # Reorder columns
+    # Rinomina Subject in slide
+    ann = ann.rename(columns={'Subject': 'patient'})
+    ann['slide'] = ann['patient']
+
     base_cols = ['slide', 'FOLD', 'dataset'] + outcome_cols + ['patient']
+    
     
     split_cols = []
     for outcome in outcome_cols:
         split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
     
-    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_IOCT', 'COHORT_2', 'HAS_ALL_MODALITIES']
+    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_ALL_MODALITIES']
     
     early_cols = [f'early_stopping_{o}' for o in outcome_cols]
     
