@@ -114,21 +114,21 @@ Use the same commands with survival configuration files:
 #### 1. Cross-Validation
 ```bash
 python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/00-config-survival-cv.yaml \
+  --config dlif_pipeline/configs/03-config-survival-cv.yaml \
   --base_dir dlif_pipeline/results
 ```
 
 #### 2. Standard Training
 ```bash
 python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/01-config-survival-standard.yaml \
+  --config dlif_pipeline/configs/04-config-survival-standard.yaml \
   --base_dir dlif_pipeline/results
 ```
 
 #### 3. External Validation
 ```bash
 python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/02-config-survival-eval.yaml \
+  --config dlif_pipeline/configs/05-config-survival-eval.yaml \
   --base_dir dlif_pipeline/results
 ```
 
