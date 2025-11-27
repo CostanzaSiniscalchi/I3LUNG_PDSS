@@ -360,6 +360,7 @@ sub1 = 'C23'
 sub2 = ''
 task = 'classification'
 # task = 'survival'
+outcomes = ['os_months_24'] # os_months_6, DCR, OS_MONTHS (for survival)
 path_pre = f'' # new_path
 path_suf = f'{task}/{training_type}/hypothesis_driven/pyrad-noimp'
 ```
