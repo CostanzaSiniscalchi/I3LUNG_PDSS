@@ -287,12 +287,12 @@ def compute_survival_metrics_for_path(path, outcome):
         # New format
         time = predictions['y_true0'].values.astype(float)
         event = predictions['y_true1'].values.astype(bool)
-        risk_score = predictions['y_pred0'].values.astype(float)
+        risk_score = -predictions['y_pred0'].values.astype(float)
     elif 'event' in predictions.columns and 'y_true' in predictions.columns:
         # Old format
         event = predictions['event'].values.astype(bool)
         time = predictions['y_true'].values.astype(float)
-        risk_score = predictions['y_pred'].values.astype(float)
+        risk_score = -predictions['y_pred'].values.astype(float)
     else:
         print("     Required columns not found in predictions (need y_true0/y_true1 or event/y_true), skipping")
         return
