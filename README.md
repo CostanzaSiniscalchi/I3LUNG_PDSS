@@ -1,10 +1,13 @@
-# I3LUNG_PDSS
+# I3LUNG: Clinical Validation of a Multimodal AI Tool to Support Immunotherapy Decisions in NSCLC
 
 ## Introduction
 
-This is the repository for the I3LUNG_PDSS project, which includes two main pipelines for analyzing medical data using machine learning and deep learning techniques. The two pipelines are:
-1. Machine Learning Early Fusion (MLEF) Pipeline
-2. Deep Learning Intermediate Fusion (DLIF) Pipeline
+This is the repository accompanying the manuscript:
+
+"I3LUNG: Clinical Validation of a Multimodal AI Tool to Support Immunotherapy Decisions in NSCLC"
+This repository contains all code and materials necessary to reproduce the core analyses and figures from the study.
+
+We developed and validated a multimodal AI-based physician decision support tool using real-world data (RWD) from six international centers. The study included two main model architectures (machine learning early fusion (MLEF) and deep learning intermediate fusion (DLIF)) and additional components for fairness auditing, explainability, and clinical usability testing.
 
 <p align="center">
 	<img src="images/I3LUNG_Overview.png" alt="I3LUNG Overview" width="600"/>

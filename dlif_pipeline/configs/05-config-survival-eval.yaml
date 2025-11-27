@@ -50,17 +50,6 @@ mods:
     genomics: false
 
 folds:
-  cross_validation_stratified:
-    - GHD_2
-    - INT_2
-    - MH_2
-    - SZMC_2
-    - VHIO_2
-    - GHD_3
-    - INT_3
-    - MH_3
-    - SZMC_3
-    - VHIO_3
   cross_validation:
     - GHD
     - INT
@@ -76,8 +65,4 @@ hyperparameters_default:
   reconstruction_weight: 0.1
   n_layers: 1
 
-# --- CONFIG FLAGS ---
-# USE_COHORT2_FILTER: [ true ]
-#  FILTER_SQUAMOUS: ["0.0", "1.0"]  # NSCLC_HISTOLOGY_SQUAMOUS == 1
-#  FILTER_CHEMO_IMMUNO: ["0", "1"]
-SKIP_TRAINING: false
+

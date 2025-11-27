@@ -7,14 +7,14 @@ from pathlib import Path
 # Configuration for csv F1, Precision, Recall across experiments
 # Specify: cohort filters, path structure, training type, task, and outcomes to analyze
 
-BASE_DIR = Path(__file__).resolve().parents[4]  # Risali a Mil2/
-RESULTS_DIR = BASE_DIR / "results"
+BASE_DIR = Path(__file__).resolve().parents[3]  # Risali a Mil2/
+RESULTS_DIR = BASE_DIR / "dlif_pipeline/results"
 
 
-training_type = 'cross_validation'
+training_type = 'standard'
 sub1 = RESULTS_DIR
-sub2 = 'cohort2'
-path_pre = f'mil' # new_path
+sub2 = 'C23'
+path_pre = f'' # new_path
 path_suf = f'classification/{training_type}/hypothesis_driven/pyrad-noimp'
 outcomes = ['os_months_24']
 # ------------------------------------------------------------------------------
