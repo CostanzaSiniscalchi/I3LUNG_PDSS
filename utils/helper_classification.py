@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import os
 from .DeLong_test import auc_roc_ci, delong_roc_variance, fastDeLong_no_weights, compute_ground_truth_statistics
 from scipy import stats
@@ -1804,6 +1805,8 @@ def plot_fairness_by_center(
     if patients_per_outcome is not None:
         label_offset = 0.02
         for container in ax.containers:
+            if not all(isinstance(c, mpatches.Rectangle) for c in container):
+                continue
             try:
                 if len(container.patches) == 0:
                     continue
@@ -1976,6 +1979,8 @@ def plot_fairness_by_group(
     if patients_per_outcome is not None:
         label_offset = 0.02
         for container in ax.containers:
+            if not all(isinstance(c, mpatches.Rectangle) for c in container):
+                continue
             try:
                 if len(container.patches) == 0:
                     continue
