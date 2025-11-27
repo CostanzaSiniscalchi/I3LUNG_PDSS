@@ -369,8 +369,6 @@ def train_and_evaluate_modality(
     
     # 2. Split data
     print("2. Splitting data...")
-    with open('mlef_pipeline/split.json', 'r') as f:
-        split = json.load(f)
     
     train_set = dataset[dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
     test_set = dataset[dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
