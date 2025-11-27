@@ -1,6 +1,6 @@
 # Deep Learning Intermediate Fusion (DLIF) pipeline
 
-A comprehensive framework for training and evaluating multi-instance learning models on multimodal data with support for classification and survival analysis tasks.
+A comprehensive framework for training and evaluating attention-based multiple instance learning (MIL) models on multimodal data, with support for both classification and survival analysis tasks. DLIF enables patient-level modelling without requiring complete data across all modalities.
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ A comprehensive framework for training and evaluating multi-instance learning mo
 
 ## Overview
 
-This pipeline provides an end-to-end solution for multi-instance learning on medical data, featuring:
+This pipeline provides an end-to-end solution for MIL on medical data, featuring:
 
 - **Multimodal Integration**: Combines radiomics (PyRadiomics/Foundation Models), clinical data (RWD), digital pathology (DP), and genomics
 - **Multiple Training Strategies**: Standard training, cross-validation, hyperparameter tuning, and external validation
