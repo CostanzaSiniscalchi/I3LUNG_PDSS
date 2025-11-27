@@ -29,6 +29,7 @@
 !Metadata_Extraction.ipynb
 !data_visualization.ipynb
 !requirements.txt
+!mlef_pipeline/results/**
 # py cache
 __pycache__/
 
