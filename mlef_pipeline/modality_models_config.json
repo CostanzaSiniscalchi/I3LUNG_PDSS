@@ -3,7 +3,7 @@
         "models": {
             "RWD": "LR",
             "RWD_DP": "LR",
-            "RWD_FMRAD": "LR",
+            "RWD_FMRAD": "RF",
             "RWD_PYRAD": "LR",
             "RWD_DP_FMRAD": "LR",
             "RWD_DP_PYRAD": "LR"
@@ -12,8 +12,8 @@
             "RWD_DP": "LR",
             "RWD_FMRAD": "LR",
             "RWD_PYRAD": "LR",
-            "RWD_DP_FMRAD": "LR",
-            "RWD_DP_PYRAD": "LR"
+            "RWD_DP_FMRAD": "RF",
+            "RWD_DP_PYRAD": "RF"
         }
     },
     "OS_6": {

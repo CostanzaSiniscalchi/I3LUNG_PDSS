@@ -673,8 +673,8 @@ def plot_auc_results(
                 paths = _pair_paths_dlif(analysis_dir, mod)
                 # Read DLIF-specific files
                 auc_m, std_m = _read_auc_dlif(paths["mod"]["results"])
-                model_m = "MIL"  # DLIF uses MIL models
-                ntrain_m = _read_n_train_dlif(paths["mod"]["train"])
+                model_m = "DLIF"  # DLIF uses MIL models
+                ntrain_m = _read_n_train_dlif(paths["mod"]["pred"])
             else:
                 paths = _pair_paths(analysis_dir, mod)
                 # modality side
