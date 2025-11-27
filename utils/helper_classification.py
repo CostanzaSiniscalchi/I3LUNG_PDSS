@@ -1882,6 +1882,7 @@ def plot_fairness_by_group(
     patients_per_outcome=None,
     outcome_thresholds=None,
     figsize=(6, 7)
+    
 ):
     """
     Plot TPR or FPR by demographic group (sex/race).
@@ -1906,7 +1907,7 @@ def plot_fairness_by_group(
         Path to save figure
     """
     if group_colors is None:
-        group_colors = ["#E78FD4", "#7BB8E0"] if group_col == 'Sex' else ["#1E52A0", '#4292C6']
+        group_colors = ["#E78FD4", "#7BB8E0"] if group_col == 'Sex' else [ '#4292C6',"#1E52A0"]
     
     plt.figure(figsize=figsize)
     
@@ -2048,7 +2049,6 @@ def plot_fairness_by_group(
     plt.legend(handles, labels, title=group_col, loc='upper left')
     
     plt.tight_layout()
-    
     plt.show()
 
 def analyze_outcome_fairness(
@@ -2056,8 +2056,7 @@ def analyze_outcome_fairness(
     outcome_name,
     base_path='mlef_pipeline/results',
     n_perms=1000,
-    random_state=42,
-    set='test' #or exval
+    random_state=42
 ):
     """
     Complete fairness analysis for a single outcome.
@@ -2439,7 +2438,7 @@ def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results'):
     
     # Match subjects from predictions with RWD data
     exval_df = predictions_df[['Subject']].merge(
-        rwd_df[['Subject', 'CENTER', 'SEX', 'RACE']], 
+        rwd_df[['Subject', 'SEX', 'RACE']], 
         on='Subject', 
         how='left'
     )
@@ -2495,36 +2494,31 @@ def analyze_exval_outcome_fairness_by_race(
     valid_races = ['WHITE', 'BLACK OR AFRICAN AMERICAN']
     race_mask = exval['RACE'].isin(valid_races)
     
-    print(f"\nRace distribution before filtering:")
-    print(f"  {exval['RACE'].value_counts().to_dict()}")
-    
     # Apply filter to both predictions and exval data
     exval_filtered = exval[race_mask]
     predictions_filtered = predictions_df[predictions_df['Subject'].isin(exval_filtered.index)]
-    
-    print(f"\nRace distribution after filtering (WHITE and BLACK OR AFRICAN AMERICAN only):")
-    print(f"  {exval_filtered['RACE'].value_counts().to_dict()}")
-    print(f"  Total patients after filter: {len(predictions_filtered)}")
     
     if len(predictions_filtered) == 0:
         print(f"  Warning: No patients remain after race filtering!")
         return None
     
-    # Extract predictions
-    y_true = predictions_filtered['y_true'].values
-    y_pred = predictions_filtered['y_pred'].values
+    # Extract predictions for race
+    y_true_race = predictions_filtered['y_true'].values
+    y_pred_race = predictions_filtered['y_pred'].values
+    
+    # Extract predictions for sex
+    y_true_sex = predictions_df['y_true'].values
+    y_pred_sex = predictions_df['y_pred'].values
     
     # Overall performance (filtered)
-    auc = roc_auc_score(y_true, y_pred)
-    tpr, fpr = compute_tpr_fpr(y_true, y_pred)
+    tpr, fpr = compute_tpr_fpr(y_true_sex, y_pred_sex)
     print(f"\nOverall EXVAL Performance (filtered by race):")
-    print(f"  AUC: {auc:.3f}")
     print(f"  TPR (threshold): {tpr:.3f}")
     print(f"  FPR (threshold): {fpr:.3f}\n")
     
     # Get race data for filtered subjects
     race_data = exval_filtered['RACE']
-    sex_data = exval_filtered['SEX']
+    sex_data = exval['SEX']
     
     # Compute patient counts per race and sex
     patients_per_race = race_data.value_counts().to_dict()
@@ -2533,18 +2527,23 @@ def analyze_exval_outcome_fairness_by_race(
     print(f"Patients per sex: {patients_per_sex}\n")
     
     # Prepare data for permutation tests
-    df_outcome = pd.DataFrame({
+    df_outcome_race = pd.DataFrame({
         'race': race_data.values,
-        'sex': sex_data.values,
-        'pred': y_pred.astype(int),
-        'actual': y_true
+        'pred': y_pred_race.astype(int),
+        'actual': y_true_race
     })
+    df_outcome_sex = pd.DataFrame({
+        'sex': sex_data.values,
+        'pred': y_pred_sex.astype(int),
+        'actual': y_true_sex
+    })
+
     
     # Race-based fairness
     print("\nRace-based fairness analysis (EXVAL set)...")
     try:
         race_fair = permutation_test_two_groups(
-            df_outcome, 
+            df_outcome_race, 
             group_col='race', 
             groups=valid_races, 
             n_perms=n_perms, 
@@ -2561,9 +2560,9 @@ def analyze_exval_outcome_fairness_by_race(
     print("\nSex-based fairness analysis (EXVAL set)...")
     try:
         sex_fair = permutation_test_two_groups(
-            df_outcome, 
+            df_outcome_sex, 
             group_col='sex', 
-            groups=df_outcome['sex'].unique(), 
+            groups=df_outcome_sex['sex'].unique(), 
             n_perms=n_perms, 
             random_state=random_state
         )
@@ -2576,16 +2575,12 @@ def analyze_exval_outcome_fairness_by_race(
     
     return {
         'outcome_name': outcome_name,
-        'predictions': predictions_filtered,
-        'exval': exval_filtered,
-        'auc': auc,
         'overall_tpr': tpr,
         'overall_fpr': fpr,
         'patients_per_race': patients_per_race,
         'patients_per_sex': patients_per_sex,
         'race_fairness': race_fair,
         'sex_fairness': sex_fair,
-        'valid_races': valid_races,
         'threshold_tpr': tpr,
         'threshold_fpr': fpr
     }
