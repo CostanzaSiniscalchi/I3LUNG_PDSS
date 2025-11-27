@@ -1,14 +1,53 @@
-# DLIF Model Training Guide
+# Multi-Instance Learning (MIL) Pipeline
 
-This guide explains how to use the DLIF (Deep Learning Intermediate Fusion) pipeline for classification and survival analysis.
+A comprehensive framework for training and evaluating multi-instance learning models on multimodal medical imaging data with support for classification and survival analysis tasks.
 
 ## Table of Contents
 
+- [Overview](#overview)
+- [Features](#features)
 - [Installation](#installation)
-- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
 - [Configuration](#configuration)
-- [Usage](#usage)
-- [Output Structure](#output-structure)
+- [Complete Workflow](#complete-workflow)
+- [Project Structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+
+## Overview
+
+This pipeline provides an end-to-end solution for multi-instance learning on medical data, featuring:
+
+- **Multimodal Integration**: Combines radiomics (PyRadiomics/Foundation Models), clinical data (RWD), digital pathology (DP), and genomics
+- **Multiple Training Strategies**: Standard training, cross-validation, hyperparameter tuning, and external validation
+- **Task Support**: Binary/multi-class classification and survival analysis (Cox proportional hazards)
+- **Attention Mechanisms**: Multi-bag attention-based architecture for interpretable predictions
+
+## Features
+
+### Data Modalities
+
+| Modality       | Description                                                           |
+|----------      |-------------                                                          |
+| **RWD**        | Real-world clinical data and patient demographics (required baseline) |
+| **RadPy**      | PyRadiomics-extracted radiomic features                               |
+| **RadFM**      | Foundation model-based radiomic features                              |
+| **DP**         | Deep learning features from digital pathology                         |
+| **Genomics**   | Molecular and genetic biomarkers                                      |
+
+### Training Modes
+
+- **Standard**: Single train/validation/test split
+- **Cross-Validation**: Leave-one-center-out cross-validation
+- **Hyperparameter Tuning**: Grid search with nested cross-validation
+- **External Validation**: Evaluation on held-out center (UOC)
+
+### Model Architecture
+
+The `mb_attention_mil` model implements:
+- Attention-based multi-instance pooling
+- Variable-length bag handling
+- Multimodal feature fusion with learned weights
+- Optional reconstruction loss for feature regularization
 
 ## Installation
 
@@ -27,10 +66,9 @@ conda activate dlif
 conda install -c conda-forge spacy
 # Install dependencies
 pip install -r dlif_pipeline/requirements.txt
-
-# Configure environment
-export MPLBACKEND=Agg  # Required for headless plotting
 ```
+
+## Quick Start
 
 # Data Requirements and Preparation
 
@@ -67,7 +105,7 @@ Please run all commands from within the  `I3LUNG_PDSS` directory.
    The annotation file will be saved in `/data`.
 
    - **Note:** The `create_annotations.py` script includes a `use_subfolds` option.  
-     To enable intra-center subanalysis, edit the script and set:  
+     To enable uni-centric subanalysis, edit the script and set:  
      `ann = create_annotations(use_subfolds=True)`
 
 These steps will produce:
@@ -76,182 +114,365 @@ These steps will produce:
 
 Ensure all files are present before running downstream experiments.
 
-## Project Structure
 
-The expected directory structure is as follows:
+### 2. Configure Experiment
+
+Create a YAML configuration file (see [`configs/`](configs/) for examples):
+
+```yaml
+# configuration example
+task: classification # classification/survival
+task_settings:
+  outcomes: ["os_months_24"]
+  # events: DEATH_EVENT_OC # survival only variable
+  loss: mm_loss # mm_survival_loss  
+  # save_monitor: c_index  # survival only variable
+
+training_type: cross_validation # hyperparameter_tuning  | evaluation | standard
+data-type: hypothesis_driven  # hypothesis_driven/data_driven
+source: pyrad  # pyrad/foundation
+imp: noimp  # noimp/imp
+seed: [0]
+
+use_early_stopping: true
+prepare_dataset: true
+
+train_df: [ "../data/features_dataset_radpy_fixed.parquet", "../data/features_dataset_fmrad.parquet" ]
+annotation_file: ../data/annotations.csv
+
+mods:
+    # RWD
+  - rwd: true
+    radpy: false
+    dp: false
+    genomics: false
+    # RWD_DP
+  - rwd: true
+    radpy: false
+    dp: true
+    genomics: false
+    # RWD_FMRAD
+  - rwd: true
+    radfm: true
+    dp: false
+    genomics: false
+    # RWD_PYRAD
+  - rwd: true
+    radpy: true
+    dp: false
+    genomics: false
+    # RWD_DP_FMRAD
+  - rwd: true
+    radfm: true
+    dp: true
+    genomics: false
+    # RWD_DP_PYRAD
+  - rwd: true
+    radpy: true
+    dp: true
+    genomics: false
+
+  
+folds:
+  cross_validation:
+    - GHD
+    - INT
+    - MH
+    - SZMC
+    - VHIO
+  standard:
+    - ALL
+
+# default hyperparameters
+hyperparameters_default:
+  batch_size: 64
+  reconstruction_weight: 0.1
+  n_layers: 1
+
+
 ```
-I3LUNG_PDSS/
-└── dlif_pipeline/                          # This repository
-    ├── configs/                            # Configuration files
-    ├── MIL/                                # Model
-    ├── pipeline/                           # Training scripts
-    ├── preprocessing/                      # Data preprocessing scripts
-    ├── datasets.json/                      # Dataset config for MIL
-    ├── bags/                               # Bag-level features
-    │   ├── radfm/                          # RadFM modality bags
-    │   └── radpy/                          # RadPy modality bags
-    ├── results/                            # Training outputs (auto-generated)
-    └── README.md
+
+
+## Configuration Details
+
+We now provide details on how to edit the configuration to run different analysis.
+
+### Task Settings
+
+```yaml
+task_settings:
+  outcomes: ["OS_MONTHS"]     # Target variable(s), for classificaiton you can also have multiple outcomes: ["os_months_6", "os_months_24","DCR", "ORR"] 
+  events: DEATH_EVENT_OC         # Event indicator (survival only)
+  loss: mm_survival_loss         # Loss function
+  save_monitor: c_index         # survival only
+
 ```
 
-## Configuration
+**Supported Outcomes:**
+- Classification: `os_months_6`, `os_months_24`, `DCR`, `ORR`
+- Survival: `OS_MONTHS`
 
-Configuration files are located in the `configs/` directory:
+**Loss Functions:**
+- `mm_loss`: Binary classification
+- `mm_survival_loss`: Cox proportional hazards
 
-### Classification Tasks
-- `00-config-classification-cv.yaml` - Cross-validation configuration
-- `01-config-classification-standard.yaml` - Standard training configuration
-- `02-config-classification-eval.yaml` - External validation configuration
+### Training Options
 
-### Survival Tasks
-- `03-config-survival-cv.yaml` - Cross-validation configuration
-- `04-config-survival-standard.yaml` - Standard training configuration
-- `05-config-survival-eval.yaml` - External validation configuration
+```yaml
+training_type: cross_validation  # standard | cross_validation | hyperparameter_tuning | evaluation
+data_type: hypothesis_driven     # hypothesis_driven 
+source: pyrad                    # pyrad 
+imp: noimp                       # noimp 
+seed: [0]                  # Random seeds for reproducibility
 
-## Usage
-
-Before running, please make sure you prepared the required data. You can find how to prepare the required data in the dedicated README.md in the preprocessing folder.
-Run all commands from the `I3LUNG_PDSS` directory.
-
-### Classification Tasks
-
-#### 1. Cross-Validation (Leave-One-Center-Out)
-
-Performs leave-one-center-out cross-validation across multiple centers:
-- GHD
-- INT
-- MH
-- SZMC
-- VHIO
-```bash
-python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/00-config-classification-cv.yaml --base_dir dlif_pipeline/results
+use_early_stopping: true
+prepare_dataset: true  # Set to true on first run or when data changes
 ```
 
-#### 2. Standard Training
+### Modality Combinations
 
-Trains on all data from the above sites and evaluates on held-out data from each site:
+```yaml
+mods:
+  - rwd: true      # Always required
+    radpy: true
+    dp: false
+    genomics: false
+  
+  - rwd: true
+    radpy: true
+    dp: true
+    genomics: false
+```
+
+> **Note**: RWD must be `true` in all configurations as it serves as the baseline modality.
+
+You can add as many modalities combinations as you want (within the modalities supported: rwd, radpy, radfm, dp, genomics.), 
+radpy and radfm are mutually exclusive.
+
+### Hyperparameter Configuration
+
+**For Grid Search:**
+
+```yaml
+hyperparameters:
+  batch_size: [16, 32, 64]
+  reconstruction_weight: [0.01, 0.1, 0.3]
+  n_layers: [1, 2]
+```
+
+**For Standard Training:**
+
+```yaml
+hyperparameters_default:
+  batch_size: 64
+  reconstruction_weight: 0.1
+  n_layers: 1
+```
+
+### Optional Filters
+
+Apply dataset filters by uncommenting relevant flags:
+
+```yaml
+# Cohort selection
+# USE_COHORT2_FILTER: [true]
+
+# Histology subtype
+# FILTER_SQUAMOUS: "1.0"  # or "0.0" for non-squamous
+# ADENO: "1.0"
+
+# Treatment regimen
+# FILTER_CHEMO_IMMUNO: "1"  # or "0"
+
+# Biomarker expression
+# FILTER_PDL1: "high"  # or "low"
+
+# Center-specific (use only one at a time)
+# FILTER_INT: [true]
+# FILTER_GHD: [true]
+# FILTER_VHIO: [true]
+# FILTER_MH: [true]
+
+```
+
+
+### Complete Workflow
+
+### 3. Train Model and Evaluate model
+
+This is an example of how to train the model with the minimum configuration example just provided (you can find the same configuration at the directory dlif_pipeline/configs/00-config-survival-cv.yaml):
+
 ```bash
 python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/01-config-classification-standard.yaml \
+  --config dlif_pipeline/configs/01-config-survival-cv.yaml \
   --base_dir dlif_pipeline/results
 ```
+Other examples are provided at dlif_pipeline/configs.
 
-#### 3. External Validation
+**Output Structure:**
 
-Evaluates on external held-out center (UOC):
-```bash
-python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/02-config-classification-eval.yaml \
-  --base_dir dlif_pipeline/results
-```
-
-### Survival Tasks
-
-Use the same commands with survival configuration files:
-
-#### 1. Cross-Validation
-```bash
-python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/03-config-survival-cv.yaml \
-  --base_dir dlif_pipeline/results
-```
-
-#### 2. Standard Training
-```bash
-python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/04-config-survival-standard.yaml \
-  --base_dir dlif_pipeline/results
-```
-
-#### 3. External Validation
-```bash
-python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/05-config-survival-eval.yaml \
-  --base_dir dlif_pipeline/results
-```
-
-### Calculate Metrics
-
-```bash
-python dlif_pipeline/pipeline/metrics/compute_metrics_from_config.py \
-  --config dlif_pipeline/configs/00-config-classification-cv.yaml \
-  --base_dir dlif_pipeline/results
-
-python dlif_pipeline/pipeline/metrics/compute_metrics_from_config.py \
-  --config dlif_pipeline/configs/01-config-classification-standard.yaml \
-  --base_dir dlif_pipeline/results
-```
-
-### Create Plots
-
-```
-bash
-python dlif_pipeline/pipeline/plotting/plot_from_config.py \
-  --config dlif_pipeline/configs/00-config-classification-cv.yaml \
-  --base_dir dlif_pipeline/results
-
-python dlif_pipeline/pipeline/plotting/plot_from_config.p \
-  --config dlif_pipeline/configs/01-config-classification-standard.yaml \
-  --base_dir dlif_pipeline/results
-```
-
-## Output Structure
-
-Training outputs are organized hierarchically in the results directory:
 ```
 results/
-└── C23/
-    └── os_months_24/
-        └── classification/                     # or 'survival'
-            └── cross_validation/               # or 'standard'/'evaluation'
-                └── hypothesis_driven/
-                    └── pyrad-noimp/
-                        └── rwd_radpy/
-                            └── seed_0/
-                                ├── attention/
-                                │   └── attention_weights.npz          # Raw attention weights
-                                ├── eval/                              # Test set evaluation
-                                │   └── 00000-mb_attention_mil/
-                                │       ├── attention/
-                                │       │   └── attention_weights.npz
-                                │       ├── mil_params.json            # Model configuration
-                                │       ├── predictions.parquet        # Test predictions
-                                │       └── scores_test.csv            # Test metrics (survival only)
-                                ├── models/
-                                │   └── best_valid.pth                 # Best model checkpoint
-                                ├── eval_cindex_ci.csv                 # C-index with CI (survival only)
-                                ├── eval_auc_ci.csv                    # AUC with CI (classification only)
-                                ├── eval_classification_metrics.csv    # F1, sensitivity, specificity (classification only)
-                                ├── history.csv                        # Training history per epoch
-                                ├── mil_params.json                    # Model hyperparameters
-                                ├── predictions_train.parquet          # Training predictions
-                                ├── predictions.parquet                # Test predictions
-                                └── slide_manifest.csv                 # Slide-level metadata
+└── cohort2/
+    └── mil/
+        └── os_months_24/
+            └── classification/
+                └── cross_validation/
+                    └── hypothesis_driven/
+                        └── pyrad-noimp/
+                            └── rwd_radpy/                                 
+                                   └──seed_0/
+                                      ├── attention/                          # Attention mechanism outputs
+                                      │   ├── attention_weights.npz           # Raw attention weights
+                                      ├── eval/                               # model on the test set
+                                      │   ├── 00000-mb_attention_mil/
+                                              ├── attention/                          # Attention mechanism outputs
+                                                   ├── attention_weights.npz          # Raw attention weights
+                                              ├── mil_params.json                     # Model configuration and hyperparameters
+                                              ├── predictions.parquet                 # predictions in test
+                                              ├── scores_test.csv                     # metrics in test (survival only)
+                                      ├── models/                             # Model checkpoints
+                                      │   ├── best_valid.pth                  # Best model (by validation metric)
+                                      ├── eval_cindex_ci.csv                  # C-index with confidence intervals (survival only)
+                                      ├── eval_auc_ci.csv                     # AUC with confidence intervals (classification only)
+                                      ├── eval_classification_metrics.csv     # F1, sensitivity, specificity (classification only)
+                                      ├── history.csv                         # Training history (loss, metrics per epoch)
+                                      ├── mil_params.json                     # Model configuration and hyperparameters
+                                      ├── predictions_train.parquet           # Training set predictions with true labels
+                                      ├── predictions.parquet                 # Test set predictions with true labels
+                                      └── slide_manifest.csv                  # Slide-level metadata and predictions
+                                      ```
 ```
 
-### Key Output Files
+#### 2. Compute Metrics
 
-**Model Artifacts:**
-- `best_valid.pth` - Best performing model checkpoint based on validation metrics
+**For Survival Analysis (C-index):**
 
-**Predictions:**
-- `predictions_train.parquet` - Training set predictions with true labels
-- `predictions.parquet` - Test set predictions with true labels
-- `slide_manifest.csv` - Slide-level metadata and predictions
+```bash
+python dlif_pipeline/pipeline/metrics/survival_cindex_ci.py
+```
 
-**Metrics (Classification):**
-- `eval_auc_ci.csv` - AUC with confidence intervals
-- `eval_classification_metrics.csv` - F1 score, sensitivity, specificity
+**For Classification (AUC, F1, Sensitivity, Specificity):**
 
-**Metrics (Survival):**
-- `eval_cindex_ci.csv` - Concordance index with confidence intervals
-- `scores_test.csv` - Test set survival metrics
+```bash
+# Edit Mil2/mil_training/scripts/pipeline/metrics/delong_n.py
+python dlif_pipeline/pipeline/metrics/delong_n.py
 
-**Training History:**
-- `history.csv` - Loss and metrics tracked per epoch
+# For additional metrics
+python dlif_pipeline/pipeline/metrics/other_metrics.py
+```
 
-**Attention Mechanisms:**
-- `attention_weights.npz` - Raw attention weights for interpretability
+**Metric Script Configuration:**
 
-**Configuration:**
-- `mil_params.json` - Complete model configuration and hyperparameters
+if you want to compute specific metrics for you experiment, edit the script:
+
+```python
+training_type = 'cross_validation' # | standard | evaluation 
+sub1 = RESULTS_DIR
+sub2 = 'cohort2' | # 'your subanalysis' or ' '
+path_pre = 'mil'
+path_suf = f'classification/{training_type}/hypothesis_driven/pyrad-noimp' | #f'survival/{training_type}/hypothesis_driven/pyrad-noimp'
+outcomes = ['os_months_24'] | # ['OS_MONTHS'] | other outcomes
+```
+
+**Generated Metric Files:**
+
+```
+seed_0/
+├── eval_cindex_ci.csv                  # Survival: C-index with confidence intervals
+├── eval_auc_ci.csv                     # Classification: AUC with CI
+└── eval_classification_metrics.csv     # Classification: F1, sensitivity, specificity
+```
+
+#### 3. Generate Plots
+
+```bash
+python dlif_pipeline/pipeline/plotting/plots_for_supplementary.py
+```
+
+**Plotting Script Configuration:**
+
+if you want to plot for you experiment, edit the script ( as above ):
+
+```python
+training_type = 'cross_validation'
+sub0 = RESULTS_DIR
+sub1 = 'cohort2'
+sub2 = ''
+task = 'classification'  # or 'survival'
+path_pre = 'mil'
+path_suf = f'{task}/{training_type}/hypothesis_driven/pyrad-noimp'
+```
+
+## Project Structure
+```
+Mil2/
+├── mil_training/                     # Main training directory
+│   ├── scripts/
+│   │   └── pipeline/
+│   │       ├── metrics/              # Metric calculation scripts
+│   │       │   ├── __pycache__/
+│   │       │   ├── metrics_utils/
+│   │       │   │   ├── __pycache__/
+│   │       │   │   ├── __init__.py
+│   │       │   │   ├── classification_metrics.py
+│   │       │   │   └── survival_metrics.py
+│   │       │   ├── __init__.py
+│   │       │   ├── calculate_average.py
+│   │       │   ├── compute_scores.py
+│   │       │   ├── delong_n.py               # AUC calculation with DeLong CI
+│   │       │   ├── other_metrics.py          # F1, sensitivity, specificity
+│   │       │   └── survival_cindex_ci.py     # C-index calculation
+│   │       │
+│   │       ├── plotting/             # Visualization scripts
+│   │       │   ├── __pycache__/
+│   │       │   ├── __init__.py
+│   │       │   ├── line_no_plot_other_metrics.py
+│   │       │   └── plots_for_supplementary.py
+│   │       │
+│   │       └── train/                # Training orchestration
+│   │           ├── hyperparameters_tuning/
+│   │           │   ├── __pycache__/
+│   │           │   ├── grid_runner.py
+│   │           │   └── hyperparam_tuning.py
+│   │           ├── utils/
+│   │           │   ├── __init__.py
+│   │                   ├── config_utils.py
+│   │                ├── dataset_utils.py
+│   │           │   └── path_utils.py
+│   │           ├── README
+│   │           ├── run_training.py
+│   │           ├── prepare_dataset.py
+│   │           └── training_loop.py
+│   │
+│   └── utils/                        # General utilities
+│       ├── __pycache__/
+│       ├── __init__.py
+│       ├── pipeline_utils.py
+│       ├── df.parquet
+│       ├── MIL.log
+│       ├── README
+│       ├── settings.json
+│       ├── train.py
+│       ├── __init__.py
+│       └── pyrightconfig.py
+│
+├── MIL/                              # Core MIL package
+```
+
+## Troubleshooting
+
+### Common Issues
+
+|              Issue                  |            Solution                    |
+|-------              ----------      |----------                 ----------   |
+| **Matplotlib backend errors**       | Ensure `export MPLBACKEND=Agg` is set  |
+| **Missing bag files**               | Set `prepare_dataset: true` in config  |
+| **Out of memory errors**            | Reduce `batch_size` in hyperparameters |
+| **Learning rate failures**          | Specify fixed `lr` in hyperparameters  |
+| **Configuration validation errors** | Verify YAML syntax and required fields |
+
+
+
+**Version**: 1.0.0  
+**Last Updated**: November 2025 
