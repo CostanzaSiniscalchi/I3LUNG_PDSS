@@ -1,6 +1,6 @@
-# MIL: Multiple Instance Learning for Medical Imaging
+# DLIF Model Training Guide
 
-A deep learning pipeline for survival analysis and classification tasks using Multiple Instance Learning (MIL) on medical imaging data.
+This guide explains how to use the DLIF (Deep Learning Intermediate Fusion) pipeline for classification and survival analysis.
 
 ## Table of Contents
 
@@ -24,6 +24,7 @@ Run this from within the `I3LUNG_PDSS` directory
 # Create and activate conda environment
 conda create -n dlif python=3.9
 conda activate dlif
+conda install -c conda-forge spacy
 # Install dependencies
 pip install -r dlif_pipeline/requirements.txt
 
@@ -84,9 +85,7 @@ Performs leave-one-center-out cross-validation across multiple centers:
 - SZMC
 - VHIO
 ```bash
-python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/00-config-classification-cv.yaml \
-  --base_dir dlif_pipeline/results
+python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/00-config-classification-cv.yaml --base_dir dlif_pipeline/results
 ```
 
 #### 2. Standard Training
@@ -217,36 +216,3 @@ results/
 
 **Configuration:**
 - `mil_params.json` - Complete model configuration and hyperparameters
-
-## Citation
-
-If you use this pipeline in your research, please cite:
-
-```bibtex
-@software{mil_pipeline_2024,
-  title     = {Multi-Instance Learning Pipeline for Medical Imaging},
-  author    = {Sacco, Matteo and Lerma, Ludovica},
-  year      = {2024},
-  url       = {https://github.com/AI-ON-Laboratory/MIL},
-  publisher = {AI-ON Laboratory}
-}
-```
-
-## Support
-
-For assistance:
-
-- **Issues**: [GitHub Issues](https://github.com/AI-ON-Laboratory/MIL/issues)
-- **Documentation**: See `docs/` directory
-- **Examples**: Review `configs-test/` for configuration templates
-- **Contact**: @matte-esse, @LudoLe
-
-## License
-
-[Specify license here - e.g., MIT, Apache 2.0, etc.]
-
----
-
-**Version**: 1.0.0  
-**Last Updated**: October 2024  
-**Maintainers**: Matteo Sacco, Ludovica Lerma

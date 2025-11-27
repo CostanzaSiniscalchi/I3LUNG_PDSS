@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import os
 from .DeLong_test import auc_roc_ci, delong_roc_variance, fastDeLong_no_weights, compute_ground_truth_statistics
 from scipy import stats
@@ -1196,7 +1197,50 @@ def load_predictions_and_data(outcome, base_path='mlef_pipeline/results'):
     # Match subjects from predictions with RWD data
     # Keep only Subject and SEX columns, in the same order as predictions
     test_df = predictions_df[['Subject']].merge(
-        rwd_df[['Subject', 'CENTER','SEX', 'RACE']], 
+        rwd_df[['Subject', 'CENTER','SEX']], 
+        on='Subject', 
+        how='left'
+    )
+    
+    # Set Subject as index
+    test_df = test_df.set_index('Subject')
+    
+    print(f"Loaded predictions for {outcome}:")
+    print(f"  Samples: {len(predictions_df)}")
+    print(f"  Columns in test data: {test_df.shape[1]} ({', '.join(test_df.columns)})")
+    print(f"  Subject order preserved: {(predictions_df['Subject'].values == test_df.index.values).all()}")
+    
+    return predictions_df, test_df
+
+def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results'):
+    """
+    Load predictions and test data for a specific outcome.
+    
+    Parameters:
+    -----------
+    outcome : str
+        Outcome name (e.g., 'DCR', 'OS6', 'OS24')
+    base_path : str
+        Base directory path (default: 'mlef_pipeline/results')
+    
+    Returns:
+    --------
+    tuple : (predictions_df, test_df)
+        - predictions_df: DataFrame with columns [Subject, y_true, y_pred]
+        - test_df: DataFrame with columns [Subject, SEX, RACE], ordered by predictions_df
+    """
+    # Load predictions from CSV
+    pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_EXVAL.csv')
+    predictions_df = pd.read_csv(pred_path)
+    
+    # Load RWD data
+    rwd_path = 'data/rwd.csv'
+    rwd_df = pd.read_csv(rwd_path)
+    
+    # Match subjects from predictions with RWD data
+    # Keep only Subject and SEX columns, in the same order as predictions
+    test_df = predictions_df[['Subject']].merge(
+        rwd_df[['Subject', 'RACE','SEX']], 
         on='Subject', 
         how='left'
     )
@@ -1761,6 +1805,8 @@ def plot_fairness_by_center(
     if patients_per_outcome is not None:
         label_offset = 0.02
         for container in ax.containers:
+            if not all(isinstance(c, mpatches.Rectangle) for c in container):
+                continue
             try:
                 if len(container.patches) == 0:
                     continue
@@ -1933,6 +1979,8 @@ def plot_fairness_by_group(
     if patients_per_outcome is not None:
         label_offset = 0.02
         for container in ax.containers:
+            if not all(isinstance(c, mpatches.Rectangle) for c in container):
+                continue
             try:
                 if len(container.patches) == 0:
                     continue
@@ -2008,7 +2056,8 @@ def analyze_outcome_fairness(
     outcome_name,
     base_path='mlef_pipeline/results',
     n_perms=1000,
-    random_state=42
+    random_state=42,
+    set='test' #or exval
 ):
     """
     Complete fairness analysis for a single outcome.
@@ -2129,6 +2178,146 @@ def analyze_outcome_fairness(
         'sex_fairness': sex_fair,
         'tpr_by_center': tpr_out,
         'fpr_by_center': fpr_out
+    }
+
+def analyze_outcome_fairness_exval(
+    outcome,
+    outcome_name,
+    base_path='mlef_pipeline/results',
+    n_perms=1000,
+    random_state=42
+):
+    """
+    Complete fairness analysis for a single outcome on external validation set.
+    
+    Parameters:
+    -----------
+    outcome : str
+        Outcome folder name (e.g., 'DCR', 'OS6', 'OS24')
+    outcome_name : str
+        Display name for outcome (e.g., 'OS 24')
+    base_path : str
+        Base directory path where predictions are stored
+    n_perms : int
+        Number of permutations for tests
+    random_state : int
+        Random seed
+    
+    Returns:
+    --------
+    dict : Results including fairness metrics and test results
+    """
+    print(f"\n{'='*60}")
+    print(f"Analyzing {outcome_name} (External Validation)")
+    print(f"{'='*60}\n")
+    
+    # Load predictions and data
+    predictions_df, test = load_predictions_and_data_exval(outcome, base_path)
+    
+    # Extract predictions
+    y_test = predictions_df['y_true'].values
+    y_pred = predictions_df['y_pred'].values
+    
+    # Overall performance
+    auc = roc_auc_score(y_test, y_pred)
+    tpr, fpr = compute_tpr_fpr(y_test, y_pred)
+    print(f"Overall ExVal Performance:")
+    print(f"  AUC: {auc:.3f}")
+    print(f"  TPR (threshold): {tpr:.3f}")
+    print(f"  FPR (threshold): {fpr:.3f}\n")
+
+    # Check if RACE exists
+    race_col = 'RACE'
+    if race_col in test.columns:
+        race_data = test[race_col]
+        # Compute patient counts per race
+        patients_per_race = race_data.value_counts().to_dict()
+        print(f"Patients per race: {patients_per_race}\n")
+    else:
+        race_data = pd.Series([None]*len(test), index=test.index)
+        patients_per_race = {}
+    
+    # Check if SEX exists
+    gender_col = 'SEX'
+    if gender_col in test.columns:
+        sex_data = test[gender_col]
+        patients_per_sex = sex_data.value_counts().to_dict()
+        print(f"Patients per sex: {patients_per_sex}\n")
+    else:
+        sex_data = pd.Series([None]*len(test), index=test.index)
+        patients_per_sex = {}
+    
+    # Prepare data for permutation tests
+    df_outcome = pd.DataFrame({
+        'race': race_data,
+        'sex': sex_data,
+        'pred': (y_pred).astype(int),
+        'actual': y_test
+    })
+    
+    # Sex-based fairness (binary)
+    sex_fair = None
+    if gender_col in test.columns:
+        print("\nSex-based fairness analysis (exval set)...")
+        try:
+            sex_fair = permutation_test_two_groups(
+                df_outcome, 
+                group_col='sex', 
+                groups=df_outcome['sex'].unique(), 
+                n_perms=n_perms, 
+                random_state=random_state
+            )
+            
+            print(f"  TPR - Female: {sex_fair['TPR']['rate_A']:.3f}, Male: {sex_fair['TPR']['rate_B']:.3f}, p={sex_fair['TPR']['p_value']:.4f}")
+            print(f"  FPR - Female: {sex_fair['FPR']['rate_A']:.3f}, Male: {sex_fair['FPR']['rate_B']:.3f}, p={sex_fair['FPR']['p_value']:.4f}")
+        except Exception as e:
+            print(f"  Warning: Sex-based analysis failed: {e}")
+
+    # Race-based fairness (multi-class)
+    race_fair = None
+    if race_col in test.columns:
+        print("\nRace-based fairness analysis (exval set)...")
+        try:
+            # Use permutation_fairness_TPR/FPR for multi-class variable
+            # This calculates rates per group and omnibus p-value
+            race_tpr_out = permutation_fairness_TPR(
+                df_outcome, 
+                group_col='race', 
+                n_perms=n_perms, 
+                stat='weighted_var', 
+                random_state=random_state
+            )
+            
+            race_fpr_out = permutation_fairness_FPR(
+                df_outcome, 
+                group_col='race', 
+                n_perms=n_perms, 
+                stat='weighted_var', 
+                random_state=random_state
+            )
+            
+            print(f"  TPR omnibus p-value: {race_tpr_out['omnibus_pvalue']:.4f}")
+            print(f"  FPR omnibus p-value: {race_fpr_out['omnibus_pvalue']:.4f}")
+            
+            # Structure similar to center_fairness in analyze_outcome_fairness
+            race_fair = {'TPR': race_tpr_out, 'FPR': race_fpr_out}
+            
+        except Exception as e:
+            print(f"  Warning: Race-based analysis failed: {e}")
+    
+    return {
+        'outcome_name': outcome_name,
+        'predictions': predictions_df,
+        'test': test,
+        'auc': auc,
+        'overall_tpr': tpr,
+        'overall_fpr': fpr,
+        'threshold_tpr': tpr,
+        'threshold_fpr': fpr,
+        'patients_per_race': patients_per_race,
+        'patients_per_sex': patients_per_sex,
+        'sex_fairness': sex_fair,
+        'race_fairness': race_fair
     }
 
 

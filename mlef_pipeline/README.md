@@ -5,6 +5,7 @@ This guide explains how to use the [`train_mlef.py`](#classification-analysis) a
 ## Overview
 
 The script trains MLEF models for different data modality combinations and saves results in a structured folder format compatible with your analysis pipeline.
+
 ## Configure environment
 
 Run the following from the `mlef_pipeline` directory:

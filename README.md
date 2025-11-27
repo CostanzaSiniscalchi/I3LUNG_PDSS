@@ -2,6 +2,10 @@
 
 ## Introduction
 
+This is the repository for the I3LUNG_PDSS project, which includes two main pipelines for analyzing medical data using machine learning and deep learning techniques. The two pipelines are:
+1. Machine Learning Early Fusion (MLEF) Pipeline
+2. Deep Learning Intermediate Fusion (DLIF) Pipeline
+
 <p align="center">
 	<img src="images/I3LUNG_Overview.png" alt="I3LUNG Overview" width="600"/>
 </p>
@@ -44,7 +48,7 @@ The DLIF pipeline implements deep learning approaches with intermediate fusion o
 
 In addition to the two main pipelines, the repository includes several Jupyter notebooks for data visualization and analysis:
 
-All of the notebooks can be run with the `mlef` conda environment.
+All of the notebooks can be run with the `mlef` conda environment (you can find installation instructions in [`mlef_pipeline/README.md`](mlef_pipeline/README.md)).
 
 - **`data_visualization.ipynb`** - General data visualization and exploration
 - **`graphs_classification.ipynb`** - Visualization of classification results
@@ -52,6 +56,8 @@ All of the notebooks can be run with the `mlef` conda environment.
 - **`Metadata_Extraction.ipynb`** - Metadata extraction and analysis
 
 These notebooks can be run independently to generate visualizations and analyze results from the pipelines.
+
+Using **`Metadata_Extraction.ipynb`**, you can generate metadata distribution plots for each individual center as well as for all centers combined. It uses  metadata divided by center contained in **`data/Metadata_excelfiles.zip`**.
 
 ---
 

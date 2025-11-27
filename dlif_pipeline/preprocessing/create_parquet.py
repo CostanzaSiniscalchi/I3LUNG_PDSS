@@ -9,16 +9,6 @@ DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
 def create_feature_dataset_from_processed(
     rad_type: str = 'pyradiomics'
 ) -> pd.DataFrame:
-
-    # Load genomics exclusion lists
-    with open(DATA_DIR / 'no_genomics_train.json', 'r') as f:
-        no_gen_train = json.load(f)
-    with open(DATA_DIR / 'no_genomics_test.json', 'r') as f:
-        no_gen_test = json.load(f)
-    with open(DATA_DIR / 'no_genomics_ext_val.json', 'r') as f:
-        no_gen_ext = json.load(f)
-    
-    exclude_genomics = set(no_gen_train + no_gen_test + no_gen_ext)
     
     # Load processed data
     rwd = pd.read_csv(DATA_DIR / 'rwd_processed.csv', index_col='Subject')
@@ -42,7 +32,8 @@ def create_feature_dataset_from_processed(
     gen_features = genomics.drop(columns=[c for c in cols_to_drop if c in genomics.columns])
     
     # Create base dataframe
-    df = pd.DataFrame({'Subject': rwd.index})
+    df = pd.DataFrame(index=rwd.index)
+    df['Subject'] = df.index
     
     # Add mod1 (RWD - always present)
     df['mod1'] = rwd_features.apply(lambda r: r.tolist(), axis=1)
@@ -59,7 +50,7 @@ def create_feature_dataset_from_processed(
     
     # Add mod4 (genomics) - None if subject not in genomics OR in exclusion list
     df['mod4'] = df['Subject'].apply(
-        lambda s: gen_features.loc[s].tolist() if (s in gen_features.index and s not in exclude_genomics) else None
+        lambda s: gen_features.loc[s].tolist() if s in gen_features.index else None
     )
     
     # Null-out all-NaN lists
@@ -84,4 +75,4 @@ print("\nCreating fmrad version...")
 df_fmrad = create_feature_dataset_from_processed(rad_type='fmrad')
 df_fmrad.to_parquet(DATA_DIR / 'features_dataset_fmrad.parquet', index=False)
 
-print("\nDone!")
+print("\nDone!") 
