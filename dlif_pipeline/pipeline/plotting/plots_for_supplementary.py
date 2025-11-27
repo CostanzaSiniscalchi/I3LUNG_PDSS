@@ -112,8 +112,8 @@ if __name__ == "__main__":
                     try:
                         df = pd.read_csv(csv_path)
                         score = df['auc'].iloc[0]
-                        ci_lower = df['ci_lower'].iloc[0]  # Note the space in column name
-                        ci_upper = df['ci_upper'].iloc[0]  # Note the space in column name
+                        ci_lower = df[' ci_lower'].iloc[0]  # Note the space in column name
+                        ci_upper = df[' ci_upper'].iloc[0]  # Note the space in column name
 
                         modalities.append(label)
                         modality_keys.append(key)

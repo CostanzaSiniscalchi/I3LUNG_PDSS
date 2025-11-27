@@ -342,49 +342,9 @@ results/
                                       ```
 ```
 
-#### 2. Compute Metrics
+At the end of training, metrics are calculated automatically.
 
-At the end of training, the metrics are automatically computed. If you want to rerun manually:
-
-**For Survival Analysis (C-index):**
-
-```bash
-python dlif_pipeline/pipeline/metrics/survival_cindex_ci.py
-```
-
-**For Classification (AUC, F1, Sensitivity, Specificity):**
-
-```bash
-# Edit Mil2/mil_training/scripts/pipeline/metrics/delong_n.py
-python dlif_pipeline/pipeline/metrics/delong_n.py
-
-# For additional metrics
-python dlif_pipeline/pipeline/metrics/other_metrics.py
-```
-
-**Metric Script Configuration:**
-
-if you want to compute specific metrics for you experiment, edit the script:
-
-```python
-training_type = 'cross_validation' # | standard | evaluation 
-sub1 = RESULTS_DIR
-sub2 = 'cohort2' | # 'your subanalysis' or ' '
-path_pre = 'mil'
-path_suf = f'classification/{training_type}/hypothesis_driven/pyrad-noimp' | #f'survival/{training_type}/hypothesis_driven/pyrad-noimp'
-outcomes = ['os_months_24'] | # ['OS_MONTHS'] | other outcomes
-```
-
-**Generated Metric Files:**
-
-```
-seed_0/
-├── eval_cindex_ci.csv                  # Survival: C-index with confidence intervals
-├── eval_auc_ci.csv                     # Classification: AUC with CI
-└── eval_classification_metrics.csv     # Classification: F1, sensitivity, specificity
-```
-
-#### 3. Generate Plots
+#### 2. Generate Plots
 
 ```bash
 python dlif_pipeline/pipeline/plotting/plots_for_supplementary.py
@@ -395,12 +355,14 @@ python dlif_pipeline/pipeline/plotting/plots_for_supplementary.py
 if you want to plot for you experiment, edit the script ( as above ):
 
 ```python
-training_type = 'cross_validation'
+training_type = 'standard'
+#  training_type = 'standard'
 sub0 = RESULTS_DIR
-sub1 = 'cohort2'
+sub1 = 'C23'
 sub2 = ''
-task = 'classification'  # or 'survival'
-path_pre = 'mil'
+task = 'classification'
+# task = 'survival'
+path_pre = f'' # new_path
 path_suf = f'{task}/{training_type}/hypothesis_driven/pyrad-noimp'
 ```
 
