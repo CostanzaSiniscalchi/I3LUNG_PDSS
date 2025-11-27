@@ -99,6 +99,7 @@ def create_annotations(
         'PDL1 CATEGORY': 'PDL1_CATEGORY',
         'IO LINE': 'IO_LINE'
     }
+    
     rwd_flags = rwd_flags.rename(columns={k: v for k, v in rename_map.items() if k in rwd_flags.columns})
     
     ann = ann.merge(rwd_flags, on='Subject', how='left')  # merge su Subject

@@ -232,7 +232,7 @@ def run_training(config, mods):
                     existing_runs = [d for d in os.listdir(eval_dir)
                                    if os.path.isdir(os.path.join(eval_dir, d)) and
                                    re.match(r'^\d{5}-', d)]
-                    if existing_runs:
+                    if training_type != 'evaluation' and existing_runs:
                         raise RuntimeError(
                             f"\nA model for seed {seed} already exists at: {base_seed_path}\n"
                             f"Found existing run directories: {', '.join(existing_runs)}\n\n"
