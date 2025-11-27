@@ -131,7 +131,7 @@ task_settings:
 training_type: cross_validation # hyperparameter_tuning  | evaluation | standard
 data-type: hypothesis_driven  # hypothesis_driven/data_driven
 source: pyrad  # pyrad/foundation
-imp: noimp  # noimp/imp When imp is selected you should use a separate dataset that includes an additional column for each clinical feature to indicate whether the value was imputed (imp columns), allowing tracking of missing data across patients.
+imp: noimp  # noimp/imp for imp should use a separate dataset that includes an additional column for each clinical feature to indicate whether the value was imputed (imp columns), allowing tracking of missing data across patients.
 seed: [0]
 
 use_early_stopping: true
