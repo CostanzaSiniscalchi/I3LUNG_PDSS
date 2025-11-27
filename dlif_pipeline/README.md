@@ -300,11 +300,11 @@ Apply dataset filters by uncommenting relevant flags:
 
 ### 3. Train Model and Evaluate model
 
-This is an example of how to train the model with the minimum configuration example just provided (you can find the same configuration at the directory dlif_pipeline/configs/00-config-survival-cv.yaml):
+This is an example of how to train the model with the minimum configuration example just provided (you can find the same configuration at the directory dlif_pipeline/configs/00-config-classification-cv.yaml):
 
 ```bash
 python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/01-config-survival-cv.yaml \
+  --config dlif_pipeline/configs/00-config-classification-cv.yaml \
   --base_dir dlif_pipeline/results
 ```
 Other examples are provided at dlif_pipeline/configs.
