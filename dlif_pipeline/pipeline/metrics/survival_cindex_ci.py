@@ -9,13 +9,13 @@ from pathlib import Path
 # Configuration for computing c-index across experiments
 # Specify: training type, cohort filters, path structure, and outcomes to analyze
 
-BASE_DIR = Path(__file__).resolve().parents[4]  # Risali a Mil2/
-RESULTS_DIR = BASE_DIR / "results"
+BASE_DIR = Path(__file__).resolve().parents[3]  # Risali a Mil2/
+RESULTS_DIR = BASE_DIR / "dlif_pipeline/results"
 
 training_type = 'standard'
 sub1 = RESULTS_DIR
-sub2 = 'adeno'
-path_pre = 'mil' # new_path
+sub2 = 'C23'
+path_pre = '' # new_path
 path_suf = f'survival/{training_type}/hypothesis_driven/pyrad-noimp'
 outcomes = ['OS_MONTHS'] # can be extended for other survival outcomes
 
