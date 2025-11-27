@@ -642,7 +642,7 @@ def train_rwd_matched_model(
     # Now create RWD-only dataset but filter to matched subjects
     rwd_dataset = dl.create_dataset(
         modes=[Mode.RWD],
-        outcome='OS MONTHS',
+        outcome=outcome.value,
         subanalysis=subanalysis
     )
     rwd_dataset = rwd_dataset[rwd_dataset['Subject'].isin(matched_subjects)]
