@@ -85,9 +85,7 @@ Performs leave-one-center-out cross-validation across multiple centers:
 - SZMC
 - VHIO
 ```bash
-python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/00-config-classification-cv.yaml \
-  --base_dir dlif_pipeline/results
+python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/00-config-classification-cv.yaml --base_dir dlif_pipeline/results
 ```
 
 #### 2. Standard Training

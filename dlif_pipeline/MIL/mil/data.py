@@ -8,19 +8,25 @@ import numpy as np
 import numpy.typing as npt
 import torch
 from torch.utils.data import Dataset
+from functools import partial
 
 # -----------------------------------------------------------------------------
 
-def build_multimodal_mixed_bag_dataset(bags, targets, encoder, bag_size, use_lens=False, max_bag_size=None, dtype=torch.float32): # FIXME:m 
-    """Build a dataset for mixed multimodal bags where some modalities may be missing."""
+def _zip(bag_data, targets, encoder=None):
+    _targets = targets if encoder is None else targets.squeeze()
+    return (*bag_data, _targets)
+
+def build_multimodal_mixed_bag_dataset(
+        bags, targets, encoder, bag_size,
+        use_lens=False, max_bag_size=None,
+        dtype=torch.float32):
+
     assert len(bags) == len(targets)
 
-    def _zip(bag_data, targets):
-        _targets = targets if encoder is None else targets.squeeze()
-        return (*bag_data, _targets)
+    zip_fn = partial(_zip, encoder=encoder)
 
     dataset = MapDataset(
-        _zip,
+        zip_fn,
         MixedMultiBagDataset(bags, dtype=dtype),
         EncodedDataset(encoder, targets),
     )
