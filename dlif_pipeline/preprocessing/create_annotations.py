@@ -87,7 +87,7 @@ def create_annotations(
         print(f"Created {n_sub} subfolds per center")
     
     # Merge additional flags from RWD - only use columns that exist
-    flag_cols = ['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO LINE']
+    flag_cols = ['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO LINE', 'IO IOCHT']
     available_flag_cols = [col for col in flag_cols if col in rwd.columns]
     
     rwd_flags = rwd[available_flag_cols].copy()
@@ -97,7 +97,8 @@ def create_annotations(
         'HISTOLOGY ADENOCARCINOMA': 'NSCLC_HISTOLOGY_ADENOCARCINOMA',
         'HISTOLOGY SQUAMOUS': 'NSCLC_HISTOLOGY_SQUAMOUS',
         'PDL1 CATEGORY': 'PDL1_CATEGORY',
-        'IO LINE': 'IO_LINE'
+        'IO LINE': 'IO_LINE',
+        'IO IOCHT': 'IO_CHT',
     }
     
     rwd_flags = rwd_flags.rename(columns={k: v for k, v in rename_map.items() if k in rwd_flags.columns})
