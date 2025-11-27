@@ -2223,6 +2223,204 @@ def create_fairness_summary(results_dict):
     
     return sex_fairness, center_fairness, pairwise_tpr, pairwise_fpr
 
+def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results'):
+    """
+    Load predictions and exval data for a specific outcome.
+    
+    Parameters:
+    -----------
+    outcome : str
+        Outcome name (e.g., 'DCR', 'OS6', 'OS24')
+    base_path : str
+        Base directory path (default: 'mlef_pipeline/results')
+    
+    Returns:
+    --------
+    tuple : (predictions_df, exval_df)
+        - predictions_df: DataFrame with columns [Subject, y_true, y_pred]
+        - exval_df: DataFrame with columns [Subject, SEX, RACE], ordered by predictions_df
+    """
+    # Load predictions from CSV
+    pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_EXVAL.csv')
+    predictions_df = pd.read_csv(pred_path)
+    
+    # Load RWD data
+    rwd_path = 'data/rwd.csv'
+    rwd_df = pd.read_csv(rwd_path)
+    
+    # Match subjects from predictions with RWD data
+    exval_df = predictions_df[['Subject']].merge(
+        rwd_df[['Subject', 'CENTER', 'SEX', 'RACE']], 
+        on='Subject', 
+        how='left'
+    )
+    
+    # Set Subject as index
+    exval_df = exval_df.set_index('Subject')
+    
+    print(f"Loaded EXVAL predictions for {outcome}:")
+    print(f"  Samples: {len(predictions_df)}")
+    print(f"  Columns in exval data: {exval_df.shape[1]} ({', '.join(exval_df.columns)})")
+    print(f"  Subject order preserved: {(predictions_df['Subject'].values == exval_df.index.values).all()}")
+    
+    return predictions_df, exval_df
+
+
+def analyze_exval_outcome_fairness_by_race(
+    outcome,
+    outcome_name,
+    base_path='mlef_pipeline/results',
+    n_perms=1000,
+    random_state=42
+):
+    """
+    Complete fairness analysis by race for external validation set.
+    Filters to only include WHITE and BLACK OR AFRICAN AMERICAN races (excludes ASIAN).
+    
+    Parameters:
+    -----------
+    outcome : str
+        Outcome folder name (e.g., 'DCR', 'OS6', 'OS24')
+    outcome_name : str
+        Display name for outcome (e.g., 'OS 24')
+    base_path : str
+        Base directory path where predictions are stored
+    n_perms : int
+        Number of permutations for tests
+    random_state : int
+        Random seed
+    
+    Returns:
+    --------
+    dict : Results including race fairness metrics and test results
+    """
+    print(f"\n{'='*60}")
+    print(f"Analyzing EXVAL Race Fairness for {outcome_name}")
+    print(f"{'='*60}\n")
+    
+    # Load EXVAL predictions and data
+    predictions_df, exval = load_predictions_and_data_exval(outcome, base_path)
+    
+    # Filter to only include WHITE and BLACK OR AFRICAN AMERICAN races
+    valid_races = ['WHITE', 'BLACK OR AFRICAN AMERICAN']
+    race_mask = exval['RACE'].isin(valid_races)
+    
+    print(f"\nRace distribution before filtering:")
+    print(f"  {exval['RACE'].value_counts().to_dict()}")
+    
+    # Apply filter to both predictions and exval data
+    exval_filtered = exval[race_mask]
+    predictions_filtered = predictions_df[predictions_df['Subject'].isin(exval_filtered.index)]
+    
+    print(f"\nRace distribution after filtering (WHITE and BLACK OR AFRICAN AMERICAN only):")
+    print(f"  {exval_filtered['RACE'].value_counts().to_dict()}")
+    print(f"  Total patients after filter: {len(predictions_filtered)}")
+    
+    if len(predictions_filtered) == 0:
+        print(f"  Warning: No patients remain after race filtering!")
+        return None
+    
+    # Extract predictions
+    y_true = predictions_filtered['y_true'].values
+    y_pred = predictions_filtered['y_pred'].values
+    
+    # Overall performance (filtered)
+    auc = roc_auc_score(y_true, y_pred)
+    tpr, fpr = compute_tpr_fpr(y_true, y_pred)
+    print(f"\nOverall EXVAL Performance (filtered by race):")
+    print(f"  AUC: {auc:.3f}")
+    print(f"  TPR (threshold): {tpr:.3f}")
+    print(f"  FPR (threshold): {fpr:.3f}\n")
+    
+    # Get race data for filtered subjects
+    race_data = exval_filtered['RACE']
+    
+    # Compute patient counts per race
+    patients_per_race = race_data.value_counts().to_dict()
+    print(f"Patients per race: {patients_per_race}\n")
+    
+    # Prepare data for permutation tests
+    df_outcome = pd.DataFrame({
+        'race': race_data.values,
+        'pred': y_pred.astype(int),
+        'actual': y_true
+    })
+    
+    # Race-based fairness
+    print("\nRace-based fairness analysis (EXVAL set)...")
+    try:
+        race_fair = permutation_test_two_groups(
+            df_outcome, 
+            group_col='race', 
+            groups=valid_races, 
+            n_perms=n_perms, 
+            random_state=random_state
+        )
+        
+        print(f"  TPR - WHITE: {race_fair['TPR']['rate_A']:.3f}, BLACK OR AFRICAN AMERICAN: {race_fair['TPR']['rate_B']:.3f}, p={race_fair['TPR']['p_value']:.4f}")
+        print(f"  FPR - WHITE: {race_fair['FPR']['rate_A']:.3f}, BLACK OR AFRICAN AMERICAN: {race_fair['FPR']['rate_B']:.3f}, p={race_fair['FPR']['p_value']:.4f}")
+    except Exception as e:
+        print(f"  Warning: Race-based analysis failed: {e}")
+        race_fair = None
+    
+    return {
+        'outcome_name': outcome_name,
+        'predictions': predictions_filtered,
+        'exval': exval_filtered,
+        'auc': auc,
+        'overall_tpr': tpr,
+        'overall_fpr': fpr,
+        'patients_per_race': patients_per_race,
+        'race_fairness': race_fair,
+        'valid_races': valid_races
+    }
+
+
+def create_race_fairness_summary(results_dict):
+    """
+    Create summary DataFrame from multiple outcome race fairness analyses.
+    
+    Parameters:
+    -----------
+    results_dict : dict
+        Dictionary with outcome names as keys and analysis results as values
+    
+    Returns:
+    --------
+    pd.DataFrame : Race fairness summary
+    """
+    race_fairness = pd.DataFrame(columns=['Metric', 'Race', 'Value', 'CI', 'p-value', 'outcome'])
+    
+    for outcome_name, results in results_dict.items():
+        if results is None or results['race_fairness'] is None:
+            continue
+            
+        # Race fairness
+        for metric, values in results['race_fairness'].items():
+            ciA = values.get('ci_A')
+            ciB = values.get('ci_B')
+            ciA_rounded = (round(float(ciA[0]), 2), round(float(ciA[1]), 2)) if isinstance(ciA, (tuple, list, np.ndarray)) and len(ciA) == 2 else ciA
+            ciB_rounded = (round(float(ciB[0]), 2), round(float(ciB[1]), 2)) if isinstance(ciB, (tuple, list, np.ndarray)) and len(ciB) == 2 else ciB
+            
+            race_fairness.loc[len(race_fairness)] = {
+                'Metric': metric,
+                'Race': 'WHITE',
+                'Value': values['rate_A'],
+                'CI': ciA_rounded,
+                'p-value': values['p_value'],
+                'outcome': outcome_name
+            }
+            race_fairness.loc[len(race_fairness)] = {
+                'Metric': metric,
+                'Race': 'BLACK OR AFRICAN AMERICAN',
+                'Value': values['rate_B'],
+                'CI': ciB_rounded,
+                'p-value': values['p_value'],
+                'outcome': outcome_name
+            }
+    
+    return race_fairness
+
 
 def plot_km_combined(target, train_set, test_set, uoc_set, title):
     # Create a single axis for the combined plot
