@@ -2412,9 +2412,188 @@ def create_fairness_summary(results_dict):
     
     return sex_fairness, center_fairness, pairwise_tpr, pairwise_fpr
 
-def create_fairness_summary_exval(results_dict):
+def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results'):
     """
-    Create summary DataFrames from multiple outcome analyses for external validation.
+    Load predictions and exval data for a specific outcome.
+    
+    Parameters:
+    -----------
+    outcome : str
+        Outcome name (e.g., 'DCR', 'OS6', 'OS24')
+    base_path : str
+        Base directory path (default: 'mlef_pipeline/results')
+    
+    Returns:
+    --------
+    tuple : (predictions_df, exval_df)
+        - predictions_df: DataFrame with columns [Subject, y_true, y_pred]
+        - exval_df: DataFrame with columns [Subject, SEX, RACE], ordered by predictions_df
+    """
+    # Load predictions from CSV
+    pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_EXVAL.csv')
+    predictions_df = pd.read_csv(pred_path)
+    
+    # Load RWD data
+    rwd_path = 'data/rwd.csv'
+    rwd_df = pd.read_csv(rwd_path)
+    
+    # Match subjects from predictions with RWD data
+    exval_df = predictions_df[['Subject']].merge(
+        rwd_df[['Subject', 'CENTER', 'SEX', 'RACE']], 
+        on='Subject', 
+        how='left'
+    )
+    
+    # Set Subject as index
+    exval_df = exval_df.set_index('Subject')
+    
+    print(f"Loaded EXVAL predictions for {outcome}:")
+    print(f"  Samples: {len(predictions_df)}")
+    print(f"  Columns in exval data: {exval_df.shape[1]} ({', '.join(exval_df.columns)})")
+    print(f"  Subject order preserved: {(predictions_df['Subject'].values == exval_df.index.values).all()}")
+    
+    return predictions_df, exval_df
+
+
+def analyze_exval_outcome_fairness_by_race(
+    outcome,
+    outcome_name,
+    base_path='mlef_pipeline/results',
+    n_perms=1000,
+    random_state=42
+):
+    """
+    Complete fairness analysis by race for external validation set.
+    Filters to only include WHITE and BLACK OR AFRICAN AMERICAN races (excludes ASIAN).
+    Also performs sex-based fairness analysis on the same filtered dataset.
+    
+    Parameters:
+    -----------
+    outcome : str
+        Outcome folder name (e.g., 'DCR', 'OS6', 'OS24')
+    outcome_name : str
+        Display name for outcome (e.g., 'OS 24')
+    base_path : str
+        Base directory path where predictions are stored
+    n_perms : int
+        Number of permutations for tests
+    random_state : int
+        Random seed
+    
+    Returns:
+    --------
+    dict : Results including race fairness metrics and test results
+    """
+    print(f"\n{'='*60}")
+    print(f"Analyzing EXVAL Race & Sex Fairness for {outcome_name}")
+    print(f"{'='*60}\n")
+    
+    # Load EXVAL predictions and data
+    predictions_df, exval = load_predictions_and_data_exval(outcome, base_path)
+    
+    # Filter to only include WHITE and BLACK OR AFRICAN AMERICAN races
+    valid_races = ['WHITE', 'BLACK OR AFRICAN AMERICAN']
+    race_mask = exval['RACE'].isin(valid_races)
+    
+    print(f"\nRace distribution before filtering:")
+    print(f"  {exval['RACE'].value_counts().to_dict()}")
+    
+    # Apply filter to both predictions and exval data
+    exval_filtered = exval[race_mask]
+    predictions_filtered = predictions_df[predictions_df['Subject'].isin(exval_filtered.index)]
+    
+    print(f"\nRace distribution after filtering (WHITE and BLACK OR AFRICAN AMERICAN only):")
+    print(f"  {exval_filtered['RACE'].value_counts().to_dict()}")
+    print(f"  Total patients after filter: {len(predictions_filtered)}")
+    
+    if len(predictions_filtered) == 0:
+        print(f"  Warning: No patients remain after race filtering!")
+        return None
+    
+    # Extract predictions
+    y_true = predictions_filtered['y_true'].values
+    y_pred = predictions_filtered['y_pred'].values
+    
+    # Overall performance (filtered)
+    auc = roc_auc_score(y_true, y_pred)
+    tpr, fpr = compute_tpr_fpr(y_true, y_pred)
+    print(f"\nOverall EXVAL Performance (filtered by race):")
+    print(f"  AUC: {auc:.3f}")
+    print(f"  TPR (threshold): {tpr:.3f}")
+    print(f"  FPR (threshold): {fpr:.3f}\n")
+    
+    # Get race data for filtered subjects
+    race_data = exval_filtered['RACE']
+    sex_data = exval_filtered['SEX']
+    
+    # Compute patient counts per race and sex
+    patients_per_race = race_data.value_counts().to_dict()
+    patients_per_sex = sex_data.value_counts().to_dict()
+    print(f"Patients per race: {patients_per_race}")
+    print(f"Patients per sex: {patients_per_sex}\n")
+    
+    # Prepare data for permutation tests
+    df_outcome = pd.DataFrame({
+        'race': race_data.values,
+        'sex': sex_data.values,
+        'pred': y_pred.astype(int),
+        'actual': y_true
+    })
+    
+    # Race-based fairness
+    print("\nRace-based fairness analysis (EXVAL set)...")
+    try:
+        race_fair = permutation_test_two_groups(
+            df_outcome, 
+            group_col='race', 
+            groups=valid_races, 
+            n_perms=n_perms, 
+            random_state=random_state
+        )
+        
+        print(f"  TPR - WHITE: {race_fair['TPR']['rate_A']:.3f}, BLACK OR AFRICAN AMERICAN: {race_fair['TPR']['rate_B']:.3f}, p={race_fair['TPR']['p_value']:.4f}")
+        print(f"  FPR - WHITE: {race_fair['FPR']['rate_A']:.3f}, BLACK OR AFRICAN AMERICAN: {race_fair['FPR']['rate_B']:.3f}, p={race_fair['FPR']['p_value']:.4f}")
+    except Exception as e:
+        print(f"  Warning: Race-based analysis failed: {e}")
+        race_fair = None
+        
+    # Sex-based fairness
+    print("\nSex-based fairness analysis (EXVAL set)...")
+    try:
+        sex_fair = permutation_test_two_groups(
+            df_outcome, 
+            group_col='sex', 
+            groups=df_outcome['sex'].unique(), 
+            n_perms=n_perms, 
+            random_state=random_state
+        )
+        
+        print(f"  TPR - Female: {sex_fair['TPR']['rate_A']:.3f}, Male: {sex_fair['TPR']['rate_B']:.3f}, p={sex_fair['TPR']['p_value']:.4f}")
+        print(f"  FPR - Female: {sex_fair['FPR']['rate_A']:.3f}, Male: {sex_fair['FPR']['rate_B']:.3f}, p={sex_fair['FPR']['p_value']:.4f}")
+    except Exception as e:
+        print(f"  Warning: Sex-based analysis failed: {e}")
+        sex_fair = None
+    
+    return {
+        'outcome_name': outcome_name,
+        'predictions': predictions_filtered,
+        'exval': exval_filtered,
+        'auc': auc,
+        'overall_tpr': tpr,
+        'overall_fpr': fpr,
+        'patients_per_race': patients_per_race,
+        'patients_per_sex': patients_per_sex,
+        'race_fairness': race_fair,
+        'sex_fairness': sex_fair,
+        'valid_races': valid_races,
+        'threshold_tpr': tpr,
+        'threshold_fpr': fpr
+    }
+
+
+def create_race_fairness_summary(results_dict):
+    """
+    Create summary DataFrame from multiple outcome race fairness analyses.
     
     Parameters:
     -----------
@@ -2423,16 +2602,42 @@ def create_fairness_summary_exval(results_dict):
     
     Returns:
     --------
-    tuple : (sex_fairness_df, race_fairness_df, pairwise_tpr, pairwise_fpr)
+    tuple : (race_fairness_df, sex_fairness_df)
     """
+    race_fairness = pd.DataFrame(columns=['Metric', 'Race', 'Value', 'CI', 'p-value', 'outcome'])
     sex_fairness = pd.DataFrame(columns=['Metric', 'Sex', 'Value', 'CI', 'p-value', 'outcome'])
-    race_fairness_list = []
-    pairwise_tpr_list = []
-    pairwise_fpr_list = []
     
     for outcome_name, results in results_dict.items():
+        if results is None:
+            continue
+            
+        # Race fairness
+        if results['race_fairness'] is not None:
+            for metric, values in results['race_fairness'].items():
+                ciA = values.get('ci_A')
+                ciB = values.get('ci_B')
+                ciA_rounded = (round(float(ciA[0]), 2), round(float(ciA[1]), 2)) if isinstance(ciA, (tuple, list, np.ndarray)) and len(ciA) == 2 else ciA
+                ciB_rounded = (round(float(ciB[0]), 2), round(float(ciB[1]), 2)) if isinstance(ciB, (tuple, list, np.ndarray)) and len(ciB) == 2 else ciB
+                
+                race_fairness.loc[len(race_fairness)] = {
+                    'Metric': metric,
+                    'Race': 'WHITE',
+                    'Value': values['rate_A'],
+                    'CI': ciA_rounded,
+                    'p-value': values['p_value'],
+                    'outcome': outcome_name
+                }
+                race_fairness.loc[len(race_fairness)] = {
+                    'Metric': metric,
+                    'Race': 'BLACK OR AFRICAN AMERICAN',
+                    'Value': values['rate_B'],
+                    'CI': ciB_rounded,
+                    'p-value': values['p_value'],
+                    'outcome': outcome_name
+                }
+                
         # Sex fairness
-        if results.get('sex_fairness'):
+        if results['sex_fairness'] is not None:
             for metric, values in results['sex_fairness'].items():
                 ciA = values.get('ci_A')
                 ciB = values.get('ci_B')
@@ -2455,62 +2660,9 @@ def create_fairness_summary_exval(results_dict):
                     'p-value': values['p_value'],
                     'outcome': outcome_name
                 }
-        
-        # Race fairness
-        if results.get('race_fairness'):
-            race_res = results['race_fairness']
-            
-            # TPR
-            tpr_data = race_res['TPR']
-            tpr_rates = tpr_data['observed_rates'].rename(
-                columns={'group': 'race', 'rate': 'TPR', 'denom': 'TPR_denom'}
-            )
-            tpr_rates['TPR_ci_lower'] = round(tpr_rates['ci_lower'], 2)
-            tpr_rates['TPR_ci_upper'] = round(tpr_rates['ci_upper'], 2)
-            
-            # FPR
-            fpr_data = race_res['FPR']
-            fpr_rates = fpr_data['observed_rates'].rename(
-                columns={'group': 'race', 'rate': 'FPR', 'denom': 'FPR_denom'}
-            )
-            fpr_rates['FPR_ci_lower'] = round(fpr_rates['ci_lower'], 2)
-            fpr_rates['FPR_ci_upper'] = round(fpr_rates['ci_upper'], 2)
-            
-            # Merge
-            race_df = pd.merge(
-                tpr_rates[['race', 'TPR', 'TPR_ci_lower', 'TPR_ci_upper']],
-                fpr_rates[['race', 'FPR', 'FPR_ci_lower', 'FPR_ci_upper']],
-                on='race',
-                how='outer'
-            ).set_index('race').sort_index()
-            
-            race_df['outcome'] = outcome_name
-            race_df['TPR_omnibus_p'] = tpr_data.get('omnibus_pvalue', np.nan)
-            race_df['FPR_omnibus_p'] = fpr_data.get('omnibus_pvalue', np.nan)
-            
-            race_fairness_list.append(race_df)
-            
-            # Pairwise matrices
-            races = race_df.index.tolist()
-            pairwise_tpr = _pairwise_df_to_matrix(
-                tpr_data.get('pairwise', pd.DataFrame()), 
-                centers=races, 
-                outcome=outcome_name
-            )
-            pairwise_fpr = _pairwise_df_to_matrix(
-                fpr_data.get('pairwise', pd.DataFrame()), 
-                centers=races, 
-                outcome=outcome_name
-            )
-            
-            pairwise_tpr_list.append(pairwise_tpr)
-            pairwise_fpr_list.append(pairwise_fpr)
     
-    race_fairness = pd.concat(race_fairness_list, axis=0).sort_index() if race_fairness_list else pd.DataFrame()
-    pairwise_tpr = pd.concat(pairwise_tpr_list, axis=0) if pairwise_tpr_list else pd.DataFrame()
-    pairwise_fpr = pd.concat(pairwise_fpr_list, axis=0) if pairwise_fpr_list else pd.DataFrame()
-    
-    return sex_fairness, race_fairness, pairwise_tpr, pairwise_fpr
+    return race_fairness, sex_fairness
+
 
 def plot_km_combined(target, train_set, test_set, uoc_set, title):
     # Create a single axis for the combined plot
