@@ -15,7 +15,7 @@ training_type = 'standard'
 sub0 = RESULTS_DIR
 sub1 = 'C23'
 sub2 = ''
-task = 'classification'
+task = 'survival'
 # task = 'survival'
 path_pre = f'' # new_path
 path_suf = f'{task}/{training_type}/hypothesis_driven/pyrad-noimp'
@@ -90,7 +90,7 @@ if __name__ == "__main__":
                     # Read the CSV file
                     try:
                         df = pd.read_csv(csv_path)
-                        score = df['cindex_mean'].iloc[0]
+                        score = df['c_index'].iloc[0]
                         ci_lower = df['ci_lower'].iloc[0]
                         ci_upper = df['ci_upper'].iloc[0]
 
@@ -112,8 +112,8 @@ if __name__ == "__main__":
                     try:
                         df = pd.read_csv(csv_path)
                         score = df['auc'].iloc[0]
-                        ci_lower = df[' ci_lower'].iloc[0]  # Note the space in column name
-                        ci_upper = df[' ci_upper'].iloc[0]  # Note the space in column name
+                        ci_lower = df['ci_lower'].iloc[0]  # Note the space in column name
+                        ci_upper = df['ci_upper'].iloc[0]  # Note the space in column name
 
                         modalities.append(label)
                         modality_keys.append(key)
