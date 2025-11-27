@@ -2465,6 +2465,7 @@ def analyze_exval_outcome_fairness_by_race(
     """
     Complete fairness analysis by race for external validation set.
     Filters to only include WHITE and BLACK OR AFRICAN AMERICAN races (excludes ASIAN).
+    Also performs sex-based fairness analysis on the same filtered dataset.
     
     Parameters:
     -----------
@@ -2484,7 +2485,7 @@ def analyze_exval_outcome_fairness_by_race(
     dict : Results including race fairness metrics and test results
     """
     print(f"\n{'='*60}")
-    print(f"Analyzing EXVAL Race Fairness for {outcome_name}")
+    print(f"Analyzing EXVAL Race & Sex Fairness for {outcome_name}")
     print(f"{'='*60}\n")
     
     # Load EXVAL predictions and data
@@ -2523,14 +2524,18 @@ def analyze_exval_outcome_fairness_by_race(
     
     # Get race data for filtered subjects
     race_data = exval_filtered['RACE']
+    sex_data = exval_filtered['SEX']
     
-    # Compute patient counts per race
+    # Compute patient counts per race and sex
     patients_per_race = race_data.value_counts().to_dict()
-    print(f"Patients per race: {patients_per_race}\n")
+    patients_per_sex = sex_data.value_counts().to_dict()
+    print(f"Patients per race: {patients_per_race}")
+    print(f"Patients per sex: {patients_per_sex}\n")
     
     # Prepare data for permutation tests
     df_outcome = pd.DataFrame({
         'race': race_data.values,
+        'sex': sex_data.values,
         'pred': y_pred.astype(int),
         'actual': y_true
     })
@@ -2551,6 +2556,23 @@ def analyze_exval_outcome_fairness_by_race(
     except Exception as e:
         print(f"  Warning: Race-based analysis failed: {e}")
         race_fair = None
+        
+    # Sex-based fairness
+    print("\nSex-based fairness analysis (EXVAL set)...")
+    try:
+        sex_fair = permutation_test_two_groups(
+            df_outcome, 
+            group_col='sex', 
+            groups=df_outcome['sex'].unique(), 
+            n_perms=n_perms, 
+            random_state=random_state
+        )
+        
+        print(f"  TPR - Female: {sex_fair['TPR']['rate_A']:.3f}, Male: {sex_fair['TPR']['rate_B']:.3f}, p={sex_fair['TPR']['p_value']:.4f}")
+        print(f"  FPR - Female: {sex_fair['FPR']['rate_A']:.3f}, Male: {sex_fair['FPR']['rate_B']:.3f}, p={sex_fair['FPR']['p_value']:.4f}")
+    except Exception as e:
+        print(f"  Warning: Sex-based analysis failed: {e}")
+        sex_fair = None
     
     return {
         'outcome_name': outcome_name,
@@ -2560,8 +2582,12 @@ def analyze_exval_outcome_fairness_by_race(
         'overall_tpr': tpr,
         'overall_fpr': fpr,
         'patients_per_race': patients_per_race,
+        'patients_per_sex': patients_per_sex,
         'race_fairness': race_fair,
-        'valid_races': valid_races
+        'sex_fairness': sex_fair,
+        'valid_races': valid_races,
+        'threshold_tpr': tpr,
+        'threshold_fpr': fpr
     }
 
 
@@ -2576,39 +2602,66 @@ def create_race_fairness_summary(results_dict):
     
     Returns:
     --------
-    pd.DataFrame : Race fairness summary
+    tuple : (race_fairness_df, sex_fairness_df)
     """
     race_fairness = pd.DataFrame(columns=['Metric', 'Race', 'Value', 'CI', 'p-value', 'outcome'])
+    sex_fairness = pd.DataFrame(columns=['Metric', 'Sex', 'Value', 'CI', 'p-value', 'outcome'])
     
     for outcome_name, results in results_dict.items():
-        if results is None or results['race_fairness'] is None:
+        if results is None:
             continue
             
         # Race fairness
-        for metric, values in results['race_fairness'].items():
-            ciA = values.get('ci_A')
-            ciB = values.get('ci_B')
-            ciA_rounded = (round(float(ciA[0]), 2), round(float(ciA[1]), 2)) if isinstance(ciA, (tuple, list, np.ndarray)) and len(ciA) == 2 else ciA
-            ciB_rounded = (round(float(ciB[0]), 2), round(float(ciB[1]), 2)) if isinstance(ciB, (tuple, list, np.ndarray)) and len(ciB) == 2 else ciB
-            
-            race_fairness.loc[len(race_fairness)] = {
-                'Metric': metric,
-                'Race': 'WHITE',
-                'Value': values['rate_A'],
-                'CI': ciA_rounded,
-                'p-value': values['p_value'],
-                'outcome': outcome_name
-            }
-            race_fairness.loc[len(race_fairness)] = {
-                'Metric': metric,
-                'Race': 'BLACK OR AFRICAN AMERICAN',
-                'Value': values['rate_B'],
-                'CI': ciB_rounded,
-                'p-value': values['p_value'],
-                'outcome': outcome_name
-            }
+        if results['race_fairness'] is not None:
+            for metric, values in results['race_fairness'].items():
+                ciA = values.get('ci_A')
+                ciB = values.get('ci_B')
+                ciA_rounded = (round(float(ciA[0]), 2), round(float(ciA[1]), 2)) if isinstance(ciA, (tuple, list, np.ndarray)) and len(ciA) == 2 else ciA
+                ciB_rounded = (round(float(ciB[0]), 2), round(float(ciB[1]), 2)) if isinstance(ciB, (tuple, list, np.ndarray)) and len(ciB) == 2 else ciB
+                
+                race_fairness.loc[len(race_fairness)] = {
+                    'Metric': metric,
+                    'Race': 'WHITE',
+                    'Value': values['rate_A'],
+                    'CI': ciA_rounded,
+                    'p-value': values['p_value'],
+                    'outcome': outcome_name
+                }
+                race_fairness.loc[len(race_fairness)] = {
+                    'Metric': metric,
+                    'Race': 'BLACK OR AFRICAN AMERICAN',
+                    'Value': values['rate_B'],
+                    'CI': ciB_rounded,
+                    'p-value': values['p_value'],
+                    'outcome': outcome_name
+                }
+                
+        # Sex fairness
+        if results['sex_fairness'] is not None:
+            for metric, values in results['sex_fairness'].items():
+                ciA = values.get('ci_A')
+                ciB = values.get('ci_B')
+                ciA_rounded = (round(float(ciA[0]), 2), round(float(ciA[1]), 2)) if isinstance(ciA, (tuple, list, np.ndarray)) and len(ciA) == 2 else ciA
+                ciB_rounded = (round(float(ciB[0]), 2), round(float(ciB[1]), 2)) if isinstance(ciB, (tuple, list, np.ndarray)) and len(ciB) == 2 else ciB
+                
+                sex_fairness.loc[len(sex_fairness)] = {
+                    'Metric': metric,
+                    'Sex': 'Female',
+                    'Value': values['rate_A'],
+                    'CI': ciA_rounded,
+                    'p-value': values['p_value'],
+                    'outcome': outcome_name
+                }
+                sex_fairness.loc[len(sex_fairness)] = {
+                    'Metric': metric,
+                    'Sex': 'Male',
+                    'Value': values['rate_B'],
+                    'CI': ciB_rounded,
+                    'p-value': values['p_value'],
+                    'outcome': outcome_name
+                }
     
-    return race_fairness
+    return race_fairness, sex_fairness
 
 
 def plot_km_combined(target, train_set, test_set, uoc_set, title):
