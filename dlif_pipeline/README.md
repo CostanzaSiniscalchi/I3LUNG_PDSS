@@ -289,10 +289,6 @@ Apply dataset filters by uncommenting relevant flags:
 
 # Center-specific (use only one at a time)
 # FILTER_INT: [true]
-# FILTER_GHD: [true]
-# FILTER_VHIO: [true]
-# FILTER_MH: [true]
-
 ```
 
 before applying subanalysis for unicenter, make sure to have generated the specific annotations.
