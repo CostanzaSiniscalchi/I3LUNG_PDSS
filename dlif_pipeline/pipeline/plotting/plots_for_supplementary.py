@@ -7,17 +7,17 @@ from pathlib import Path
 # ------------------------------------------------------------------------------
 # Configuration for generating plots across experiments
 # Specify: cohort filters, path structure, training type, task, and outcomes to analyze
-BASE_DIR = Path(__file__).resolve().parents[4]  # Risali a Mil2/
-RESULTS_DIR = BASE_DIR / "results"
+BASE_DIR = Path(__file__).resolve().parents[3]  # Risali a Mil2/
+RESULTS_DIR = BASE_DIR / "dlif_pipeline/results"
 
-training_type = 'cross_validation'
-# training_type = 'standard'
+training_type = 'standard'
+#  training_type = 'standard'
 sub0 = RESULTS_DIR
-sub1 = 'cohort2'
+sub1 = 'C23'
 sub2 = ''
 task = 'classification'
 # task = 'survival'
-path_pre = f'mil' # new_path
+path_pre = f'' # new_path
 path_suf = f'{task}/{training_type}/hypothesis_driven/pyrad-noimp'
 # ------------------------------------------------------------------------------
 
@@ -112,8 +112,8 @@ if __name__ == "__main__":
                     try:
                         df = pd.read_csv(csv_path)
                         score = df['auc'].iloc[0]
-                        ci_lower = df[' ci_lower'].iloc[0]  # Note the space in column name
-                        ci_upper = df[' ci_upper'].iloc[0]  # Note the space in column name
+                        ci_lower = df['ci_lower'].iloc[0]  # Note the space in column name
+                        ci_upper = df['ci_upper'].iloc[0]  # Note the space in column name
 
                         modalities.append(label)
                         modality_keys.append(key)
