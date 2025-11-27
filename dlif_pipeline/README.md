@@ -303,9 +303,7 @@ Apply dataset filters by uncommenting relevant flags:
 This is an example of how to train the model with the minimum configuration example just provided (you can find the same configuration at the directory dlif_pipeline/configs/00-config-classification-cv.yaml):
 
 ```bash
-python dlif_pipeline/pipeline/train.py \
-  --config dlif_pipeline/configs/00-config-classification-cv.yaml \
-  --base_dir dlif_pipeline/results
+python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/01-config-classification-standard.yaml --base_dir dlif_pipeline/results
 ```
 Other examples are provided at dlif_pipeline/configs.
 
@@ -345,6 +343,8 @@ results/
 ```
 
 #### 2. Compute Metrics
+
+At the end of training, the metrics are automatically computed. If you want to rerun manually:
 
 **For Survival Analysis (C-index):**
 
