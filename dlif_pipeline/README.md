@@ -1,6 +1,6 @@
-# Multi-Instance Learning (MIL) Pipeline
+# Deep Learning Intermediate Fusion (DLIF) pipeline
 
-A comprehensive framework for training and evaluating multi-instance learning models on multimodal medical imaging data with support for classification and survival analysis tasks.
+A comprehensive framework for training and evaluating multi-instance learning models on multimodal data with support for classification and survival analysis tasks.
 
 ## Table of Contents
 
