@@ -423,16 +423,14 @@ Mil2/
 
 ## Troubleshooting
 
-### Common Issues
-
-|              Issue                             |            Solution                    |
-|-------              ----------                 |----------                 ----------   |
-| **Matplotlib backend errors**                  | Ensure `export MPLBACKEND=Agg` is set  |
-| **Missing bag files**                          | Set `prepare_dataset: true` in config  |
-| **Out of memory errors**                       | Reduce `batch_size` in hyperparameters |
-| **Learning rate failures**                     | Specify fixed `lr` in hyperparameters  |
-| **Configuration validation errors**            | Verify YAML syntax and required fields |
-| **Error reading CSV result file for plotting** | Verify the space in plot_results.py line 115 116 different for MAC and Windows |
+| Issue                                       | Solution                                                         |
+|---------------------------------------------|------------------------------------------------------------------|
+| **Matplotlib backend errors**               | Ensure `export MPLBACKEND=Agg` is set                            |
+| **Missing bag files**                       | Set `prepare_dataset: true` in config                            |
+| **Out of memory errors**                    | Reduce `batch_size` in hyperparameters                           |
+| **Learning rate failures**                  | Specify fixed `lr` in hyperparameters                            |
+| **Configuration validation errors**         | Verify YAML syntax and required fields                           |
+| **Error reading CSV result file for plotting** | Check the space in `plot_results.py` (different for macOS vs Windows) |
 
 
 
