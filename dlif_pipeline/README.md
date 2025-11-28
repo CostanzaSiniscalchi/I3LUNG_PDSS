@@ -345,16 +345,16 @@ At the end of training, metrics are calculated automatically.
 #### 2. Generate Plots
 
 ```bash
-python dlif_pipeline/pipeline/plotting/plots_for_supplementary.py
+python dlif_pipeline/pipeline/plotting/plot_results.py
 ```
 
 **Plotting Script Configuration:**
 
-if you want to plot for you experiment, edit the script ( as above ):
+if you want to plot for you experiment, edit the script plot_results ( as above ):
 
 ```python
-training_type = 'standard'
-#  training_type = 'standard'
+training_type = 'standard' # here 'standard' will plot results on the test set
+#  training_type = 'cross_validation'
 sub0 = RESULTS_DIR
 sub1 = 'C23'
 sub2 = ''
@@ -423,15 +423,14 @@ Mil2/
 
 ## Troubleshooting
 
-### Common Issues
-
-|              Issue                  |            Solution                    |
-|-------              ----------      |----------                 ----------   |
-| **Matplotlib backend errors**       | Ensure `export MPLBACKEND=Agg` is set  |
-| **Missing bag files**               | Set `prepare_dataset: true` in config  |
-| **Out of memory errors**            | Reduce `batch_size` in hyperparameters |
-| **Learning rate failures**          | Specify fixed `lr` in hyperparameters  |
-| **Configuration validation errors** | Verify YAML syntax and required fields |
+| Issue                                       | Solution                                                         |
+|---------------------------------------------|------------------------------------------------------------------|
+| **Matplotlib backend errors**               | Ensure `export MPLBACKEND=Agg` is set                            |
+| **Missing bag files**                       | Set `prepare_dataset: true` in config                            |
+| **Out of memory errors**                    | Reduce `batch_size` in hyperparameters                           |
+| **Learning rate failures**                  | Specify fixed `lr` in hyperparameters                            |
+| **Configuration validation errors**         | Verify YAML syntax and required fields                           |
+| **Error reading CSV result file for plotting** | Check the space in `plot_results.py` (different for macOS vs Windows) |
 
 
 

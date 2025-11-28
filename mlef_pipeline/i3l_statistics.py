@@ -89,7 +89,8 @@ class Statistics:
 
     def _compute_ground_truth_statistics(self, ground_truth):
         ground_truth = np.array(ground_truth)
-        assert np.array_equal(np.unique(ground_truth), [0, 1])
+        if not np.array_equal(np.unique(ground_truth), [0, 1]):
+            return None, None
         order = (-ground_truth).argsort()
         label_1_count = int(ground_truth.sum())
 
@@ -104,6 +105,9 @@ class Statistics:
         predictions: np.array of floats of the probability of being class 1
         """
         order, label_1_count = self._compute_ground_truth_statistics(ground_truth)
+        if order is None or label_1_count is None:
+            return np.nan, np.nan
+        
         predictions_sorted_transposed = predictions[np.newaxis, order]
         aucs, delongcov = self._fastDeLong_no_weights(predictions_sorted_transposed, label_1_count)
         assert len(aucs) == 1, "There is a bug in the code, please forward this to the developers"
@@ -122,6 +126,9 @@ class Statistics:
         auc, auc_cov = self._delong_roc_variance(
             y_true,
             y_pred)
+
+        if pd.isna(auc) or pd.isna(auc_cov):
+            return np.nan, np.nan
         
         auc_std = np.sqrt(auc_cov)
         lower_upper_q = np.abs(np.array([0, 1]) - (1 - alpha) / 2)
