@@ -345,12 +345,12 @@ At the end of training, metrics are calculated automatically.
 #### 2. Generate Plots
 
 ```bash
-python dlif_pipeline/pipeline/plotting/plots_for_supplementary.py
+python dlif_pipeline/pipeline/plotting/plot_results.py
 ```
 
 **Plotting Script Configuration:**
 
-if you want to plot for you experiment, edit the script ( as above ):
+if you want to plot for you experiment, edit the script plot_results ( as above ):
 
 ```python
 training_type = 'standard'
