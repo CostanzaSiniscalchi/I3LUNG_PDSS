@@ -138,9 +138,18 @@ if __name__ == "__main__":
         title_suffix = '-'.join(part for part in title_parts if part)
 
         if is_survival:
-            metric_label = 'CV C-Index'
-            plot_title = f'C-Index - {title_suffix}'
-            y_label = 'C-Index'
+            if training_type == 'cross_validation':
+                metric_label = 'CV C-Index'
+                plot_title = f'CV C-Index - {title_suffix}'
+                y_label = 'C-Index'
+            if training_type == 'standard':
+                metric_label = 'Test C-Index'
+                plot_title = f'Test C-Index - {title_suffix}'
+                y_label = 'C-Index'
+            else:
+                metric_label = 'C-Index'
+                plot_title = f'C-Index - {title_suffix}'
+                y_label = 'C-Index'
         else:
             if training_type == 'cross_validation':
                 metric_label = 'CV AUC'
@@ -156,7 +165,13 @@ if __name__ == "__main__":
                 y_label = 'AUC'
 
         plt.plot(modalities, score_values, marker='o', linestyle='-', color='#1a80bb', label=metric_label)
-        plt.fill_between(modalities, ci_lowers, ci_uppers, color='#8cc5e3', alpha=0.3, label='Confidence interval')
+        # plt.fill_between(modalities, ci_lowers, ci_uppers, color='#8cc5e3', alpha=0.3, label='Confidence interval')
+        if len(modalities) == 1:
+            plt.errorbar(modalities, score_values, yerr=[score_values - ci_lowers, ci_uppers - score_values], 
+                        fmt='o', color='#1a80bb', capsize=5, label=metric_label)
+        else:
+            plt.plot(modalities, score_values, marker='o', linestyle='-', color='#1a80bb', label=metric_label)
+            plt.fill_between(modalities, ci_lowers, ci_uppers, color='#8cc5e3', alpha=0.3, label='Confidence interval')
 
         for i, (val, lower, upper) in enumerate(zip(score_values, ci_lowers, ci_uppers)):
             ci_range = val - lower  # Since CI is symmetric, this equals upper - val
