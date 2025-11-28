@@ -48,7 +48,7 @@ class DataLoader:
 
     def _early_fusion(self, mode_data: dict[Mode, pd.DataFrame], outcome: str, is_survival: bool=False) -> pd.DataFrame:
         merged = pd.DataFrame()
-
+        
         for data in mode_data.values():
             if merged.empty:
                 merged = data
@@ -170,8 +170,6 @@ class DataLoader:
         if len(to_standard_normalize) > 0:
             df[to_standard_normalize] = scaler.transform(df[to_standard_normalize])
         df = df.rename(columns={col: f'log_{col}' for col in to_log_normalize})
-        # print(f'{len(to_log_normalize)} features log normalized')
-        # print(f'{len(to_standard_normalize)} features standardized')
         
         return df, scaler, to_standard_normalize, to_log_normalize
     
