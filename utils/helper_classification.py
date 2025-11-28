@@ -548,7 +548,11 @@ def plot_auc_results(
 
         fig = plt.figure(figsize=(12, 6))
         # BLUE: modality
-        plt.plot(X, auc_mod_mean, linestyle="-", marker="o", label="CV AUC", color="#1a80bb")
+        if arch_name == "DLIF":
+            label = 'TEST AUC'
+        else:
+            label = "CV AUC"
+        plt.plot(X, auc_mod_mean, linestyle="-", marker="o", label=label, color="#1a80bb")
         if len(sizes) > 0:
             plt.scatter(X, auc_mod_mean, s=sizes, color="#1a80bb", zorder=3)
         else:
