@@ -179,7 +179,11 @@ def compute_metrics_with_ci(y_true: np.ndarray, y_pred_proba: np.ndarray,
     
     # Calculate AUC with CI
     auc, ci = stats.auc_roc_ci(y_true, y_pred_proba, alpha=0.95)
-    auc_std = (ci[1] - ci[0]) / 2
+    
+    if pd.isna(auc) or pd.isna(ci).any():
+        auc_std = np.nan
+    else:
+        auc_std = (ci[1] - ci[0]) / 2
     
     # Convert probabilities to binary predictions
     y_pred_binary = np.where(np.isnan(y_pred_proba), np.nan, (y_pred_proba >= threshold).astype(int))
@@ -188,13 +192,19 @@ def compute_metrics_with_ci(y_true: np.ndarray, y_pred_proba: np.ndarray,
     f1_macro = f1_score(y_true, y_pred_binary, average='macro', zero_division=0)
     
     # Calculate confusion matrix for sensitivity and specificity
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred_binary).ravel()
-    
-    # Sensitivity (recall, TPR)
-    sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    
-    # Specificity (TNR)
-    specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    cm = confusion_matrix(y_true, y_pred_binary)
+
+    if cm.shape == (2, 2):
+        tn, fp, fn, tp = cm.ravel()
+        
+        # Sensitivity (recall, TPR)
+        sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        
+        # Specificity (TNR)
+        specificity = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    else:
+        sensitivity = np.nan
+        specificity = np.nan
     
     return {
         'auc': auc,
@@ -856,8 +866,26 @@ def main():
     base_path = Path(args.output_dir)
     select_features = not args.no_feature_selection
     
-    # Load modality models configuration
+        # Load modality models configuration
     modality_models_config, rwd_only_models_config = load_modality_models_config(outcome)
+    if outcome == Outcome.OS_6 and subanalysis == Subanalysis.IO_ONLY:
+        print("Using hardcoded modality models config for OS_24 SQUAMOUS")
+        modality_models_config = {
+            'RWD': 'LR',
+            'RWD_DP': 'LR',
+            'RWD_FMRAD': 'LR',
+            'RWD_PYRAD': 'LR',
+            'RWD_DP_FMRAD': 'LR',
+            'RWD_DP_PYRAD': 'LR'
+        }
+        rwd_only_models_config = {
+            'RWD_DP': 'LR',
+            'RWD_FMRAD': 'RF',
+            'RWD_PYRAD': 'LR',
+            'RWD_DP_FMRAD': 'LR',
+            'RWD_DP_PYRAD': 'RF'
+        }
+
     
     # Determine which modalities to train
     if args.modalities:
