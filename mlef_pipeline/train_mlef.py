@@ -868,24 +868,6 @@ def main():
     
         # Load modality models configuration
     modality_models_config, rwd_only_models_config = load_modality_models_config(outcome)
-    if outcome == Outcome.OS_6 and subanalysis == Subanalysis.IO_ONLY:
-        print("Using hardcoded modality models config for OS_24 SQUAMOUS")
-        modality_models_config = {
-            'RWD': 'LR',
-            'RWD_DP': 'LR',
-            'RWD_FMRAD': 'LR',
-            'RWD_PYRAD': 'LR',
-            'RWD_DP_FMRAD': 'LR',
-            'RWD_DP_PYRAD': 'LR'
-        }
-        rwd_only_models_config = {
-            'RWD_DP': 'LR',
-            'RWD_FMRAD': 'RF',
-            'RWD_PYRAD': 'LR',
-            'RWD_DP_FMRAD': 'LR',
-            'RWD_DP_PYRAD': 'RF'
-        }
-
     
     # Determine which modalities to train
     if args.modalities:
