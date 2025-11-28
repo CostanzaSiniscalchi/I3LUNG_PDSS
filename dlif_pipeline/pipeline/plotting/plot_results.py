@@ -112,8 +112,8 @@ if __name__ == "__main__":
                     try:
                         df = pd.read_csv(csv_path)
                         score = df['auc'].iloc[0]
-                        ci_lower = df[' ci_lower'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
-                        ci_upper = df[' ci_upper'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
+                        ci_lower = df['ci_lower'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
+                        ci_upper = df['ci_upper'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
 
                         modalities.append(label)
                         modality_keys.append(key)
@@ -142,9 +142,18 @@ if __name__ == "__main__":
             plot_title = f'C-Index - {title_suffix}'
             y_label = 'C-Index'
         else:
-            metric_label = 'CV AUC'
-            plot_title = f'AUC - {title_suffix}'
-            y_label = 'AUC'
+            if training_type == 'cross_validation':
+                metric_label = 'CV AUC'
+                plot_title = f'AUC - {title_suffix}'
+                y_label = 'AUC'
+            if training_type == 'standard':
+                metric_label = 'Test AUC'
+                plot_title = f'Test AUC - {title_suffix}'
+                y_label = 'AUC'
+            else:
+                metric_label = 'AUC'
+                plot_title = f'AUC - {title_suffix}'
+                y_label = 'AUC'
 
         plt.plot(modalities, score_values, marker='o', linestyle='-', color='#1a80bb', label=metric_label)
         plt.fill_between(modalities, ci_lowers, ci_uppers, color='#8cc5e3', alpha=0.3, label='Confidence interval')
