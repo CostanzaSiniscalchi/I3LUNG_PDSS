@@ -353,8 +353,8 @@ python dlif_pipeline/pipeline/plotting/plot_results.py
 if you want to plot for you experiment, edit the script plot_results ( as above ):
 
 ```python
-training_type = 'standard'
-#  training_type = 'standard'
+training_type = 'standard' # here 'standard' will plot results on the test set
+#  training_type = 'cross_validation'
 sub0 = RESULTS_DIR
 sub1 = 'C23'
 sub2 = ''
