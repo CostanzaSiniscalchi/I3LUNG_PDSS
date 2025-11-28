@@ -28,6 +28,26 @@ mods:
     radpy: false
     dp: true
     genomics: false
+    # RWD_FMRAD
+  - rwd: true
+    radfm: true
+    dp: false
+    genomics: false
+    # RWD_PYRAD
+  - rwd: true
+    radpy: true
+    dp: false
+    genomics: false
+    # RWD_DP_FMRAD
+  - rwd: true
+    radfm: true
+    dp: true
+    genomics: false
+    # RWD_DP_PYRAD
+  - rwd: true
+    radpy: true
+    dp: true
+    genomics: false
 
   
 folds:
