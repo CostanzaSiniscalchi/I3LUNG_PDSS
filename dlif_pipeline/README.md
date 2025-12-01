@@ -313,6 +313,20 @@ cross_validation:
   - INT_sub4
   - INT_sub5
 ```
+
+an example for INT classification cross validation is provided at:
+
+```yaml
+dlif_pipeline/configs/06-config-classification-cv-int.yaml
+```
+
+moreover, if you want to run the hyperparameter_tuning modality, please make sure to use the provided configuration.
+you can find it at:
+
+```yaml
+dlif_pipeline/configs/07-config-hyperparam.yaml
+```
+
 ### Complete Workflow
 
 ### 3. Train Model and Evaluate model
