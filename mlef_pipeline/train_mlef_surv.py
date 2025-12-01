@@ -234,11 +234,27 @@ def train_and_evaluate_modality(
         X_test = X_test.drop(columns=submodel_features)
         X_ext = X_ext.drop(columns=submodel_features)
     
+    # remove columns with constant values and nan values
+    constant_cols = [col for col in X_train.columns if X_train[col].nunique() <= 1 or X_train[col].isna().all()]
+    if len(constant_cols) > 0:
+        X_train = X_train.drop(columns=constant_cols)
+        X_test = X_test.drop(columns=constant_cols)
+        X_ext = X_ext.drop(columns=constant_cols)
+    
     # 5. Imputation
     print("5. Imputing missing values...")
-    X_train_imputed, imputer = dl.impute_df(X_train)
-    X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
-    X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer) if not X_ext.empty else (X_ext, None)
+    with open('mlef_pipeline/features.json', 'r') as f:
+        rwd_features = json.load(f)['RWD']
+    
+    rwd_cols = [col for col in rwd_features if col in X_train.columns]
+    other_cols = [c for c in X_train.columns if c not in rwd_cols]
+
+    X_train_rwd_imputed, imputer = dl.impute_df(X_train[rwd_cols])
+    X_train_imputed = pd.concat([X_train_rwd_imputed, X_train[other_cols]], axis=1)
+    X_test_rwd_imputed, _ = dl.impute_df(X_test[rwd_cols], imputer=imputer)
+    X_test_imputed = pd.concat([X_test_rwd_imputed, X_test[other_cols]], axis=1)
+    X_ext_rwd_imputed, _ = dl.impute_df(X_ext[rwd_cols], imputer=imputer)
+    X_ext_imputed = pd.concat([X_ext_rwd_imputed, X_ext[other_cols]], axis=1)
     
     # 6. Normalization
     print("6. Normalizing features...")
