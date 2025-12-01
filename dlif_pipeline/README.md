@@ -292,7 +292,49 @@ Apply dataset filters by uncommenting relevant flags:
 ```
 
 before applying subanalysis for unicenter, make sure to have generated the specific annotations.
+also, make sure when you run subanalysis for unicenter, to change the cross_validation folds this:
 
+```yaml
+cross_validation:
+  - CENTER_sub1
+  - CENTER_sub2
+  - CENTER_sub3
+  - CENTER_sub4
+  - CENTER_sub5
+```
+
+for example, for INT unicenter subanalysis:
+
+```yaml
+cross_validation:
+  - INT_sub1
+  - INT_sub2
+  - INT_sub3
+  - INT_sub4
+  - INT_sub5
+```
+
+an example for INT classification cross validation is provided at:
+
+```yaml
+dlif_pipeline/configs/06-config-classification-cv-int.yaml
+```
+
+### Hyperparameter Tuning
+
+
+To run hyperparameter tuning, use:
+
+```bash
+python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/07-config-hyperparam.yaml --base_dir dlif_pipeline/results
+```
+
+The tuning was done on:
+
+Modalities: rwd, radpy, dp
+Outcome: os_months_6
+
+We used the resulting hyperparameters for all other experiments.
 
 ### Complete Workflow
 
@@ -301,7 +343,7 @@ before applying subanalysis for unicenter, make sure to have generated the speci
 This is an example of how to train the model with the minimum configuration example just provided (you can find the same configuration at the directory dlif_pipeline/configs/00-config-classification-cv.yaml):
 
 ```bash
-python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/01-config-classification-standard.yaml --base_dir dlif_pipeline/results
+python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/00-config-classification-cv.yaml --base_dir dlif_pipeline/results
 ```
 Other examples are provided at dlif_pipeline/configs.
 
@@ -432,7 +474,10 @@ Mil2/
 | **Configuration validation errors**         | Verify YAML syntax and required fields                           |
 | **Error reading CSV result file for plotting** | Check the space in `plot_results.py` (different for macOS vs Windows) |
 
-
+**Running experiments in parallel:**
+- Do NOT regenerate bags during parallel runs - it will interfere with other processes
+- Do NOT run multicenter and unicenter experiments simultaneously - they require different annotation files and will conflict
+- Generate all required bags/annotations sequentially before starting parallel experiments
 
 **Version**: 1.0.0  
 **Last Updated**: November 2025 

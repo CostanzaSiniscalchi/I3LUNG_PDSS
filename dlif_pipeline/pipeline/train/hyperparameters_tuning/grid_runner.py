@@ -12,6 +12,8 @@ def run_grid_search_cv(P, config, base_results_path, bag_path, folds, mods, fold
     Saves results separately per combo.
     """
 
+    print( "\nStarting hyperparameter tuning grid search...\n")
+
     import os
     task_settings = config["task_settings"]
     hyper_grid = config["hyperparameters"]
@@ -26,6 +28,9 @@ def run_grid_search_cv(P, config, base_results_path, bag_path, folds, mods, fold
         print(f"🔧 Training combo {i+1}/{len(combos)}: {combo}")
 
         combo_str = stringify_hyperparams(combo)
+
+        print(f" Combo string: {combo_str}")
+
         results_path = build_full_path(
             base_path=base_results_path,
             hyperparams=combo,
@@ -37,6 +42,8 @@ def run_grid_search_cv(P, config, base_results_path, bag_path, folds, mods, fold
         config_copy = deepcopy(config)
         config_copy["hyper_combo"] = combo
         config_copy["results_path"] = results_path
+
+        print(f" Results path: {results_path}")
 
         
         # Run training for this seed/fold
