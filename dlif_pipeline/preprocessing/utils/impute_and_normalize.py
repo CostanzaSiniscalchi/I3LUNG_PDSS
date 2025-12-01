@@ -130,24 +130,14 @@ for modality in ['digital_pathology', 'pyradiomics', 'fmrad']:
     print(f"Processing {modality}...")
     df = pd.read_csv(DATA_DIR / f'{modality}.csv', index_col='Subject')
     
-    metadata = df[['CENTER', 'SET']].copy()
-    features = df.drop(columns=['CENTER', 'SET']).copy()
-    
-    for col in features.columns:
-        features[col] = pd.to_numeric(features[col], errors='coerce')
-    
     train_mask = df['SET'] == 'TRAIN'
-    scaler = StandardScaler()
-    train_proc = pd.DataFrame(scaler.fit_transform(features[train_mask]), columns=features.columns, index=features[train_mask].index)
-    train_proc = pd.concat([metadata[train_mask], train_proc], axis=1)
+    train_proc, scaler, to_std, to_log = normalize(df[train_mask])
     
     test_mask = df['SET'] == 'TEST'
-    test_proc = pd.DataFrame(scaler.transform(features[test_mask]), columns=features.columns, index=features[test_mask].index)
-    test_proc = pd.concat([metadata[test_mask], test_proc], axis=1)
+    test_proc, _, _, _ = normalize(df[test_mask], scaler=scaler, to_standard_normalize=to_std, to_log_normalize=to_log)
     
     ext_mask = df['SET'] == 'EXVAL'
-    ext_proc = pd.DataFrame(scaler.transform(features[ext_mask]), columns=features.columns, index=features[ext_mask].index)
-    ext_proc = pd.concat([metadata[ext_mask], ext_proc], axis=1)
+    ext_proc, _, _, _ = normalize(df[ext_mask], scaler=scaler, to_standard_normalize=to_std, to_log_normalize=to_log)
     
     result = pd.concat([train_proc, test_proc, ext_proc])
     result.to_csv(DATA_DIR / f'{modality}_processed.csv')

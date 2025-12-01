@@ -325,8 +325,8 @@ dlif_pipeline/configs/06-config-classification-cv-int.yaml
 
 To run hyperparameter tuning, use:
 
-```yaml
-python dlif_pipeline/main.py --config dlif_pipeline/configs/07-config-hyperparam.yaml
+```bash
+python dlif_pipeline/main.py --config dlif_pipeline/configs/07-config-hyperparam.yaml --base_dir dlif_pipeline/results
 ```
 
 The tuning was done on:
@@ -343,7 +343,7 @@ We used the resulting hyperparameters for all other experiments.
 This is an example of how to train the model with the minimum configuration example just provided (you can find the same configuration at the directory dlif_pipeline/configs/00-config-classification-cv.yaml):
 
 ```bash
-python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/07-config-hyperparam.yaml --base_dir dlif_pipeline/results
+python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/00-config-classification-cv.yaml --base_dir dlif_pipeline/results
 ```
 Other examples are provided at dlif_pipeline/configs.
 
