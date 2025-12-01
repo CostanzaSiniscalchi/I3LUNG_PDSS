@@ -78,7 +78,7 @@ def get_modality_folder_name(modes: List[Mode]) -> str:
     return '_'.join(sorted([m.value for m in modes]))
 
 
-def load_modality_models_config(outcome: str, config_path: str = 'mlef_pipeline/modality_models_config.json') -> Tuple[dict, dict]:
+def load_modality_models_config(outcome: str, subanalysis: str, config_path: str = 'mlef_pipeline/modality_models_config.json') -> Tuple[dict, dict]:
     """Load the modality models configuration file.
     
     Returns:
@@ -87,6 +87,7 @@ def load_modality_models_config(outcome: str, config_path: str = 'mlef_pipeline/
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
+            config = config.get(subanalysis.value, {})
             config = config.get(outcome.value, {})
         return config.get('models', {}), config.get('rwd_only_models', {})
     except FileNotFoundError:
@@ -867,7 +868,7 @@ def main():
     select_features = not args.no_feature_selection
     
         # Load modality models configuration
-    modality_models_config, rwd_only_models_config = load_modality_models_config(outcome)
+    modality_models_config, rwd_only_models_config = load_modality_models_config(outcome, subanalysis)
     
     # Determine which modalities to train
     if args.modalities:
