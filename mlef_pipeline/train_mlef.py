@@ -407,7 +407,7 @@ def train_and_evaluate_modality(
     X_train = X_train.drop(columns=submodel_features, errors='ignore')
     X_test = X_test.drop(columns=submodel_features, errors='ignore')
     X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
-
+    print(f"  ✓ Training set: {X_train.shape[0]} samples\n  ✓ Test set: {X_test.shape[0]} samples\n  ✓ External set: {X_ext.shape[0]} samples")
     #remove costant and nan columns
     constant_columns = [col for col in X_train.columns if X_train[col].nunique() == 1 or X_test[col].nunique() == 1]
     all_nan_columns = [col for col in X_train.columns if X_train[col].isna().all() or X_test[col].isna().all()]
@@ -708,9 +708,42 @@ def train_rwd_matched_model(
     X_test = X_test.drop(columns=submodel_features, errors='ignore')
     X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
     
-    X_train_imputed, imputer = dl.impute_df(X_train)
-    X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer) if not X_ext.empty else (X_ext, None)
-    X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
+    X_train = X_train.drop(columns=submodel_features, errors='ignore')
+    X_test = X_test.drop(columns=submodel_features, errors='ignore')
+    X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
+    print(f"  ✓ Training set: {X_train.shape[0]} samples\n  ✓ Test set: {X_test.shape[0]} samples\n  ✓ External set: {X_ext.shape[0]} samples")
+    #remove costant and nan columns
+    constant_columns = [col for col in X_train.columns if X_train[col].nunique() == 1 or X_test[col].nunique() == 1]
+    all_nan_columns = [col for col in X_train.columns if X_train[col].isna().all() or X_test[col].isna().all()]
+    X_train.drop(columns=constant_columns + all_nan_columns, inplace=True)
+    X_test.drop(columns=constant_columns + all_nan_columns, inplace=True)
+    X_ext.drop(columns=constant_columns + all_nan_columns, inplace=True)
+
+    # 4. Imputation
+    print("4. Imputing missing values...")
+    with open('mlef_pipeline/features.json', 'r') as f:
+        rwd_features = json.load(f)['RWD']
+    
+    # Only impute RWD features that are present in the data
+    rwd_cols = [c for c in rwd_features if c in X_train.columns]
+    other_cols = [c for c in X_train.columns if c not in rwd_cols]
+    
+    X_train_rwd_imputed, imputer = dl.impute_df(X_train[rwd_cols])
+    X_train_imputed = pd.concat([X_train_rwd_imputed, X_train[other_cols]], axis=1)
+    
+    if not X_ext.empty:
+        X_ext_rwd_imputed, _ = dl.impute_df(X_ext[rwd_cols], imputer=imputer)
+        X_ext_imputed = pd.concat([X_ext_rwd_imputed, X_ext[other_cols]], axis=1)
+    else:
+        X_ext_imputed = X_ext
+        
+    X_test_rwd_imputed, _ = dl.impute_df(X_test[rwd_cols], imputer=imputer)
+    X_test_imputed = pd.concat([X_test_rwd_imputed, X_test[other_cols]], axis=1)
+
+    # print(X_train.shape)
+    # X_train_imputed, imputer = dl.impute_df(X_train)
+    # X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer)
+    # X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
     
     X_train_scaled, scaler, to_standard_normalize, to_log_normalize = dl.normalize(X_train_imputed)
     X_test_scaled, _, _, _ = dl.normalize(X_test_imputed, scaler=scaler, 
