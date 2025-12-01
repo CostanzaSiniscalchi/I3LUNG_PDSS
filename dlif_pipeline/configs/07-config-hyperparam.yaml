@@ -3,10 +3,10 @@ task_settings:
   outcomes: [ "os_months_6" ]
   loss: mm_loss # mm_survival_loss  mm_loss
 
-training_type: cross_validation # hyperparameter_tuning  # cross_validation_stratified
-data-type: hyperparameter_tuning  # hypothesis_driven/data_driven
-source: pyrad  # pyrad/foundation
-imp: noimp  # noimp/imp
+training_type: hyperparameter_tuning # hyperparameter_tuning  # cross_validation_stratified
+data-type: hypothesis_driven  # hypothesis_driven
+source: pyrad  # pyrad 
+imp: noimp  # noimp
 seed: [0]
 
 use_early_stopping: true
@@ -20,9 +20,9 @@ mods:
     radfm: true
     dp: true
     genomics: false
+
  
 folds:
-  cross_validation:
   cross_validation:
     - GHD
     - INT

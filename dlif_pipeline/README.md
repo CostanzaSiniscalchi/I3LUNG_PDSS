@@ -320,12 +320,21 @@ an example for INT classification cross validation is provided at:
 dlif_pipeline/configs/06-config-classification-cv-int.yaml
 ```
 
-moreover, if you want to run the hyperparameter_tuning modality, please make sure to use the provided configuration.
-you can find it at:
+### Hyperparameter Tuning
+
+
+To run hyperparameter tuning, use:
 
 ```yaml
-dlif_pipeline/configs/07-config-hyperparam.yaml
+python dlif_pipeline/main.py --config dlif_pipeline/configs/07-config-hyperparam.yaml
 ```
+
+The tuning was done on:
+
+Modalities: rwd, radpy, dp
+Outcome: os_months_6
+
+We used the resulting hyperparameters for all other experiments.
 
 ### Complete Workflow
 
@@ -334,7 +343,7 @@ dlif_pipeline/configs/07-config-hyperparam.yaml
 This is an example of how to train the model with the minimum configuration example just provided (you can find the same configuration at the directory dlif_pipeline/configs/00-config-classification-cv.yaml):
 
 ```bash
-python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/01-config-classification-standard.yaml --base_dir dlif_pipeline/results
+python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/07-config-hyperparam.yaml --base_dir dlif_pipeline/results
 ```
 Other examples are provided at dlif_pipeline/configs.
 
