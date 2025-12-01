@@ -369,7 +369,6 @@ def train_and_evaluate_modality(
     # Create output directory
     modality_folder = get_modality_folder_name(modes)
     output_dir = create_output_dirs(base_path, subanalysis.value, modality_folder, outcome.value)
-    output_dir = output_dir / 'prova'
     output_dir.mkdir(parents=True, exist_ok=True)
     # 1. Load and prepare data
     print("1. Loading data...")
