@@ -474,7 +474,10 @@ Mil2/
 | **Configuration validation errors**         | Verify YAML syntax and required fields                           |
 | **Error reading CSV result file for plotting** | Check the space in `plot_results.py` (different for macOS vs Windows) |
 
-
+**Running experiments in parallel:**
+- Do NOT regenerate bags during parallel runs - it will interfere with other processes
+- Do NOT run multicenter and unicenter experiments simultaneously - they require different annotation files and will conflict
+- Generate all required bags/annotations sequentially before starting parallel experiments
 
 **Version**: 1.0.0  
 **Last Updated**: November 2025 
