@@ -607,7 +607,7 @@ def plot_auc_results(
         plt.xlim(-0.4, len(modalities) - 0.55)
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{analysis}.png"
+            out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{outcome}_{analysis}.png"
             plt.savefig(out, dpi=600, bbox_inches="tight")
         if show:
             plt.show()
@@ -627,7 +627,8 @@ def plot_auc_results(
         # Build the correct path based on architecture
         if architecture == "MLEF":
             # MLEF: mlef_pipeline/results/outcome/analysis/
-            base_path = Path("mlef_pipeline/results") / outcome / analysis
+            # base_path = Path("mlef_pipeline/results") / outcome / analysis
+            base_path = Path("new/results") / outcome / analysis
             analysis_dir = base_path
         else:  # DLIF
             if use_preds:
