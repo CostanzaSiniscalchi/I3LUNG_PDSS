@@ -292,8 +292,27 @@ Apply dataset filters by uncommenting relevant flags:
 ```
 
 before applying subanalysis for unicenter, make sure to have generated the specific annotations.
+also, make sure when you run subanalysis for unicenter, to change the cross_validation folds this:
 
+```yaml
+cross_validation:
+  - CENTER_sub1
+  - CENTER_sub2
+  - CENTER_sub3
+  - CENTER_sub4
+  - CENTER_sub5
+```
 
+for example, for INT unicenter subanalysis:
+
+```yaml
+cross_validation:
+  - INT_sub1
+  - INT_sub2
+  - INT_sub3
+  - INT_sub4
+  - INT_sub5
+```
 ### Complete Workflow
 
 ### 3. Train Model and Evaluate model
