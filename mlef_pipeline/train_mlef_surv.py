@@ -24,7 +24,7 @@ from typing import List, Tuple
 import numpy as np
 import pandas as pd
 from lifelines import CoxPHFitter
-from sklearn.model_selection import GroupKFold
+from sklearn.model_selection import GroupKFold, StratifiedKFold
 
 from data_curation import DataLoader, SafeGroupKFold
 from i3l_statistics import Statistics
@@ -192,7 +192,14 @@ def train_and_evaluate_modality(
     test_set = dataset[dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
     ext_set = dataset[dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
 
-    train_folds = train_set['CENTER']
+    if subanalysis != Subanalysis.INT:
+        train_folds = train_set['CENTER']
+    else:
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        train_folds = pd.Series(np.nan, index=train_set.index)
+        for fold, (_, test_index) in enumerate(skf.split(train_set, train_set['DEATH EVENT'])):
+            train_folds.iloc[test_index] = fold
+        
     train_set = train_set.drop(columns=['CENTER'])
     
     # 3. Remove test samples with TIME > max train TIME
@@ -253,8 +260,8 @@ def train_and_evaluate_modality(
     X_train_imputed = pd.concat([X_train_rwd_imputed, X_train[other_cols]], axis=1)
     X_test_rwd_imputed, _ = dl.impute_df(X_test[rwd_cols], imputer=imputer)
     X_test_imputed = pd.concat([X_test_rwd_imputed, X_test[other_cols]], axis=1)
-    X_ext_rwd_imputed, _ = dl.impute_df(X_ext[rwd_cols], imputer=imputer)
-    X_ext_imputed = pd.concat([X_ext_rwd_imputed, X_ext[other_cols]], axis=1)
+    X_ext_rwd_imputed, _ = dl.impute_df(X_ext[rwd_cols], imputer=imputer) if not X_ext.empty else (X_ext[rwd_cols], None)
+    X_ext_imputed = pd.concat([X_ext_rwd_imputed, X_ext[other_cols]], axis=1) if not X_ext.empty else X_ext
     
     # 6. Normalization
     print("6. Normalizing features...")
@@ -523,7 +530,14 @@ def train_rwd_matched_model(
     test_set = rwd_dataset[rwd_dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
     ext_set = rwd_dataset[rwd_dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
 
-    train_folds = train_set['CENTER']
+    if subanalysis != Subanalysis.INT:
+        train_folds = train_set['CENTER']
+    else:
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        train_folds = pd.Series(np.nan, index=train_set.index)
+        for fold, (_, test_index) in enumerate(skf.split(train_set, train_set['DEATH EVENT'])):
+            train_folds.iloc[test_index] = fold
+    
     train_set = train_set.drop(columns=['CENTER'])
     
     # Remove test samples with TIME > max train TIME
@@ -723,7 +737,7 @@ def main():
     parser = argparse.ArgumentParser(description='Train MLEF CoxPH survival models for different modality combinations')
     parser.add_argument('--subanalysis', type=str, default='C23',
                         choices=['C23', 'C2', 'IO_ONLY', 'IO_CHT', 'LOW_PDL1', 
-                                'HIGH_PDL1', 'SQUAMOUS', 'ADENOCARCINOMA'],
+                                'HIGH_PDL1', 'SQUAMOUS', 'ADENOCARCINOMA', 'INT'],
                         help='Subgroup analysis to perform (default: C23)')
     parser.add_argument('--modalities', type=str, nargs='+', default=None,
                         help='Modalities to train (default: all combinations). '
