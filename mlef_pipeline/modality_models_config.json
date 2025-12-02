@@ -37,6 +37,7 @@
         "OS_24": {
             "models": {
                 "RWD": "RF",
+                "FMRAD":"LR",
                 "RWD_DP": "LR",
                 "RWD_FMRAD": "LR",
                 "RWD_PYRAD": "LR",
