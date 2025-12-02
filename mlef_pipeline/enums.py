@@ -21,6 +21,7 @@ class Subanalysis(Enum):
     HIGH_PDL1 = 'HIGH_PDL1'
     SQUAMOUS = 'SQUAMOUS'
     ADENOCARCINOMA = 'ADENOCARCINOMA'
+    INT = 'INT'
 
 class Model(Enum):
     LR = 'LR'

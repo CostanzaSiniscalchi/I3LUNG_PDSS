@@ -84,6 +84,8 @@ class DataLoader:
                 subanalysis_features = subanalysis_features[subanalysis_features['HISTOLOGY SQUAMOUS'] == 1]
             case Subanalysis.ADENOCARCINOMA:
                 subanalysis_features = subanalysis_features[subanalysis_features['HISTOLOGY ADENOCARCINOMA'] == 1]
+            case Subanalysis.INT:
+                subanalysis_features = subanalysis_features[subanalysis_features['CENTER'] == 'INT']
             case _:
                 raise ValueError(f"Unsupported subanalysis: {subanalysis}")
         
