@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from sklearn.utils import compute_sample_weight
 import random
-from sklearn.model_selection import GroupKFold
+from sklearn.model_selection import GroupKFold, StratifiedKFold
 from sklearn.metrics import f1_score, confusion_matrix, make_scorer
 
 # Suppress specific warnings
@@ -384,8 +384,15 @@ def train_and_evaluate_modality(
     train_set = dataset[dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
     test_set = dataset[dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
     ext_set = dataset[dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+
+    if subanalysis != Subanalysis.INT:
+        train_folds = train_set['CENTER']
+    else:
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        train_folds = pd.Series(np.nan, index=train_set.index)
+        for fold, (_, test_index) in enumerate(skf.split(train_set, train_set[outcome.value])):
+            train_folds.iloc[test_index] = fold
     
-    train_folds = train_set['CENTER']
     train_set = train_set.drop(columns=['CENTER'])
 
     # 3. Separate features and target
@@ -434,11 +441,6 @@ def train_and_evaluate_modality(
         
     X_test_rwd_imputed, _ = dl.impute_df(X_test[rwd_cols], imputer=imputer)
     X_test_imputed = pd.concat([X_test_rwd_imputed, X_test[other_cols]], axis=1)
-
-    # print(X_train.shape)
-    # X_train_imputed, imputer = dl.impute_df(X_train)
-    # X_ext_imputed, _ = dl.impute_df(X_ext, imputer=imputer)
-    # X_test_imputed, _ = dl.impute_df(X_test, imputer=imputer)
 
     # 5. Normalization
     print("5. Normalizing features...")
@@ -692,7 +694,14 @@ def train_rwd_matched_model(
     test_set = rwd_dataset[rwd_dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
     ext_set = rwd_dataset[rwd_dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
 
-    train_folds = train_set['CENTER']
+    if subanalysis != Subanalysis.INT:
+        train_folds = train_set['CENTER']
+    else:
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        train_folds = pd.Series(np.nan, index=train_set.index)
+        for fold, (_, test_index) in enumerate(skf.split(train_set, train_set[outcome.value])):
+            train_folds.iloc[test_index] = fold
+    
     train_set = train_set.drop(columns=['CENTER'])
 
     X_train, y_train = train_set.drop(columns=[outcome.value]), train_set[outcome.value]
@@ -786,9 +795,19 @@ def train_rwd_matched_model(
     
     y_pred_test = model.predict_proba(X_test_final)[:, 1]
     test_metrics = compute_metrics_with_ci(y_test.values, y_pred_test)
-    
-    y_pred_ext = model.predict_proba(X_ext_final)[:, 1]
-    ext_metrics = compute_metrics_with_ci(y_ext.values, y_pred_ext)
+
+    if not X_ext_final.empty:
+        y_pred_ext = model.predict_proba(X_ext_final)[:, 1]
+        ext_metrics = compute_metrics_with_ci(y_ext.values, y_pred_ext)
+    else:
+        y_pred_ext = np.array([])
+        ext_metrics = {
+            'auc': np.nan,
+            'auc_std': np.nan,
+            'f1_macro': np.nan,
+            'sensitivity': np.nan,
+            'specificity': np.nan
+        }
     
     # Save everything
     joblib.dump(model, output_dir / f'model_{model_type.value}.pkl')
