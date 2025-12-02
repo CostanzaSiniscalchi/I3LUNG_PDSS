@@ -53,10 +53,7 @@ def build_path_from_config(config, mod_string, base_dir):
 
     # Build prefix parts the same way as run_training.py
     prefix_parts = ["results"]
-    if config.get("FILTER_SQUAMOUS") is not None:
-        prefix_parts.append(f"squamous_{config['FILTER_SQUAMOUS']}")
-    if config.get("FILTER_CHEMO_IMMUNO") is not None:
-        prefix_parts.append(f"chemoio_{config['FILTER_CHEMO_IMMUNO']}")
+
     if config.get("USE_COHORT2_FILTER"):
         prefix_parts.append("C2")
     else:
@@ -77,6 +74,10 @@ def build_path_from_config(config, mod_string, base_dir):
         prefix_parts.append(f"pdl1_{config['FILTER_PDL1']}")
     if config.get("FILTER_ALL_MODS"):
         prefix_parts.append("all_mods")
+    if config.get("FILTER_SQUAMOUS") is not None:
+        prefix_parts.append(f"squamous_{config['FILTER_SQUAMOUS']}")
+    if config.get("FILTER_CHEMO_IMMUNO") is not None:
+        prefix_parts.append(f"chemoio_{config['FILTER_CHEMO_IMMUNO']}")
 
     # If only "results", no filter active -> add "main_analysis"
     # if len(prefix_parts) == 1:

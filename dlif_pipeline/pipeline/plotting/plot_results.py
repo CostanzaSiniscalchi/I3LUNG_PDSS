@@ -14,7 +14,7 @@ training_type = 'standard'
 #  training_type = 'standard'
 sub0 = RESULTS_DIR
 sub1 = 'C23'
-sub2 = ''
+sub2 = 'chemoio_1'
 task = 'classification'
 # task = 'survival'
 path_pre = f'' # new_path
@@ -91,8 +91,8 @@ if __name__ == "__main__":
                     try:
                         df = pd.read_csv(csv_path)
                         score = df['c_index'].iloc[0]
-                        ci_lower = df['ci_lower'].iloc[0]
-                        ci_upper = df['ci_upper'].iloc[0]
+                        ci_lower = df[' ci_lower'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
+                        ci_upper = df[' ci_upper'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
 
                         modalities.append(label)
                         modality_keys.append(key)
@@ -112,8 +112,8 @@ if __name__ == "__main__":
                     try:
                         df = pd.read_csv(csv_path)
                         score = df['auc'].iloc[0]
-                        ci_lower = df['ci_lower'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
-                        ci_upper = df['ci_upper'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
+                        ci_lower = df[' ci_lower'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
+                        ci_upper = df[' ci_upper'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
 
                         modalities.append(label)
                         modality_keys.append(key)
@@ -142,7 +142,7 @@ if __name__ == "__main__":
                 metric_label = 'CV C-Index'
                 plot_title = f'CV C-Index - {title_suffix}'
                 y_label = 'C-Index'
-            if training_type == 'standard':
+            elif training_type == 'standard':
                 metric_label = 'Test C-Index'
                 plot_title = f'Test C-Index - {title_suffix}'
                 y_label = 'C-Index'
@@ -155,7 +155,7 @@ if __name__ == "__main__":
                 metric_label = 'CV AUC'
                 plot_title = f'AUC - {title_suffix}'
                 y_label = 'AUC'
-            if training_type == 'standard':
+            elif training_type == 'standard':
                 metric_label = 'Test AUC'
                 plot_title = f'Test AUC - {title_suffix}'
                 y_label = 'AUC'
@@ -170,7 +170,6 @@ if __name__ == "__main__":
             plt.errorbar(modalities, score_values, yerr=[score_values - ci_lowers, ci_uppers - score_values], 
                         fmt='o', color='#1a80bb', capsize=5, label=metric_label)
         else:
-            plt.plot(modalities, score_values, marker='o', linestyle='-', color='#1a80bb', label=metric_label)
             plt.fill_between(modalities, ci_lowers, ci_uppers, color='#8cc5e3', alpha=0.3, label='Confidence interval')
 
         for i, (val, lower, upper) in enumerate(zip(score_values, ci_lowers, ci_uppers)):

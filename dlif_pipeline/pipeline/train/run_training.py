@@ -33,10 +33,7 @@ def run_training(config, mods):
      The prefix is based on the filters that determine the subgroup analysis.
     '''
     prefix_parts = ["results"]
-    if config.get("FILTER_SQUAMOUS") is not None:
-        prefix_parts.append(f"squamous_{config['FILTER_SQUAMOUS']}")
-    if config.get("FILTER_CHEMO_IMMUNO") is not None:
-        prefix_parts.append(f"chemoio_{config['FILTER_CHEMO_IMMUNO']}")
+
     if config.get("USE_COHORT2_FILTER"):
         print("in run training")
         prefix_parts.append("C2")
@@ -57,6 +54,11 @@ def run_training(config, mods):
         
     if config.get("ADENO"):
         prefix_parts.append(f"adeno")
+    
+    if config.get("FILTER_SQUAMOUS") is not None:
+        prefix_parts.append(f"squamous_{config['FILTER_SQUAMOUS']}")
+    if config.get("FILTER_CHEMO_IMMUNO") is not None:
+        prefix_parts.append(f"chemoio_{config['FILTER_CHEMO_IMMUNO']}")
 
     if config.get("FILTER_PDL1"):
         prefix_parts.append(f"pdl1_{config['FILTER_PDL1']}")
