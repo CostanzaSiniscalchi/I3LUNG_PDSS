@@ -81,11 +81,10 @@ def get_datasets(P, training_type, config, fold, folds, outcome,
         val_filter["NSCLC_HISTOLOGY_SQUAMOUS"]   = [sq_flag]
 
     # ─── : apply chemo+immuno filter if set to 0 or 1 ──────────
-    ci_flag = config.get("FILTER_CHEMO_IMMUNO", None)
-    if ci_flag in ("0", "1") and "IO_CHT" in annotations_df:
-        print(f" Filtering IO_CHT == {ci_flag}")
-        train_filter["IO_CHT"] = [ci_flag]
-        val_filter["IO_CHT"]   = [ci_flag]
+    if ci_flag in ("0", "1") and "IO IOCHT" in annotations_df:
+        print(f" Filtering IO IOCHT == {ci_flag}")
+        train_filter["IO IOCHT"] = [int(ci_flag)]
+        val_filter["IO IOCHT"]   = [int(ci_flag)]
 
     # ─── : apply PDL1_GROUP filter if set to "low" or "high" ──────────
     pdl1_flag = config.get("FILTER_PDL1", None)
