@@ -899,7 +899,7 @@ def main():
                         help='Target outcome to predict (default: OS_6)')
     parser.add_argument('--subanalysis', type=str, default='C23',
                         choices=['C23', 'C2', 'IO_ONLY', 'IO_CHT', 'LOW_PDL1', 
-                                'HIGH_PDL1', 'SQUAMOUS', 'ADENOCARCINOMA'],
+                                'HIGH_PDL1', 'SQUAMOUS', 'ADENOCARCINOMA', 'INT'],
                         help='Subgroup analysis to perform (default: C23)')
     parser.add_argument('--modalities', type=str, nargs='+', default=None,
                         help='Modalities to train (default: all combinations). '
