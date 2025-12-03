@@ -31,7 +31,8 @@
 !requirements.txt
 !mlef_pipeline/results/**
 mlef_pipeline/results/OS
-!new/**
+new
+new2
 # py cache
 __pycache__/
 

@@ -413,7 +413,15 @@ def train_and_evaluate_modality(
     X_train = X_train.drop(columns=submodel_features, errors='ignore')
     X_test = X_test.drop(columns=submodel_features, errors='ignore')
     X_ext = X_ext.drop(columns=submodel_features, errors='ignore')
-    print(f"  ✓ Training set: {X_train.shape[0]} samples\n  ✓ Test set: {X_test.shape[0]} samples\n  ✓ External set: {X_ext.shape[0]} samples")
+    print(f"    Training set: {X_train.shape[0]} samples\n    Test set: {X_test.shape[0]} samples\n    External set: {X_ext.shape[0]} samples")
+    
+    # Remove features with more than 40% missing values
+    missing_threshold = 0.4
+    features_missing = X_train.columns[X_train.isna().mean() > missing_threshold]
+    print(f"    Removing {features_missing.tolist()} features with >{missing_threshold*100}% missing values")
+    X_train.drop(columns=features_missing, inplace=True)
+    X_test.drop(columns=features_missing, inplace=True)
+    X_ext.drop(columns=features_missing, inplace=True)
     #remove costant and nan columns
     constant_columns = [col for col in X_train.columns if X_train[col].nunique() == 1 or X_test[col].nunique() == 1]
     all_nan_columns = [col for col in X_train.columns if X_train[col].isna().all() or X_test[col].isna().all()]
