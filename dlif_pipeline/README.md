@@ -386,8 +386,16 @@ At the end of training, metrics are calculated automatically.
 
 #### 2. Generate Plots
 
+For line plots:
+
 ```bash
 python dlif_pipeline/pipeline/plotting/plot_results.py --config /path/to/your/config.yaml
+```
+
+For KM curves:
+
+```bash
+python dlif_pipeline/pipeline/plotting/km_plot.py --config /path/to/your/config.yaml
 ```
 
 ## Project Structure
