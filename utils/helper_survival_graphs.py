@@ -469,35 +469,7 @@ def plot_cindex_results(
         p_value = np.mean(np.abs(bootstrap_diffs - np.mean(bootstrap_diffs)) >= np.abs(observed_diff))
         
         return p_value
-
-    def _compute_pvalue2(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
-        """
-        Read predictions directly from prediction.xlsx files (Subject, y_pred, y_true),
-        align on Subject, then run DeLong.
-        """
-        if not (pred_mod_path and pred_ro_path and pred_mod_path.exists() and pred_ro_path.exists()):
-            return None
-        dm = pd.read_csv(pred_mod_path)
-        dr = pd.read_csv(pred_ro_path)
-        # minimal schema check
-        for col in ("Subject", "y_pred", "y_true"):
-            if col not in dm.columns:
-                return None
-        if "Subject" not in dr.columns or "y_pred" not in dr.columns:
-            return None
-
-        m = dm.rename(columns={"y_pred": "y_pred_mod"})
-        r = dr.rename(columns={"y_pred": "y_pred_ro"})
-        merged = pd.merge(m[["Subject", "y_true", "y_pred_mod"]],
-                          r[["Subject", "y_pred_ro"]],
-                          on="Subject", how="inner")
-        if merged.empty:
-            return None
-        return float(delong_test_comparison(
-            merged["y_true"].to_numpy(),
-            merged["y_pred_mod"].to_numpy(),
-            merged["y_pred_ro"].to_numpy()
-        )['p_value'])
+    
 
     def _plot_one(analysis: str, rows: List[dict]) -> plt.Figure:
         modalities = [r["modality"] for r in rows]
@@ -539,7 +511,7 @@ def plot_cindex_results(
             star = rows[i].get("stars", "")
             if star:
                 # nudge a bit to the right of the blue text
-                plt.text(i + 0.33, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
+                plt.text(i + 0.36, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
 
 
         # --- RED annotations (keep values but REMOVE stars here) ---
