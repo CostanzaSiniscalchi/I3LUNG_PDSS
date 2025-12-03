@@ -39,7 +39,7 @@ class DataLoader:
                 elif mode == Mode.GEN:
                     with open ('mlef_pipeline/features.json', 'r') as f:
                         selected_features = json.load(f)['GEN']
-                    mode_data[mode] = mode_data[mode][['Subject'] + selected_features]
+                    mode_data[mode] = mode_data[mode][['Subject', 'CENTER', 'SET'] + selected_features]
             else:
                 raise ValueError(f"Unsupported mode: {mode}")
             
