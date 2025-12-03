@@ -278,7 +278,7 @@ Apply dataset filters by uncommenting relevant flags:
 # USE_COHORT2_FILTER: [true]
 
 # Histology subtype
-# FILTER_SQUAMOUS: "1.0"  # or "0.0" for non-squamous
+# FILTER_SQUAMOUS: 1  # or 0 for non-squamous
 # ADENO: "1.0"
 
 # Treatment regimen

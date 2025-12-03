@@ -1,35 +1,47 @@
+#!/usr/bin/env python3
+"""
+Generate line plots from config file.
+
+Usage:
+    python plot_results.py --config path/to/config.yaml
+
+This script:
+- Parses the config to determine task type, outcomes, and paths
+- Generates line plots for AUC or C-index with confidence intervals for all available modalities
+"""
+
+import os
+import sys
+import argparse
+import yaml
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 from pathlib import Path
 
-# ------------------------------------------------------------------------------
-# Configuration for generating plots across experiments
-# Specify: cohort filters, path structure, training type, task, and outcomes to analyze
-BASE_DIR = Path(__file__).resolve().parents[3]  # Risali a Mil2/
-RESULTS_DIR = BASE_DIR / "dlif_pipeline/results"
+# Add parent directory to path
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-training_type = 'cross_validation'
-#  training_type = 'standard'
-sub0 = RESULTS_DIR
-sub1 = 'C23'
-sub2 = 'pdl1_high'
-task = 'classification'
-# task = 'survival'
-path_pre = f'' # new_path
-path_suf = f'{task}/{training_type}/hypothesis_driven/pyrad-noimp'
-# ------------------------------------------------------------------------------
+# Import path building functions from metrics script
+from metrics.compute_metrics_from_config import build_path_from_config
 
-if task == 'classification':
-    outcomes = ['os_months_6', 'DCR']
-elif task == 'survival':
-    outcomes = ['OS_MONTHS']
-else:
-    raise ValueError(f"Unsupported task: {task}")
 
-if __name__ == "__main__":
-    # modality dictionary
+def plot_results_from_config(config_arg, base_dir=None):
+    """
+    Generate line plots for trained models based on config.
+
+    Args:
+        config_arg: Either a path to a config YAML file (str) or a config dictionary (dict)
+        base_dir: Base results directory (optional, computed from script location if not provided)
+    """
+    # Load config
+    if isinstance(config_arg, str):
+        with open(config_arg) as f:
+            config = yaml.safe_load(f)
+    else:
+        config = config_arg
+    
+    # Define modality display names
     modality_dict = {
         "dp": "DP",
         "rwd": "RWD-only",
@@ -45,97 +57,110 @@ if __name__ == "__main__":
         "rwd_radfm_dp_genomics": "RWD\nDP\nFM RAD\nGenomics",
         "rwd_radpy_dp_genomics": "RWD\nDP\nPYRAD\nGenomics",
     }
+    
+    # Parse path info using a sample modality string (just to get base path structure)
+    path_info = build_path_from_config(config, list(modality_dict.keys())[0], base_dir)
+    print(path_info)
+    task = path_info['task']
+    training_type = path_info['training_type']
+    outcomes = path_info['outcomes']
+    
+    print(f"\n📊 Generating plots")
+    print(f"   Task: {task}")
+    print(f"   Training type: {training_type}")
+    print(f"   Outcomes: {', '.join(outcomes)}")
+    print(f"   Plotting all available modalities")
+
+    is_survival = (task == 'survival')
 
     for outcome in outcomes:
-        path = os.path.join(sub0, sub1, sub2, path_pre, outcome, path_suf)
+        print(f"\n   Processing outcome: {outcome}")
+        
+        # Build base path for this outcome
+        base_path = os.path.join(
+            path_info['base_dir'],
+            *path_info['prefix_parts'],
+            outcome,
+            task,
+            training_type,
+            path_info['data_type'],
+            f"{path_info['source']}-{path_info['imp']}"
+        )
 
-        # Check if path exists
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"Path does not exist: {path}")
+        if not os.path.exists(base_path):
+            print(f"      Path does not exist: {base_path}")
+            continue
 
-        # Get all folders in the path
-        all_folders = [f.name for f in os.scandir(path) if f.is_dir()]
-
-        # Check that all folder names are in the modality dictionary
-        for folder in all_folders:
-            if folder not in modality_dict:
-                raise ValueError(f"Folder '{folder}' is not in the modality dictionary")
-
-        # Determine if this is a survival outcome based on path_suf
-        is_survival = path_suf.startswith('survival')
-
-        # Collect data for plotting
-        modalities = []
-        modality_keys = []  # Keep track of keys for CSV
+        # Collect data for plotting across all modalities
+        modality_labels = []
+        modality_keys = []
         score_values = []
         ci_lowers = []
         ci_uppers = []
 
-        # Process folders in the order of the modality_dict
-        for key, label in modality_dict.items():
-            folder_path = os.path.join(path, key)
+        # Iterate through all modalities in the defined order
+        for mod_string in modality_dict.keys():
+            folder_path = os.path.join(base_path, mod_string)
 
-            if os.path.exists(folder_path):
-                # Check for seed_0 folder
-                seed_path = os.path.join(folder_path, 'seed_0')
-                if not os.path.exists(seed_path):
-                    raise FileNotFoundError(f"seed_0 folder not found in: {folder_path}")
+            if not os.path.exists(folder_path):
+                print(f"      Modality folder not found: {mod_string}")
+                continue
 
-                if is_survival:
-                    # Use eval_cindex_ci.csv for survival outcomes
-                    csv_path = os.path.join(seed_path, 'eval_cindex_ci.csv')
-                    if not os.path.exists(csv_path):
-                        raise FileNotFoundError(f"eval_cindex_ci.csv not found in: {seed_path}")
+            # Check for seed_0 folder
+            seed_path = os.path.join(folder_path, 'seed_0')
+            if not os.path.exists(seed_path):
+                print(f"      seed_0 folder not found in: {folder_path}")
+                continue
 
-                    # Read the CSV file
-                    try:
-                        df = pd.read_csv(csv_path)
-                        score = df['c_index'].iloc[0]
-                        ci_lower = df['ci_lower'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
-                        ci_upper = df['ci_upper'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
+            # Determine which CSV to read
+            if is_survival:
+                csv_path = os.path.join(seed_path, 'eval_cindex_ci.csv')
+                score_col = 'c_index'
+            else:
+                csv_path = os.path.join(seed_path, 'eval_auc_ci.csv')
+                score_col = 'auc'
 
-                        modalities.append(label)
-                        modality_keys.append(key)
-                        score_values.append(score)
-                        ci_lowers.append(ci_lower)
-                        ci_uppers.append(ci_upper)
+            if not os.path.exists(csv_path):
+                print(f"      CSV not found: {csv_path}")
+                continue
 
-                    except Exception as e:
-                        raise ValueError(f"Error reading CSV file {csv_path}: {e}")
-                else:
-                    # Use eval_auc_ci.csv for non-survival outcomes
-                    csv_path = os.path.join(seed_path, 'eval_auc_ci.csv')
-                    if not os.path.exists(csv_path):
-                        raise FileNotFoundError(f"eval_auc_ci.csv not found in: {seed_path}")
+            # Read the CSV file
+            try:
+                df = pd.read_csv(csv_path)
+                score = df[score_col].iloc[0]
+                ci_lower = df['ci_lower'].iloc[0]
+                ci_upper = df['ci_upper'].iloc[0]
 
-                    # Read the CSV file
-                    try:
-                        df = pd.read_csv(csv_path)
-                        score = df['auc'].iloc[0]
-                        ci_lower = df['ci_lower'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
-                        ci_upper = df['ci_upper'].iloc[0]  # Note the space in column name; the space is needed for WindowsOS, for MacOS delete the space
+                modality_labels.append(modality_dict[mod_string])
+                modality_keys.append(mod_string)
+                score_values.append(score)
+                ci_lowers.append(ci_lower)
+                ci_uppers.append(ci_upper)
+                
+                print(f"      ✓ Found data for: {mod_string}")
 
-                        modalities.append(label)
-                        modality_keys.append(key)
-                        score_values.append(score)
-                        ci_lowers.append(ci_lower)
-                        ci_uppers.append(ci_upper)
+            except Exception as e:
+                print(f"      Error reading CSV file {csv_path}: {e}")
+                continue
 
-                    except Exception as e:
-                        raise ValueError(f"Error reading CSV file {csv_path}: {e}")
+        if len(score_values) == 0:
+            print(f"      No data found for outcome: {outcome}")
+            continue
 
-        # Convert to numpy arrays for plotting
+        print(f"      Found {len(score_values)} modalities with data")
+
+        # Convert to numpy arrays
         score_values = np.array(score_values)
         ci_lowers = np.array(ci_lowers)
         ci_uppers = np.array(ci_uppers)
 
         # Create the plot
-        plt.figure(figsize=(12, 6))
+        plt.figure(figsize=(14, 6))
 
-        # Create title with sub1-sub2-training_type-outcome format
-        title_parts = [sub1, sub2, training_type, outcome]
-        # Filter out empty strings and join with '-'
-        title_suffix = '-'.join(part for part in title_parts if part)
+        # Create title components
+        title_parts = [part for part in path_info['prefix_parts'] if part != 'results']
+        title_parts.extend([training_type, outcome])
+        title_suffix = '-'.join(title_parts)
 
         if is_survival:
             if training_type == 'cross_validation':
@@ -164,31 +189,43 @@ if __name__ == "__main__":
                 plot_title = f'AUC - {title_suffix}'
                 y_label = 'AUC'
 
-        plt.plot(modalities, score_values, marker='o', linestyle='-', color='#1a80bb', label=metric_label)
-        # plt.fill_between(modalities, ci_lowers, ci_uppers, color='#8cc5e3', alpha=0.3, label='Confidence interval')
-        if len(modalities) == 1:
-            plt.errorbar(modalities, score_values, yerr=[score_values - ci_lowers, ci_uppers - score_values], 
+        # Plot based on number of points
+        if len(modality_labels) == 1:
+            plt.errorbar(modality_labels, score_values, 
+                        yerr=[score_values - ci_lowers, ci_uppers - score_values], 
                         fmt='o', color='#1a80bb', capsize=5, label=metric_label)
         else:
-            plt.fill_between(modalities, ci_lowers, ci_uppers, color='#8cc5e3', alpha=0.3, label='Confidence interval')
+            plt.plot(modality_labels, score_values, marker='o', linestyle='-', 
+                    color='#1a80bb', label=metric_label)
+            plt.fill_between(range(len(modality_labels)), ci_lowers, ci_uppers, 
+                           color='#8cc5e3', alpha=0.3, label='Confidence interval')
 
+        # Add value labels
         for i, (val, lower, upper) in enumerate(zip(score_values, ci_lowers, ci_uppers)):
-            ci_range = val - lower  # Since CI is symmetric, this equals upper - val
-            plt.text(i, 0.02, f"{val:.2f} ± {ci_range:.2f}", fontsize=10, ha='center', color='#1a80bb')
+            ci_range = val - lower
+            plt.text(i, 0.02, f"{val:.2f} ± {ci_range:.2f}", 
+                    fontsize=9, ha='center', color='#1a80bb')
 
+        plt.xticks(range(len(modality_labels)), modality_labels, rotation=45, ha='right')
         plt.title(plot_title, pad=20)
         plt.ylabel(y_label)
         plt.ylim(0, 1)
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.legend()
-    
-        path = os.path.join(sub0, sub1, path_pre)
+        plt.tight_layout()
 
-        # Save as PNG
-        os.makedirs(path, exist_ok=True)
+        # Create output directory
+        output_dir = os.path.join(
+            path_info['base_dir'],
+            *path_info['prefix_parts']
+        )
+        os.makedirs(output_dir, exist_ok=True)
 
-        plt.savefig(os.path.join(path, f'line_plot-{sub2}-{training_type}-{outcome}-600.png'), dpi=600, bbox_inches='tight')
-        print(f"Saved plot to {os.path.join(path, f'line_plot-{sub2}-{training_type}-{outcome}-600.png')}")
+        # Save plot
+        output_prefix = '-'.join(title_parts)
+        png_path = os.path.join(output_dir, f'line_plot-{output_prefix}-600.png')
+        plt.savefig(png_path, dpi=600, bbox_inches='tight')
+        print(f"      Saved plot: {png_path}")
 
         # Save plot data as CSV
         plot_data = pd.DataFrame({
@@ -197,4 +234,27 @@ if __name__ == "__main__":
             'CI_Lower': ci_lowers,
             'CI_Upper': ci_uppers
         })
-        plot_data.to_csv(os.path.join(path, f'line_plot-{sub2}-{training_type}-{outcome}.csv'), index=False)
+        csv_path = os.path.join(output_dir, f'line_plot-{output_prefix}.csv')
+        plot_data.to_csv(csv_path, index=False)
+        print(f"      Saved data: {csv_path}")
+
+        plt.close()
+
+    print("\n✅ All plots generated!")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate line plots from config file for all available modalities"
+    )
+    parser.add_argument("--config", required=True, help="Path to config YAML file")
+    parser.add_argument("--base_dir", default=None, 
+                       help="Base results directory (optional)")
+    
+    args = parser.parse_args()
+    
+    plot_results_from_config(args.config, args.base_dir)
+
+
+if __name__ == "__main__":
+    main()
