@@ -573,9 +573,8 @@ def plot_cindex_results(
             else:
                 dlif_base_path = Path(dlif_base_path)
 
-            dlif_outcome = _outcome_to_dlif(outcome)
-            analysis_dir = (dlif_base_path / analysis / dlif_outcome / "classification" /
-                          dlif_eval_type / dlif_feature_type / dlif_extraction)
+            analysis_dir = (dlif_base_path / analysis / 'OS_MONTHS' / "survival" /
+                          'cross_validation' / dlif_feature_type / dlif_extraction)
 
         if not analysis_dir.exists():
             continue
@@ -599,7 +598,8 @@ def plot_cindex_results(
         for mod in modalities:
             # Get paths based on architecture
             if architecture == "DLIF":
-                paths = _pair_paths_dlif(analysis_dir, mod)
+                paths = _pair_paths_dlif(analysis_dir, f'{mod}', 'seed_0')
+                print(paths)
                 # Read DLIF-specific files
                 cindex_m, std_m = _read_c_index_dlif(paths["mod"]["results"])
                 model_m = "MIL"  # DLIF uses MIL models
