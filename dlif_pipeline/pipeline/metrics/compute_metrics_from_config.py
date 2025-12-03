@@ -362,10 +362,13 @@ def main():
     )
     parser.add_argument("--config", required=True, help="Path to config YAML file")
     parser.add_argument("--base_dir", required=True, help="Base results directory")
+    parser.add_argument("--mod_string", required=True, 
+        help="Modality string to plot (e.g., dp_rwd_radfm or just dp)")
     args = parser.parse_args()
     config = args.config
     base_dir = args.base_dir
-    run_task_metrics(config, base_dir)
+    mod_string = args.mod_string
+    run_task_metrics(config, mod_string, base_dir)
 
 if __name__ == "__main__":
     main()
