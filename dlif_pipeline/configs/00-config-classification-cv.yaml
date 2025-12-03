@@ -1,6 +1,6 @@
 task: classification # classification/survival
 task_settings:
-  outcomes: ["os_months_6", "DCR"]
+  outcomes: ["os_months_6", "DCR", "os_months_24"]
   # events: DEATH_EVENT_OC # survival only variable
   loss: mm_loss # mm_survival_loss  mm_loss
   # save_monitor: c_index  # survival only variable
@@ -85,5 +85,3 @@ hyperparameters_default:
   batch_size: 16
   reconstruction_weight: 0.1
   n_layers: 2
-
-FILTER_PDL1: "high"
