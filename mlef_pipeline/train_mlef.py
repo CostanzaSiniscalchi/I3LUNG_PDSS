@@ -424,7 +424,7 @@ def train_and_evaluate_modality(
     # 4. Imputation
     print("4. Imputing missing values...")
     with open('mlef_pipeline/features.json', 'r') as f:
-        rwd_features = json.load(f)['RWD']
+        rwd_features = json.load(f)['RWD'] 
     
     # Only impute RWD features that are present in the data
     rwd_cols = [c for c in rwd_features if c in X_train.columns]
