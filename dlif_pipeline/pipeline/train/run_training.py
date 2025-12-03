@@ -10,7 +10,6 @@ import json
 from metrics.compute_scores import compute_scores
 from metrics.calculate_average import compute_weighted_average
 from metrics.compute_metrics_from_config import run_task_metrics
-from plotting.plot_results import plot_results_from_config
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 
@@ -179,8 +178,6 @@ def run_training(config, mods):
                 "combo": best_combo
             })
 
-        plot_results_from_config(config, ROOT)
-
         # Pick best final model among all seeds
         best_model = pick_best_final_model(final_model_path, config["task"])
         best_seed = int(best_model["seed"].replace("seed_", ""))
@@ -278,5 +275,4 @@ def run_training(config, mods):
            
 
             print(f"Training completed for seed {seed}, fold {fold} at {full_path}")
-        plot_results_from_config(config, mod_string, ROOT)
         return {"experiment_paths": experiment_paths}

@@ -154,8 +154,8 @@ def plot_results_from_config(config_arg, base_dir=None):
         ci_lowers = np.array(ci_lowers)
         ci_uppers = np.array(ci_uppers)
 
-        # Create the plot
-        plt.figure(figsize=(14, 6))
+        # Create the plot - EXACT STYLE FROM ORIGINAL SCRIPT
+        plt.figure(figsize=(12, 6))
 
         # Create title components
         title_parts = [part for part in path_info['prefix_parts'] if part != 'results']
@@ -189,30 +189,25 @@ def plot_results_from_config(config_arg, base_dir=None):
                 plot_title = f'AUC - {title_suffix}'
                 y_label = 'AUC'
 
-        # Plot based on number of points
+        # Plot based on number of points - EXACT LOGIC FROM ORIGINAL
+        plt.plot(modality_labels, score_values, marker='o', linestyle='-', color='#1a80bb', label=metric_label)
+        
         if len(modality_labels) == 1:
-            plt.errorbar(modality_labels, score_values, 
-                        yerr=[score_values - ci_lowers, ci_uppers - score_values], 
+            plt.errorbar(modality_labels, score_values, yerr=[score_values - ci_lowers, ci_uppers - score_values], 
                         fmt='o', color='#1a80bb', capsize=5, label=metric_label)
         else:
-            plt.plot(modality_labels, score_values, marker='o', linestyle='-', 
-                    color='#1a80bb', label=metric_label)
-            plt.fill_between(range(len(modality_labels)), ci_lowers, ci_uppers, 
-                           color='#8cc5e3', alpha=0.3, label='Confidence interval')
+            plt.fill_between(modality_labels, ci_lowers, ci_uppers, color='#8cc5e3', alpha=0.3, label='Confidence interval')
 
         # Add value labels
         for i, (val, lower, upper) in enumerate(zip(score_values, ci_lowers, ci_uppers)):
             ci_range = val - lower
-            plt.text(i, 0.02, f"{val:.2f} ± {ci_range:.2f}", 
-                    fontsize=9, ha='center', color='#1a80bb')
+            plt.text(i, 0.02, f"{val:.2f} ± {ci_range:.2f}", fontsize=10, ha='center', color='#1a80bb')
 
-        plt.xticks(range(len(modality_labels)), modality_labels, rotation=45, ha='right')
         plt.title(plot_title, pad=20)
         plt.ylabel(y_label)
         plt.ylim(0, 1)
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.legend()
-        plt.tight_layout()
 
         # Create output directory
         output_dir = os.path.join(
