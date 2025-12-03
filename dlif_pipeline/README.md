@@ -387,78 +387,49 @@ At the end of training, metrics are calculated automatically.
 #### 2. Generate Plots
 
 ```bash
-python dlif_pipeline/pipeline/plotting/plot_results.py
-```
-
-**Plotting Script Configuration:**
-
-if you want to plot for you experiment, edit the script plot_results ( as above ):
-
-```python
-training_type = 'standard' # here 'standard' will plot results on the test set
-#  training_type = 'cross_validation'
-sub0 = RESULTS_DIR
-sub1 = 'C23'
-sub2 = ''
-task = 'classification'
-# task = 'survival'
-outcomes = ['os_months_24'] # os_months_6, DCR, OS_MONTHS (for survival)
-path_pre = f'' # new_path
-path_suf = f'{task}/{training_type}/hypothesis_driven/pyrad-noimp'
+python dlif_pipeline/pipeline/plotting/plot_results.py --config /path/to/your/config.yaml
 ```
 
 ## Project Structure
 ```
-Mil2/
-├── mil_training/                     # Main training directory
-│   ├── scripts/
-│   │   └── pipeline/
-│   │       ├── metrics/              # Metric calculation scripts
-│   │       │   ├── __pycache__/
-│   │       │   ├── metrics_utils/
-│   │       │   │   ├── __pycache__/
-│   │       │   │   ├── __init__.py
-│   │       │   │   ├── classification_metrics.py
-│   │       │   │   └── survival_metrics.py
-│   │       │   ├── __init__.py
-│   │       │   ├── calculate_average.py
-│   │       │   ├── compute_scores.py
-│   │       │   ├── delong_n.py               # AUC calculation with DeLong CI
-│   │       │   ├── other_metrics.py          # F1, sensitivity, specificity
-│   │       │   └── survival_cindex_ci.py     # C-index calculation
-│   │       │
-│   │       ├── plotting/             # Visualization scripts
-│   │       │   ├── __pycache__/
-│   │       │   ├── __init__.py
-│   │       │   ├── line_no_plot_other_metrics.py
-│   │       │   └── plots_for_supplementary.py
-│   │       │
-│   │       └── train/                # Training orchestration
-│   │           ├── hyperparameters_tuning/
-│   │           │   ├── __pycache__/
-│   │           │   ├── grid_runner.py
-│   │           │   └── hyperparam_tuning.py
-│   │           ├── utils/
-│   │           │   ├── __init__.py
-│   │                   ├── config_utils.py
-│   │                ├── dataset_utils.py
-│   │           │   └── path_utils.py
-│   │           ├── README
-│   │           ├── run_training.py
-│   │           ├── prepare_dataset.py
-│   │           └── training_loop.py
+dlif_pipeline/
+├── pipeline/
+│   ├── metrics/              # Metric calculation scripts
+│   │   ├── metrics_utils/
+│   │   │   ├── __init__.py
+│   │   │   ├── classification_metrics.py
+│   │   │   └── survival_metrics.py
+│   │   ├── __init__.py
+│   │   ├── calculate_average.py
+│   │   ├── compute_scores.py
+│   │   ├── delong_n.py               # AUC calculation with DeLong CI
+│   │   ├── other_metrics.py          # F1, sensitivity, specificity
+│   │   └── survival_cindex_ci.py     # C-index calculation
+│   │
+│   ├── plotting/             # Visualization scripts
+│   │   ├── __init__.py
+│   │   ├── line_no_plot_other_metrics.py
+│   │   └── plots_for_supplementary.py
+│   │
+│   └── train/                # Training orchestration
+│       ├── hyperparameters_tuning/
+│       │   ├── grid_runner.py
+│       │   └── hyperparam_tuning.py
+│       ├── utils/
+│       │   ├── __init__.py
+│           ├── config_utils.py
+│           ├── dataset_utils.py
+│           └── path_utils.py
+│       ├─ run_training.py
+│       ├── README
+│       ├── prepare_dataset.py
+│       └── training_loop.py
 │   │
 │   └── utils/                        # General utilities
-│       ├── __pycache__/
 │       ├── __init__.py
 │       ├── pipeline_utils.py
-│       ├── df.parquet
-│       ├── MIL.log
-│       ├── README
-│       ├── settings.json
-│       ├── train.py
-│       ├── __init__.py
-│       └── pyrightconfig.py
+│   ├── README
+│   └── train.py
 │
 ├── MIL/                              # Core MIL package
 ```
