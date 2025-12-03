@@ -10,7 +10,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parents[3]  # Risali a Mil2/
 RESULTS_DIR = BASE_DIR / "dlif_pipeline/results"
 
-training_type = 'standard'
+training_type = 'cross_validation'
 #  training_type = 'standard'
 sub0 = RESULTS_DIR
 sub1 = 'C23'
@@ -22,7 +22,7 @@ path_suf = f'{task}/{training_type}/hypothesis_driven/pyrad-noimp'
 # ------------------------------------------------------------------------------
 
 if task == 'classification':
-    outcomes = ['os_months_24', 'os_months_6', 'DCR']
+    outcomes = ['os_months_6', 'DCR']
 elif task == 'survival':
     outcomes = ['OS_MONTHS']
 else:
