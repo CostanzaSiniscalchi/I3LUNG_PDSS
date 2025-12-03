@@ -1,9 +1,7 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_curve, auc
 from scipy import stats
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 def compute_ground_truth_statistics(ground_truth):
     ground_truth = np.array(ground_truth)
@@ -50,10 +48,6 @@ def delong_test_comparison(y_true, y_pred1, y_pred2, alpha=0.05):
     
     z_score = auc_diff / np.sqrt(var_diff)
     p_value = 2 * (1 - stats.norm.cdf(abs(z_score)))  # Two-tailed test
-    
-    # Get confidence intervals
-    auc1_ci = auc_roc_ci(y_true, y_pred1, alpha)[1]
-    auc2_ci = auc_roc_ci(y_true, y_pred2, alpha)[1]
     
     return p_value
 
