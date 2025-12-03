@@ -62,9 +62,9 @@ folds:
 
 # default hyperparameters
 hyperparameters_default:
-  batch_size: 64
+  batch_size: 16
   reconstruction_weight: 0.1
-  n_layers: 1
+  n_layers: 2
 
 FILTER_INT: [ true ]  # filter INT cohort
 

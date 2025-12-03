@@ -48,6 +48,26 @@ mods:
     radpy: true
     dp: true
     genomics: false
+    # RWD_RADFM_DP_GENOMICS
+  - rwd: true
+    radfm: true
+    dp: true
+    genomics: true
+    # RWD_RADPY_DP_GENOMICS
+  - rwd: true
+    radpy: true
+    dp: true
+    genomics: true
+    # RWD_RADFM_DP_GENOMICS
+  - rwd: true
+    radfm: true
+    dp: true
+    genomics: true
+    # RWD_RADPY_DP_GENOMICS
+  - rwd: true
+    radpy: true
+    dp: true
+    genomics: true
 
   
 folds:
@@ -62,7 +82,8 @@ folds:
 
 # default hyperparameters
 hyperparameters_default:
-  batch_size: 64
+  batch_size: 16
   reconstruction_weight: 0.1
-  n_layers: 1
+  n_layers: 2
 
+FILTER_PDL1: "high"

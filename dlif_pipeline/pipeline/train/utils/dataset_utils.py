@@ -81,6 +81,7 @@ def get_datasets(P, training_type, config, fold, folds, outcome,
         val_filter["NSCLC_HISTOLOGY_SQUAMOUS"]   = [sq_flag]
 
     # ─── : apply chemo+immuno filter if set to 0 or 1 ──────────
+    ci_flag = config.get("FILTER_CHEMO_IMMUNO", None)
     if ci_flag in ("0", "1") and "IO IOCHT" in annotations_df:
         print(f" Filtering IO IOCHT == {ci_flag}")
         train_filter["IO IOCHT"] = [int(ci_flag)]

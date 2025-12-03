@@ -112,6 +112,25 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
         P, training_type, config, fold, folds, outcome
     )
 
+    # Check if validation set has both classes
+    val_labels = val_dataset.labels(outcome)
+    print(f"val_labels type: {type(val_labels)}")
+    print(f"val_labels length: {len(val_labels)}")
+    print(f"val_labels first 5: {val_labels[:5]}")
+    print(f"val_labels element types: {[type(x) for x in val_labels[:5]]}")
+    # Estrai solo i valori stringa, ignorando dict
+    val_labels_flat = []
+    for x in val_labels:
+        if isinstance(x, (list, np.ndarray)):
+            val_labels_flat.extend([str(v) for v in x if not isinstance(v, dict)])
+        elif not isinstance(x, dict):
+            val_labels_flat.append(str(x))
+
+    unique_val_labels = np.unique(val_labels_flat)
+    if len(unique_val_labels) < 2:
+        print(f"⚠️  Skipping fold {fold} - only one class ({unique_val_labels}) in validation set")
+        return
+
 
     # 5. Select hyperparameters
     combo = config.get("hyper_combo", config.get("hyperparameters_default", {}))

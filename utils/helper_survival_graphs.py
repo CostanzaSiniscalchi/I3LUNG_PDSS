@@ -13,6 +13,8 @@ from matplotlib.patches import Rectangle
 from matplotlib.transforms import Bbox
 import shap
 from utils.DeLong_test import *
+from lifelines.utils import concordance_index
+from scipy.stats import bootstrap
 
 def plot_km_combined(datasets, stats: bool=True):
     """
@@ -180,7 +182,7 @@ def plot_cindex_results(
                rwd_radfm_dp/
                rwd_radpy_dp/
     """
-    metric = 'C-INDEX' if outcome == 'OS' else 'AUC'
+    metric = 'C-INDEX'
     # ------------------------- utilities -------------------------
     def _parse_mean_std(val) -> Tuple[float, float]:
         if pd.isna(val):
@@ -409,9 +411,66 @@ def plot_cindex_results(
         }
 
         return paths
-
+ 
 
     def _compute_pvalue(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
+        """
+        Compare two survival models using permutation test on C-index difference.
+        """
+        if not (pred_mod_path and pred_ro_path and pred_mod_path.exists() and pred_ro_path.exists()):
+            return None
+        
+        dm = pd.read_csv(pred_mod_path).dropna(subset=['risk_score'])
+        dr = pd.read_csv(pred_ro_path).dropna(subset=['risk_score'])
+        
+        # merge on Subject to ensure same patients
+        merged = dm.merge(dr, on='Subject', suffixes=('_mod', '_ro'))
+        
+        # handle column names
+        if 'TIME_mod' in merged.columns:
+            time = merged['TIME_mod'].values
+            event = merged['EVENT_mod'].values
+        else:
+            time = merged['TIME'].values
+            event = merged['EVENT'].values
+        
+        risk_mod = merged['risk_score_mod'].values
+        risk_ro = merged['risk_score_ro'].values
+        
+        # compute observed C-index difference
+        c_mod = concordance_index(time, -risk_mod, event)
+        c_ro = concordance_index(time, -risk_ro, event)
+        observed_diff = c_mod - c_ro
+        
+        n_bootstrap = 1000
+        bootstrap_diffs = []
+        
+        rng = np.random.default_rng(42)
+        n_samples = len(merged)
+        
+        for _ in range(n_bootstrap):
+            # resample with replacement
+            idx = rng.choice(n_samples, size=n_samples, replace=True)
+            
+            try:
+                c_mod_boot = concordance_index(time[idx], -risk_mod[idx], event[idx])
+                c_ro_boot = concordance_index(time[idx], -risk_ro[idx], event[idx])
+                bootstrap_diffs.append(c_mod_boot - c_ro_boot)
+            except:
+                # skip if bootstrap sample has issues
+                continue
+        
+        bootstrap_diffs = np.array(bootstrap_diffs)
+        
+        if len(bootstrap_diffs) == 0:
+            return None
+        
+        # two-tailed p-value: proportion of bootstrap diffs as extreme as observed
+        p_value = np.mean(np.abs(bootstrap_diffs - np.mean(bootstrap_diffs)) >= np.abs(observed_diff))
+        
+        return p_value
+
+    def _compute_pvalue2(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
         """
         Read predictions directly from prediction.xlsx files (Subject, y_pred, y_true),
         align on Subject, then run DeLong.
@@ -444,35 +503,35 @@ def plot_cindex_results(
         modalities = [r["modality"] for r in rows]
         X = np.arange(len(modalities))
 
-        auc_mod_mean = np.array([r[f"{metric}_mod_mean"] for r in rows], dtype=float)
-        auc_mod_std  = np.array([r[f"{metric}_mod_std"]  for r in rows], dtype=float)
+        cindex_mod_mean = np.array([r[f"{metric}_mod_mean"] for r in rows], dtype=float)
+        cindex_mod_std  = np.array([r[f"{metric}_mod_std"]  for r in rows], dtype=float)
         n_train_mod  = np.array([r["n_train_mod"]  for r in rows], dtype=float)
         sizes        = _scale_sizes(n_train_mod)
         model_names  = [r["model_mod"] for r in rows]
 
         fig = plt.figure(figsize=(12, 6))
         # BLUE: modality
-        plt.plot(X, auc_mod_mean, linestyle="-", marker="o", label=f"CV {metric}", color="#1a80bb")
-        plt.scatter(X, auc_mod_mean, s=sizes, color="#1a80bb", zorder=3)
-        plt.fill_between(X, auc_mod_mean - auc_mod_std, auc_mod_mean + auc_mod_std,
+        plt.plot(X, cindex_mod_mean, linestyle="-", marker="o", label=f"CV {metric}", color="#1a80bb")
+        plt.scatter(X, cindex_mod_mean, s=sizes, color="#1a80bb", zorder=3)
+        plt.fill_between(X, cindex_mod_mean - cindex_mod_std, cindex_mod_mean + cindex_mod_std,
                          alpha=0.3, color="#8cc5e3", label="Confidence interval")
 
         multimodal_better = None
 
         if arch_name == "MLEF":
-            auc_ro_mean = np.array([r[f"{metric}_ro_mean"] for r in rows], dtype=float)
-            auc_ro_std  = np.array([r[f"{metric}_ro_std"]  for r in rows], dtype=float)
-            plt.plot(X, auc_ro_mean, linestyle="-", marker="o", label=f"CV {metric} - RWD-only matched", color="#a00000")
-            plt.scatter(X, auc_ro_mean, s=sizes, color="#a00000", zorder=3)
-            plt.fill_between(X, auc_ro_mean - auc_ro_std, auc_ro_mean + auc_ro_std,
+            cindex_ro_mean = np.array([r[f"{metric}_ro_mean"] for r in rows], dtype=float)
+            cindex_ro_std  = np.array([r[f"{metric}_ro_std"]  for r in rows], dtype=float)
+            plt.plot(X, cindex_ro_mean, linestyle="-", marker="o", label=f"CV {metric} - RWD-only matched", color="#a00000")
+            plt.scatter(X, cindex_ro_mean, s=sizes, color="#a00000", zorder=3)
+            plt.fill_between(X, cindex_ro_mean - cindex_ro_std, cindex_ro_mean + cindex_ro_std,
                              alpha=0.3, color="#d8a6a6", label="Confidence interval - RWD-only matched")
-            multimodal_better = (auc_mod_mean > auc_ro_mean)
+            multimodal_better = (cindex_mod_mean > cindex_ro_mean)
 
         xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})" for m, n in zip(modalities, n_train_mod)]
         plt.xticks(X, xticks)
 
         # --- BLUE annotations (now show stars here) ---
-        for i, (mval, mstd, mname) in enumerate(zip(auc_mod_mean, auc_mod_std, model_names)):
+        for i, (mval, mstd, mname) in enumerate(zip(cindex_mod_mean, cindex_mod_std, model_names)):
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
             plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
                     fontsize=9, ha="center", color="#1a80bb")
@@ -570,19 +629,19 @@ def plot_cindex_results(
             if architecture == "DLIF":
                 paths = _pair_paths_dlif(analysis_dir, mod)
                 # Read DLIF-specific files
-                auc_m, std_m = _read_auc_dlif(paths["mod"]["results"])
+                cindex_m, std_m = _read_auc_dlif(paths["mod"]["results"])
                 model_m = "MIL"  # DLIF uses MIL models
                 ntrain_m = _read_n_train_dlif(paths["mod"]["train"])
             else:
                 paths = _pair_paths(analysis_dir, mod)
                 # modality side
-                auc_m, std_m = _read_result_cv(paths["mod"]["results"])
+                cindex_m, std_m = _read_result_cv(paths["mod"]["results"])
                 model_m = _read_model_name(paths["mod"]["model"])
                 ntrain_m = _read_n_train(paths["mod"]["train"])
 
             row = {
                 "modality": mod,
-                f"{metric}_mod_mean": float(auc_m),
+                f"{metric}_mod_mean": float(cindex_m),
                 f"{metric}_mod_std": float(std_m) if np.isfinite(std_m) else 0.0,
                 "n_train_mod": ntrain_m,
                 "model_mod": model_m,
@@ -602,11 +661,11 @@ def plot_cindex_results(
                     })
                 else:
                     ro = paths["rwd_only"]
-                    if ro is not None:
-                        auc_r, std_r = _read_result_cv(ro["results"])
+                    if ro['results'] is not None:
+                        cindex_r, std_r = _read_result_cv(ro["results"])
                         pval = _compute_pvalue(paths["mod"]["pred"], ro["pred"])
                         row.update({
-                            f"{metric}_ro_mean": float(auc_r),
+                            f"{metric}_ro_mean": float(cindex_r),
                             f"{metric}_ro_std":  float(std_r) if np.isfinite(std_r) else 0.0,
                             "n_train_ro":  _read_n_train(ro["train"]),
                             "model_ro":    _read_model_name(ro["model"]),
