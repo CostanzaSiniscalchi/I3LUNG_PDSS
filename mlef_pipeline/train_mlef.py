@@ -946,7 +946,7 @@ def main():
         default_model_type = Model[args.model]
         default_model_type._explicit = True
     else:
-        default_model_type = None
+        default_model_type = Model.LR
     base_path = Path(args.output_dir)
     select_features = not args.no_feature_selection
     
@@ -968,6 +968,8 @@ def main():
                     mode_list.append(Mode.FMRAD)
                 elif m == 'PYRAD':
                     mode_list.append(Mode.PYRAD)
+                elif m == 'GEN':
+                    mode_list.append(Mode.GEN)
             if mode_list:
                 modalities_to_train.append(mode_list)
     else:
