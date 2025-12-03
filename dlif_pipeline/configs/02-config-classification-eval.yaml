@@ -1,6 +1,6 @@
 task: classification # classification/survival
 task_settings:
-  outcomes: ["os_months_24"]
+  outcomes: ["os_months_24", "os_months_6", "DCR"]
   # events: DEATH_EVENT_OC # survival only variable
   loss: mm_loss # mm_survival_loss  mm_loss
   # save_monitor: c_index  # survival only variable
@@ -48,6 +48,16 @@ mods:
     radpy: true
     dp: true
     genomics: false
+    # RWD_RADFM_DP_GENOMICS
+  - rwd: true
+    radfm: true
+    dp: true
+    genomics: true
+    # RWD_RADPY_DP_GENOMICS
+  - rwd: true
+    radpy: true
+    dp: true
+    genomics: true
 
 folds:
   cross_validation:
@@ -61,8 +71,8 @@ folds:
 
 # default hyperparameters
 hyperparameters_default:
-  batch_size: 64
+  batch_size: 16
   reconstruction_weight: 0.1
-  n_layers: 1
+  n_layers: 2
 
-
+FILTER_PDL1: "high"

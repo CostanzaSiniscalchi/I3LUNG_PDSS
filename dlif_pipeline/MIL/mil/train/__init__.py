@@ -131,8 +131,7 @@ def build_fastai_learner(
 
     """
     from . import _fastai
-    print(f"Train samples: {len(train_dataset)}")
-    print(f"Val samples: {len(val_dataset)}")
+
     labels, unique = utils.get_labels((train_dataset, val_dataset), outcomes, config.model_type, events=events)
 
     # Prepare bags
