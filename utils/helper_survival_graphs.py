@@ -210,23 +210,23 @@ def plot_cindex_results(
         
         return _parse_mean_std(sub[metric].iloc[0])
 
-    def _read_auc_dlif(auc_csv_path: Path) -> Tuple[float, float]:
-        """Read AUC from DLIF's eval_auc_ci.csv file."""
-        if auc_csv_path is None or not auc_csv_path.exists():
+    def _read_c_index_dlif(cindex_csv_path: Path) -> Tuple[float, float]:
+        """Read C-Index from DLIF's eval_cindex_ci.csv file."""
+        if cindex_csv_path is None or not cindex_csv_path.exists():
             return (np.nan, np.nan)
         try:
-            df = pd.read_csv(auc_csv_path)
-            # Expected columns: auc, ci_lower, ci_upper
-            if 'auc' in df.columns:
-                auc = float(df['auc'].iloc[0])
+            df = pd.read_csv(cindex_csv_path)
+            # Expected columns: c_index, ci_lower, ci_upper
+            if 'c_index' in df.columns:
+                c_index = float(df['c_index'].iloc[0])
                 # Calculate std from CI if available
                 if 'ci_lower' in df.columns and 'ci_upper' in df.columns:
                     ci_lower = float(df['ci_lower'].iloc[0])
                     ci_upper = float(df['ci_upper'].iloc[0])
                     # Approximate std from 95% CI: (upper - lower) / (2 * 1.96)
                     std = (ci_upper - ci_lower) / (2 * 1.96)
-                    return (auc, std)
-                return (auc, 0.0)
+                    return (c_index, std)
+                return (c_index, 0.0)
         except Exception:
             pass
         return (np.nan, np.nan)
@@ -629,7 +629,7 @@ def plot_cindex_results(
             if architecture == "DLIF":
                 paths = _pair_paths_dlif(analysis_dir, mod)
                 # Read DLIF-specific files
-                cindex_m, std_m = _read_auc_dlif(paths["mod"]["results"])
+                cindex_m, std_m = _read_c_index_dlif(paths["mod"]["results"])
                 model_m = "MIL"  # DLIF uses MIL models
                 ntrain_m = _read_n_train_dlif(paths["mod"]["train"])
             else:
