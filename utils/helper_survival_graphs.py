@@ -233,12 +233,20 @@ def plot_cindex_results(
 
     def _read_n_train_dlif(predictions_train_path: Path) -> int:
         """Read number of training samples from DLIF's predictions_train.parquet."""
+        print(f"DEBUG: predictions_train_path = {predictions_train_path}")
+        print(f"DEBUG: exists? {predictions_train_path.exists() if predictions_train_path else 'None'}")
+        
         if predictions_train_path is None or not predictions_train_path.exists():
+            print("DEBUG: returning NaN (path None or doesn't exist)")
             return int(np.nan)
+        
         try:
             df = pd.read_parquet(predictions_train_path)
-            return int(len(df))
-        except Exception:
+            n = int(len(df))
+            print(f"DEBUG: successfully read {n} rows")
+            return n
+        except Exception as e:
+            print(f"DEBUG: exception reading parquet: {e}")
             return int(np.nan)
 
     def _read_model_name(model_path: Path) -> str:
@@ -387,7 +395,8 @@ def plot_cindex_results(
         dlif_modality = _map_mlef_to_dlif_modality(modality)
 
         # Build path: base_dir / modality / seed_X /
-        mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
+        mod_dir = base_dir / dlif_modality / "seed_0"
+        print(mod_dir)
 
         if not mod_dir.exists():
             return {
@@ -399,13 +408,30 @@ def plot_cindex_results(
                 },
                 "rwd_only": None
             }
+        
+        sites = ['GHD', 'INT', 'MH', 'SZMC', 'VHIO']
+
+        all_preds = []
+        all_preds_train = []
+        for site in sites:
+            site_dir = mod_dir / f'fold_{site}' 
+            pred = pd.read_parquet(site_dir / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet')
+            train_pred = pd.read_parquet(site_dir / 'predictions_train.parquet')
+            all_preds.append(pred)
+            all_preds_train.append(train_pred)
+        
+        predictions_df = pd.concat(all_preds, ignore_index=True)
+        predictions_train_df = pd.concat(all_preds_train, ignore_index=True)
+
+        predictions_df.to_parquet(mod_dir / 'predictions_all.parquet')
+        predictions_train_df.to_parquet(mod_dir / 'predictions_train_all.parquet')
 
         paths = {
             "mod": {
-                "results": mod_dir / "eval_auc_ci.csv" if (mod_dir / "eval_auc_ci.csv").exists() else None,
-                "pred": mod_dir / "predictions.parquet" if (mod_dir / "predictions.parquet").exists() else None,
+                "results": mod_dir / "eval_cindex_ci.csv" if (mod_dir / "eval_cindex_ci.csv").exists() else None,
+                "pred": mod_dir / 'predictions_all.parquet',
                 "model": None,  # DLIF stores models differently
-                "train": mod_dir / "predictions_train.parquet" if (mod_dir / "predictions_train.parquet").exists() else None,
+                "train": mod_dir / 'predictions_all.parquet',
             },
             "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
         }
@@ -585,7 +611,7 @@ def plot_cindex_results(
             if not analysis_dir.exists():
                 continue
             dlif_modalities = [p.name for p in analysis_dir.iterdir()
-                             if p.is_dir() and p.name.lower().startswith("rwd")]
+                 if p.is_dir() and p.name.lower().startswith("rwd") and 'genomics' not in p.name.lower()]
             modalities = [_map_dlif_to_mlef_modality(m) for m in dlif_modalities]
             modalities = _ordered_modalities(modalities)
         else:
@@ -595,11 +621,10 @@ def plot_cindex_results(
             continue
 
         rows: List[dict] = []
-        for mod in modalities:
+        for mod, dlif_mod in zip(modalities, dlif_modalities):
             # Get paths based on architecture
             if architecture == "DLIF":
-                paths = _pair_paths_dlif(analysis_dir, f'{mod}', 'seed_0')
-                print(paths)
+                paths = _pair_paths_dlif(analysis_dir, dlif_mod)
                 # Read DLIF-specific files
                 cindex_m, std_m = _read_c_index_dlif(paths["mod"]["results"])
                 model_m = "MIL"  # DLIF uses MIL models
