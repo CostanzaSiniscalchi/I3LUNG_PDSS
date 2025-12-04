@@ -33,10 +33,11 @@ def find_csv_files_in_structure(results_dir):
         root_path = Path(root)
         
         # Check if we're in a seed_0 directory with the target files
-        if root_path.name == "seed_0" and ("eval_auc_ci.csv" in files or "eval_classification_metrics.csv" in files):
-            # Parse the path to extract metadata
+        if root_path.name == "seed_0" and ("eval_auc_ci.csv" in files or "eval_cindex_ci.csv" in files or "eval_classification_metrics.csv" in files):           # Parse the path to extract metadata
             parts = root_path.parts
             results_idx = parts.index("results")
+            print(f"Found: {root_path}, files: {files}")  # debug
+
             
             # Extract components from path
             path_after_results = parts[results_idx + 1:]
@@ -76,7 +77,7 @@ def find_csv_files_in_structure(results_dir):
                 'analysis_type': analysis_type,  # classification or survival
                 'method': method,  # cross_validation, standard, or evaluation
                 'modality': modality,
-                'auc_file': root_path / "eval_auc_ci.csv" if "eval_auc_ci.csv" in files else None,
+                'auc_file': root_path / "eval_auc_ci.csv" if "eval_auc_ci.csv" in files else (root_path / "eval_cindex_ci.csv" if "eval_cindex_ci.csv" in files else None),
                 'metrics_file': root_path / "eval_classification_metrics.csv" if "eval_classification_metrics.csv" in files else None,
                 'path': root_path
             })
@@ -130,9 +131,12 @@ for (outcome, subanalysis, method), items in auc_groups.items():
         try:
             df = pd.read_csv(item['auc_file'])
             
-            # Rename 'auc' column to 'Score' if it exists
+            # Rename 'auc' or 'cindex' column to 'Score' if it exists
+            # Rename 'auc' or 'cindex' column to 'Score' if it exists
             if 'auc' in df.columns:
                 df = df.rename(columns={'auc': 'Score'})
+            elif 'c_index' in df.columns:
+                df = df.rename(columns={'c_index': 'Score'})
             
             # Add modality column if not present
             if 'Modality' not in df.columns:
@@ -270,12 +274,18 @@ for file_path in csv_files:
     try:
         file_df = pd.read_csv(file_path)
         
+        # Rename 'auc' or 'cindex' column to 'Score' if it exists
+        if 'auc' in file_df.columns:
+            file_df = file_df.rename(columns={'auc': 'Score'})
+        elif 'c_index' in file_df.columns:
+            file_df = file_df.rename(columns={'c_index': 'Score'})
+        
         # Process each row in the file
         for _, row in file_df.iterrows():
             modality = row['Modality']
             score = row['Score']
-            ci_lower = row['ci_lower']
-            ci_upper = row['ci_upper']
+            ci_lower = row.get('ci_lower') or row.get('CI_Lower')
+            ci_upper = row.get('ci_upper') or row.get('CI_Upper')
             
             # Format score with confidence interval
             formatted_score = format_score_with_ci(score, ci_lower, ci_upper)
