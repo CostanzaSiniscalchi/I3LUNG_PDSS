@@ -1009,8 +1009,7 @@ def shap_beeswarm(model, X_train: pd.DataFrame, X_test: pd.DataFrame, mapping = 
     shap_values = explainer(X_test)
     shap_values.feature_names = [mapping.get(name, name) for name in shap_values.feature_names]
     shap.plots.beeswarm(shap_values[:,:,1], show=False, max_display=20)
-
-plt.show()
+    plt.show()
 
 
 def generate_dlif_metric_files(
