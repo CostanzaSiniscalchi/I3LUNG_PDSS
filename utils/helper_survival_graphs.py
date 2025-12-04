@@ -188,13 +188,13 @@ def plot_cindex_results(
         if pd.isna(val):
             return (np.nan, np.nan)
         if isinstance(val, (int, float, np.floating)):
-            return (float(val), 0.0)
+            return (round(float(val), 2), 0.0)
         s = str(val).replace("+/-", "±")
         parts = [p.strip() for p in s.split("±")]
         try:
             if len(parts) == 2:
-                return (float(parts[0]), float(parts[1]))
-            return (float(parts[0]), 0.0)
+                return (round(float(parts[0]), 2), round(float(parts[1]), 2))
+            return (round(float(parts[0]), 2), 0.0)
         except Exception:
             return (np.nan, np.nan)
 
@@ -219,12 +219,11 @@ def plot_cindex_results(
             # Expected columns: c_index, ci_lower, ci_upper
             if 'c_index' in df.columns:
                 c_index = float(df['c_index'].iloc[0])
-                # Calculate std from CI if available
+                
                 if 'ci_lower' in df.columns and 'ci_upper' in df.columns:
                     ci_lower = float(df['ci_lower'].iloc[0])
                     ci_upper = float(df['ci_upper'].iloc[0])
-                    # Approximate std from 95% CI: (upper - lower) / (2 * 1.96)
-                    std = (ci_upper - ci_lower) / (2 * 1.96)
+                    std = (ci_upper - ci_lower) / 2
                     return (c_index, std)
                 return (c_index, 0.0)
         except Exception:
@@ -240,7 +239,6 @@ def plot_cindex_results(
             site_path = train_pred_path / f'fold_{site}' / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet'
             df = pd.read_parquet(site_path)
             num += df.shape[0]
-        print('patients num:', num)
         return num
 
     def _read_model_name(model_path: Path) -> str:
@@ -503,9 +501,34 @@ def plot_cindex_results(
                              alpha=0.3, color="#d8a6a6", label="Confidence interval - RWD-only matched")
             multimodal_better = (cindex_mod_mean > cindex_ro_mean)
 
-        xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})" for m, n in zip(modalities, n_train_mod)]
-        plt.xticks(X, xticks)
 
+        if arch_name == "DLIF":
+            xticks = []
+            for m, n in zip(modalities, n_train_mod):
+                parts = m.split('_')
+                # Join with newlines
+                formatted_name = '\n'.join(parts)
+                xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
+            plt.xticks(X, xticks, rotation=0, fontsize=8)
+        else:
+            xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})" 
+                    for m, n in zip(modalities, n_train_mod)]
+            plt.xticks(X, xticks, rotation=0)
+
+        
+        for i, (mval, mstd, mname) in enumerate(zip(cindex_mod_mean, cindex_mod_std, model_names)):
+            base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
+            if arch_name == "DLIF":
+                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f}",
+                        fontsize=9, ha="center", color="#1a80bb")
+            else:
+                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
+                        fontsize=9, ha="center", color="#1a80bb")
+            star = rows[i].get("stars", "")
+            if star:
+                plt.text(i + 0.36, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
+
+        '''
         # --- BLUE annotations (now show stars here) ---
         for i, (mval, mstd, mname) in enumerate(zip(cindex_mod_mean, cindex_mod_std, model_names)):
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
@@ -517,7 +540,7 @@ def plot_cindex_results(
                 # nudge a bit to the right of the blue text
                 plt.text(i + 0.36, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
 
-
+        '''
         # --- RED annotations (keep values but REMOVE stars here) ---
         if arch_name == "MLEF":
             for i, rrow in enumerate(rows):
