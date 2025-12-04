@@ -318,40 +318,12 @@ for file_path in csv_files:
 
 # Create the populated dataframe
 populated_df = pd.DataFrame(rows)
-print("\nDEBUG: Rows with subanalysis=None:")
-print(populated_df[populated_df['subanalysis'].isna()])
-print(f"\nTotal rows with None: {populated_df['subanalysis'].isna().sum()}")
 
 # Group by outcome, modality, subanalysis and combine cv, test, and evaluation scores
 final_rows = []
 populated_df['subanalysis'] = populated_df['subanalysis'].fillna('None')
 
 grouped = populated_df.groupby(['outcome', 'modality', 'subanalysis'])
-print("\nDEBUG grouped keys:")
-print(populated_df.groupby(['outcome', 'modality', 'subanalysis']).size())
-
-''' for (outcome, modality, subanalysis), group in grouped:
-    cv_score = group[group['cv-auc/c-index'].notna()]['cv-auc/c-index'].iloc[0] if any(group['cv-auc/c-index'].notna()) else None
-    test_score = group[group['test-auc/c-index'].notna()]['test-auc/c-index'].iloc[0] if any(group['test-auc/c-index'].notna()) else None
-    ext_val_score = group[group['ext_val-auc/c-index'].notna()]['ext_val-auc/c-index'].iloc[0] if any(group['ext_val-auc/c-index'].notna()) else None
-    
-    final_rows.append({
-        'outcome': outcome,
-        'modality': modality,
-        'subanalysis': subanalysis,
-        'cv-auc/c-index': cv_score,
-        'cv-f1': None,
-        'cv-specificity': None,
-        'cv-sensitivity': None,
-        'test-auc/c-index': test_score,
-        'test-f1': None,
-        'test-specificity': None,
-        'test-sensitivity': None,
-        'ext_val-auc/c-index': ext_val_score,
-        'ext_val-f1': None,
-        'ext_val-specificity': None,
-        'ext_val-sensitivity': None
-    }) '''
 
 # Create final dataframe
 df = grouped.agg(lambda x: x.dropna().iloc[0] if len(x.dropna()) > 0 else None).reset_index()
