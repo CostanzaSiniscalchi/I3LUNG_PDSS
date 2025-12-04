@@ -178,7 +178,7 @@ def run_training(config, mods):
                 "combo": best_combo
             })
 
-         # Pick best final model among all seeds
+        # Pick best final model among all seeds
         best_model = pick_best_final_model(final_model_path, config["task"])
         best_seed = int(best_model["seed"].replace("seed_", ""))
 
@@ -272,7 +272,7 @@ def run_training(config, mods):
 
             # Compute extended metrics (DeLong CI, F1, etc.)
             run_task_metrics(config, mod_string, ROOT)
+           
 
             print(f"Training completed for seed {seed}, fold {fold} at {full_path}")
-
         return {"experiment_paths": experiment_paths}

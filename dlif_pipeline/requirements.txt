@@ -13,3 +13,5 @@ tqdm
 triangle
 pyarrow
 openpyxl
+shap
+lifelines

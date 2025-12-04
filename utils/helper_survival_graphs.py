@@ -233,12 +233,20 @@ def plot_cindex_results(
 
     def _read_n_train_dlif(predictions_train_path: Path) -> int:
         """Read number of training samples from DLIF's predictions_train.parquet."""
+        print(f"DEBUG: predictions_train_path = {predictions_train_path}")
+        print(f"DEBUG: exists? {predictions_train_path.exists() if predictions_train_path else 'None'}")
+        
         if predictions_train_path is None or not predictions_train_path.exists():
+            print("DEBUG: returning NaN (path None or doesn't exist)")
             return int(np.nan)
+        
         try:
             df = pd.read_parquet(predictions_train_path)
-            return int(len(df))
-        except Exception:
+            n = int(len(df))
+            print(f"DEBUG: successfully read {n} rows")
+            return n
+        except Exception as e:
+            print(f"DEBUG: exception reading parquet: {e}")
             return int(np.nan)
 
     def _read_model_name(model_path: Path) -> str:
@@ -387,7 +395,8 @@ def plot_cindex_results(
         dlif_modality = _map_mlef_to_dlif_modality(modality)
 
         # Build path: base_dir / modality / seed_X /
-        mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
+        mod_dir = base_dir / dlif_modality / "seed_0"
+        print(mod_dir)
 
         if not mod_dir.exists():
             return {
@@ -399,13 +408,30 @@ def plot_cindex_results(
                 },
                 "rwd_only": None
             }
+        
+        sites = ['GHD', 'INT', 'MH', 'SZMC', 'VHIO']
+
+        all_preds = []
+        all_preds_train = []
+        for site in sites:
+            site_dir = mod_dir / f'fold_{site}' 
+            pred = pd.read_parquet(site_dir / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet')
+            train_pred = pd.read_parquet(site_dir / 'predictions_train.parquet')
+            all_preds.append(pred)
+            all_preds_train.append(train_pred)
+        
+        predictions_df = pd.concat(all_preds, ignore_index=True)
+        predictions_train_df = pd.concat(all_preds_train, ignore_index=True)
+
+        predictions_df.to_parquet(mod_dir / 'predictions_all.parquet')
+        predictions_train_df.to_parquet(mod_dir / 'predictions_train_all.parquet')
 
         paths = {
             "mod": {
-                "results": mod_dir / "eval_auc_ci.csv" if (mod_dir / "eval_auc_ci.csv").exists() else None,
-                "pred": mod_dir / "predictions.parquet" if (mod_dir / "predictions.parquet").exists() else None,
+                "results": mod_dir / "eval_cindex_ci.csv" if (mod_dir / "eval_cindex_ci.csv").exists() else None,
+                "pred": mod_dir / 'predictions_all.parquet',
                 "model": None,  # DLIF stores models differently
-                "train": mod_dir / "predictions_train.parquet" if (mod_dir / "predictions_train.parquet").exists() else None,
+                "train": mod_dir / 'predictions_all.parquet',
             },
             "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
         }
@@ -469,35 +495,7 @@ def plot_cindex_results(
         p_value = np.mean(np.abs(bootstrap_diffs - np.mean(bootstrap_diffs)) >= np.abs(observed_diff))
         
         return p_value
-
-    def _compute_pvalue2(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
-        """
-        Read predictions directly from prediction.xlsx files (Subject, y_pred, y_true),
-        align on Subject, then run DeLong.
-        """
-        if not (pred_mod_path and pred_ro_path and pred_mod_path.exists() and pred_ro_path.exists()):
-            return None
-        dm = pd.read_csv(pred_mod_path)
-        dr = pd.read_csv(pred_ro_path)
-        # minimal schema check
-        for col in ("Subject", "y_pred", "y_true"):
-            if col not in dm.columns:
-                return None
-        if "Subject" not in dr.columns or "y_pred" not in dr.columns:
-            return None
-
-        m = dm.rename(columns={"y_pred": "y_pred_mod"})
-        r = dr.rename(columns={"y_pred": "y_pred_ro"})
-        merged = pd.merge(m[["Subject", "y_true", "y_pred_mod"]],
-                          r[["Subject", "y_pred_ro"]],
-                          on="Subject", how="inner")
-        if merged.empty:
-            return None
-        return float(delong_test_comparison(
-            merged["y_true"].to_numpy(),
-            merged["y_pred_mod"].to_numpy(),
-            merged["y_pred_ro"].to_numpy()
-        )['p_value'])
+    
 
     def _plot_one(analysis: str, rows: List[dict]) -> plt.Figure:
         modalities = [r["modality"] for r in rows]
@@ -539,7 +537,7 @@ def plot_cindex_results(
             star = rows[i].get("stars", "")
             if star:
                 # nudge a bit to the right of the blue text
-                plt.text(i + 0.33, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
+                plt.text(i + 0.36, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
 
 
         # --- RED annotations (keep values but REMOVE stars here) ---
@@ -601,9 +599,8 @@ def plot_cindex_results(
             else:
                 dlif_base_path = Path(dlif_base_path)
 
-            dlif_outcome = _outcome_to_dlif(outcome)
-            analysis_dir = (dlif_base_path / analysis / dlif_outcome / "classification" /
-                          dlif_eval_type / dlif_feature_type / dlif_extraction)
+            analysis_dir = (dlif_base_path / analysis / 'OS_MONTHS' / "survival" /
+                          'cross_validation' / dlif_feature_type / dlif_extraction)
 
         if not analysis_dir.exists():
             continue
@@ -614,7 +611,7 @@ def plot_cindex_results(
             if not analysis_dir.exists():
                 continue
             dlif_modalities = [p.name for p in analysis_dir.iterdir()
-                             if p.is_dir() and p.name.lower().startswith("rwd")]
+                 if p.is_dir() and p.name.lower().startswith("rwd") and 'genomics' not in p.name.lower()]
             modalities = [_map_dlif_to_mlef_modality(m) for m in dlif_modalities]
             modalities = _ordered_modalities(modalities)
         else:
@@ -624,10 +621,10 @@ def plot_cindex_results(
             continue
 
         rows: List[dict] = []
-        for mod in modalities:
+        for mod, dlif_mod in zip(modalities, dlif_modalities):
             # Get paths based on architecture
             if architecture == "DLIF":
-                paths = _pair_paths_dlif(analysis_dir, mod)
+                paths = _pair_paths_dlif(analysis_dir, dlif_mod)
                 # Read DLIF-specific files
                 cindex_m, std_m = _read_c_index_dlif(paths["mod"]["results"])
                 model_m = "MIL"  # DLIF uses MIL models
