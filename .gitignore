@@ -42,3 +42,4 @@ __pycache__/
 dlif_pipeline/bags/
 dlif_pipeline/results/
 mlef_pipeline/results/
+dlif_pipeline/preds/*

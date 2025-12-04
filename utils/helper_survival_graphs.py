@@ -480,7 +480,10 @@ def plot_cindex_results(
 
         fig = plt.figure(figsize=(12, 6))
         # BLUE: modality
-        plt.plot(X, cindex_mod_mean, linestyle="-", marker="o", label=f"CV {metric}", color="#1a80bb")
+        if arch_name == 'MLEF':
+            plt.plot(X, cindex_mod_mean, linestyle="-", marker="o", label=f"CV {metric}", color="#1a80bb")
+        else:
+            plt.plot(X, cindex_mod_mean, linestyle="-", marker="o", label=f"TEST {metric}", color="#1a80bb")
         plt.scatter(X, cindex_mod_mean, s=sizes, color="#1a80bb", zorder=3)
         plt.fill_between(X, cindex_mod_mean - cindex_mod_std, cindex_mod_mean + cindex_mod_std,
                          alpha=0.3, color="#8cc5e3", label="Confidence interval")
@@ -498,6 +501,7 @@ def plot_cindex_results(
 
 
         if arch_name == "DLIF":
+            ttl = title_prefix or f"TEST {metric} - {arch_name}"
             xticks = []
             for m, n in zip(modalities, n_train_mod):
                 parts = m.split('_')
@@ -506,6 +510,7 @@ def plot_cindex_results(
                 xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
             plt.xticks(X, xticks, rotation=0, fontsize=8)
         else:
+            ttl = title_prefix or f"CV {metric} - {arch_name}"
             xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})" 
                     for m, n in zip(modalities, n_train_mod)]
             plt.xticks(X, xticks, rotation=0)
@@ -545,7 +550,6 @@ def plot_cindex_results(
                     plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
                             fontsize=9, ha="center", color="#a00000")
 
-        ttl = title_prefix or f"CV {metric} - {arch_name}"
         plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
         plt.ylabel(metric)
         plt.ylim(0, 1)
