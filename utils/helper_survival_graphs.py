@@ -231,23 +231,17 @@ def plot_cindex_results(
             pass
         return (np.nan, np.nan)
 
-    def _read_n_train_dlif(predictions_train_path: Path) -> int:
-        """Read number of training samples from DLIF's predictions_train.parquet."""
-        print(f"DEBUG: predictions_train_path = {predictions_train_path}")
-        print(f"DEBUG: exists? {predictions_train_path.exists() if predictions_train_path else 'None'}")
-        
-        if predictions_train_path is None or not predictions_train_path.exists():
-            print("DEBUG: returning NaN (path None or doesn't exist)")
-            return int(np.nan)
-        
-        try:
-            df = pd.read_parquet(predictions_train_path)
-            n = int(len(df))
-            print(f"DEBUG: successfully read {n} rows")
-            return n
-        except Exception as e:
-            print(f"DEBUG: exception reading parquet: {e}")
-            return int(np.nan)
+    def _read_n_train_dlif(analysis_dir: Path, mod_key: str) -> int:
+        """Count number of training samples from DLIF prediction_train.parquet file."""
+        train_pred_path = analysis_dir / mod_key / 'seed_0'
+        num = 0
+        sites = ['INT', 'GHD', 'VHIO', 'MH', 'SZMC']
+        for site in sites:
+            site_path = train_pred_path / f'fold_{site}' / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet'
+            df = pd.read_parquet(site_path)
+            num += df.shape[0]
+        print('patients num:', num)
+        return num
 
     def _read_model_name(model_path: Path) -> str:
         """
@@ -298,6 +292,8 @@ def plot_cindex_results(
             'rwd_radpy': 'RWD_PYRAD',
             'rwd_radfm_dp': 'RWD_DP_FMRAD',
             'rwd_radpy_dp': 'RWD_DP_PYRAD',
+            'rwd_radpy_dp_genomics': 'RWD_DP_PYRAD_GENOMICS',
+            'rwd_radfm_dp_genomics': 'RWD_DP_FMRAD_GENOMICS',
         }
         return mapping.get(dlif_name.lower(), dlif_name.upper())
 
@@ -396,7 +392,6 @@ def plot_cindex_results(
 
         # Build path: base_dir / modality / seed_X /
         mod_dir = base_dir / dlif_modality / "seed_0"
-        print(mod_dir)
 
         if not mod_dir.exists():
             return {
@@ -408,30 +403,13 @@ def plot_cindex_results(
                 },
                 "rwd_only": None
             }
-        
-        sites = ['GHD', 'INT', 'MH', 'SZMC', 'VHIO']
-
-        all_preds = []
-        all_preds_train = []
-        for site in sites:
-            site_dir = mod_dir / f'fold_{site}' 
-            pred = pd.read_parquet(site_dir / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet')
-            train_pred = pd.read_parquet(site_dir / 'predictions_train.parquet')
-            all_preds.append(pred)
-            all_preds_train.append(train_pred)
-        
-        predictions_df = pd.concat(all_preds, ignore_index=True)
-        predictions_train_df = pd.concat(all_preds_train, ignore_index=True)
-
-        predictions_df.to_parquet(mod_dir / 'predictions_all.parquet')
-        predictions_train_df.to_parquet(mod_dir / 'predictions_train_all.parquet')
 
         paths = {
             "mod": {
                 "results": mod_dir / "eval_cindex_ci.csv" if (mod_dir / "eval_cindex_ci.csv").exists() else None,
-                "pred": mod_dir / 'predictions_all.parquet',
-                "model": None,  # DLIF stores models differently
-                "train": mod_dir / 'predictions_all.parquet',
+                "pred": None,
+                "model": None,
+                "train": None,
             },
             "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
         }
@@ -608,10 +586,7 @@ def plot_cindex_results(
         # Collect modalities
         if architecture == "DLIF":
             # For DLIF, list directories and map them to MLEF names
-            if not analysis_dir.exists():
-                continue
-            dlif_modalities = [p.name for p in analysis_dir.iterdir()
-                 if p.is_dir() and p.name.lower().startswith("rwd") and 'genomics' not in p.name.lower()]
+            dlif_modalities = [el for el in os.listdir(analysis_dir) if el.startswith('rwd')]
             modalities = [_map_dlif_to_mlef_modality(m) for m in dlif_modalities]
             modalities = _ordered_modalities(modalities)
             modalities_map = {dlif: mlef for dlif, mlef in zip(dlif_modalities, modalities)}
@@ -630,7 +605,7 @@ def plot_cindex_results(
                 # Read DLIF-specific files
                 cindex_m, std_m = _read_c_index_dlif(paths["mod"]["results"])
                 model_m = "MIL"  # DLIF uses MIL models
-                ntrain_m = _read_n_train_dlif(paths["mod"]["train"])
+                ntrain_m = _read_n_train_dlif(analysis_dir, mod_key)
             else:
                 paths = _pair_paths(analysis_dir, mod_key)
                 # modality side
