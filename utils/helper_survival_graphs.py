@@ -614,30 +614,32 @@ def plot_cindex_results(
                  if p.is_dir() and p.name.lower().startswith("rwd") and 'genomics' not in p.name.lower()]
             modalities = [_map_dlif_to_mlef_modality(m) for m in dlif_modalities]
             modalities = _ordered_modalities(modalities)
+            modalities_map = {dlif: mlef for dlif, mlef in zip(dlif_modalities, modalities)}
         else:
             modalities = _collect_modalities(analysis_dir)
+            modalities_map = {m: m for m in modalities}
 
         if not modalities:
             continue
 
         rows: List[dict] = []
-        for mod, dlif_mod in zip(modalities, dlif_modalities):
+        for mod_key, mod_value in modalities_map.items():
             # Get paths based on architecture
             if architecture == "DLIF":
-                paths = _pair_paths_dlif(analysis_dir, dlif_mod)
+                paths = _pair_paths_dlif(analysis_dir, mod_key)
                 # Read DLIF-specific files
                 cindex_m, std_m = _read_c_index_dlif(paths["mod"]["results"])
                 model_m = "MIL"  # DLIF uses MIL models
                 ntrain_m = _read_n_train_dlif(paths["mod"]["train"])
             else:
-                paths = _pair_paths(analysis_dir, mod)
+                paths = _pair_paths(analysis_dir, mod_key)
                 # modality side
                 cindex_m, std_m = _read_result_cv(paths["mod"]["results"])
                 model_m = _read_model_name(paths["mod"]["model"])
                 ntrain_m = _read_n_train(paths["mod"]["train"])
 
             row = {
-                "modality": mod,
+                "modality": mod_value,
                 f"{metric}_mod_mean": float(cindex_m),
                 f"{metric}_mod_std": float(std_m) if np.isfinite(std_m) else 0.0,
                 "n_train_mod": ntrain_m,
@@ -646,7 +648,7 @@ def plot_cindex_results(
 
             # paired RWD_ONLY (MLEF only) with RWD red==blue behavior
             if arch_name == "MLEF":
-                if mod == "RWD":
+                if mod_key == "RWD":
                     # enforce coincidence for RWD: red == blue; no p-value
                     row.update({
                         f"{metric}_ro_mean": row[f"{metric}_mod_mean"],
