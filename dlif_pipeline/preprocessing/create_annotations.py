@@ -64,8 +64,7 @@ def create_annotations(
     })
     
     # Get outcome columns
-    # outcome_cols = [c for c in ann.columns if c not in ['Subject', 'FOLD', 'dataset']]
-    outcome_cols = ["os_months_6", "os_months_24","DCR", "ORR", "OS_MONTHS"]
+    outcome_cols = [c for c in ann.columns if c not in ['Subject', 'FOLD', 'dataset']]
     # Create dataset_ and fold_ for each outcome
     for outcome in outcome_cols:
         ann[f'dataset_{outcome}'] = np.where(ann[outcome].notna(), ann['dataset'], None)
@@ -151,7 +150,6 @@ def create_annotations(
     all_mods_dict = dict(zip(features['Subject'], features['HAS_ALL_MODALITIES']))
     ann['HAS_ALL_MODALITIES'] = ann['Subject'].map(all_mods_dict).fillna(0).astype(int)
 
-    
     print(f"Patients with all modalities: {ann['HAS_ALL_MODALITIES'].sum()}")
     
     # Add early stopping for ALL outcomes
@@ -159,7 +157,9 @@ def create_annotations(
     with open('data/early_stopping_data.json', 'r') as f:
         es_data = json.load(f)
 
-    for outcome in outcome_cols:
+    outcome_cols_es = ["os_months_6", "os_months_24","DCR", "ORR", "OS_MONTHS"]
+
+    for outcome in outcome_cols_es:
         fold_col = f'fold_{outcome}'
         early_stop_col = f'early_stopping_{outcome}'
         
@@ -185,7 +185,7 @@ def create_annotations(
     
     flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_ALL_MODALITIES']
     
-    early_cols = [f'early_stopping_{o}' for o in outcome_cols]
+    early_cols = [f'early_stopping_{o}' for o in outcome_cols_es]
     
     final_cols = base_cols + split_cols + flag_cols + early_cols
     
