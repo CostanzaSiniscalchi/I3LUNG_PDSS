@@ -3,7 +3,7 @@
 Generate line plots from config file.
 
 Usage:
-    python plot_results.py --config path/to/config.yaml
+    python dlif_pipeline/pipeline/plotting/plot_results.py --config dlif_pipeline/configs/00-config-classification-cv.yaml
 
 This script:
 - Parses the config to determine task type, outcomes, and paths
@@ -65,7 +65,7 @@ def plot_results_from_config(config_arg, base_dir=None):
     training_type = path_info['training_type']
     outcomes = path_info['outcomes']
     
-    print(f"\n📊 Generating plots")
+    print(f"\n Generating plots")
     print(f"   Task: {task}")
     print(f"   Training type: {training_type}")
     print(f"   Outcomes: {', '.join(outcomes)}")
