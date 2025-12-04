@@ -4,7 +4,7 @@
             "models": {
                 "RWD": "LR",
                 "RWD_DP": "LR",
-                "RWD_FMRAD": "RF",
+                "RWD_FMRAD": "LR",
                 "RWD_PYRAD": "LR",
                 "RWD_DP_FMRAD": "LR",
                 "RWD_DP_PYRAD": "LR"
