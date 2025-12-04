@@ -54,13 +54,16 @@ def find_csv_files_in_structure(results_dir):
             # Check if position 2 is classification/survival (main analysis) or another folder (subanalysis)
             if path_after_results[2] in ["classification", "survival"]:
                 # Main analysis: Cohort/outcome/classification_or_survival/method/...
-                subanalysis = None
+                if cohort!='C23':
+                    subanalysis = cohort
+                else:
+                    subanalysis = None
                 outcome = path_after_results[1]
                 analysis_type = path_after_results[2]
                 method = path_after_results[3]
                 modality = path_after_results[-2]
             elif len(path_after_results) >= 9 and path_after_results[3] in ["classification", "survival"]:
-                # Subanalysis: Cohort/subanalysis/outcome/classification_or_survival/method/...
+                # Subanalysis: C23/subanalysis/outcome/classification_or_survival/method/...
                 subanalysis = path_after_results[1]
                 outcome = path_after_results[2]
                 analysis_type = path_after_results[3]
