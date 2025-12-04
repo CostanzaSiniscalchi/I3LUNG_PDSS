@@ -132,7 +132,6 @@ for (outcome, subanalysis, method), items in auc_groups.items():
             df = pd.read_csv(item['auc_file'])
             
             # Rename 'auc' or 'cindex' column to 'Score' if it exists
-            # Rename 'auc' or 'cindex' column to 'Score' if it exists
             if 'auc' in df.columns:
                 df = df.rename(columns={'auc': 'Score'})
             elif 'c_index' in df.columns:
@@ -215,6 +214,9 @@ def parse_filename(filename):
     # Remove .csv extension and split by dashes
     base_name = filename.replace('.csv', '')
     parts = base_name.split('-')
+
+    print(f"DEBUG parsing: {filename} -> parts: {parts}")  # ADD THIS
+
     
     # Format is either:
     # line_plot-{method}-{outcome}.csv (main analysis, 3 parts after splitting)
@@ -284,7 +286,7 @@ for file_path in csv_files:
         for _, row in file_df.iterrows():
             modality = row['Modality']
             score = row['Score']
-            ci_lower = row.get('ci_lower') or row.get('CI_Lower')
+            ci_lower = row.get('ci_lower') or row.get('CI_Lower') 
             ci_upper = row.get('ci_upper') or row.get('CI_Upper')
             
             # Format score with confidence interval
@@ -316,12 +318,19 @@ for file_path in csv_files:
 
 # Create the populated dataframe
 populated_df = pd.DataFrame(rows)
+print("\nDEBUG: Rows with subanalysis=None:")
+print(populated_df[populated_df['subanalysis'].isna()])
+print(f"\nTotal rows with None: {populated_df['subanalysis'].isna().sum()}")
 
 # Group by outcome, modality, subanalysis and combine cv, test, and evaluation scores
 final_rows = []
-grouped = populated_df.groupby(['outcome', 'modality', 'subanalysis'])
+populated_df['subanalysis'] = populated_df['subanalysis'].fillna('None')
 
-for (outcome, modality, subanalysis), group in grouped:
+grouped = populated_df.groupby(['outcome', 'modality', 'subanalysis'])
+print("\nDEBUG grouped keys:")
+print(populated_df.groupby(['outcome', 'modality', 'subanalysis']).size())
+
+''' for (outcome, modality, subanalysis), group in grouped:
     cv_score = group[group['cv-auc/c-index'].notna()]['cv-auc/c-index'].iloc[0] if any(group['cv-auc/c-index'].notna()) else None
     test_score = group[group['test-auc/c-index'].notna()]['test-auc/c-index'].iloc[0] if any(group['test-auc/c-index'].notna()) else None
     ext_val_score = group[group['ext_val-auc/c-index'].notna()]['ext_val-auc/c-index'].iloc[0] if any(group['ext_val-auc/c-index'].notna()) else None
@@ -342,10 +351,10 @@ for (outcome, modality, subanalysis), group in grouped:
         'ext_val-f1': None,
         'ext_val-specificity': None,
         'ext_val-sensitivity': None
-    })
+    }) '''
 
 # Create final dataframe
-df = pd.DataFrame(final_rows)
+df = grouped.agg(lambda x: x.dropna().iloc[0] if len(x.dropna()) > 0 else None).reset_index()
 
 print(f"\nPopulated dataframe with {len(df)} rows")
 
@@ -388,7 +397,7 @@ for file_path in metrics_files:
     if subanalysis_parts:
         subanalysis = '-'.join(subanalysis_parts)
     else:
-        subanalysis = None
+        subanalysis = 'None'  # ← CAMBIA None in 'None' stringa
     
     try:
         metrics_df = pd.read_csv(file_path)
