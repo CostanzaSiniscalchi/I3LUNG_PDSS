@@ -281,8 +281,7 @@ def plot_auc_results(
                 if 'ci_lower' in df.columns and 'ci_upper' in df.columns:
                     ci_lower = float(df['ci_lower'].iloc[0])
                     ci_upper = float(df['ci_upper'].iloc[0])
-                    # Approximate std from 95% CI: (upper - lower) / (2 * 1.96)
-                    std = (ci_upper - ci_lower) / (2 * 1.96)
+                    std = (ci_upper - ci_lower) / (2)
                     return (auc, std)
                 return (auc, 0.0)
         except Exception:
@@ -574,20 +573,31 @@ def plot_auc_results(
                              alpha=0.3, color="#d8a6a6", label="Confidence interval - RWD-only matched")
             multimodal_better = (auc_mod_mean > auc_ro_mean)
 
-        xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})" for m, n in zip(modalities, n_train_mod)]
-        plt.xticks(X, xticks)
+        if arch_name == "DLIF":
+            xticks = []
+            for m, n in zip(modalities, n_train_mod):
+                parts = m.split('_')
+                # Join with newlines
+                formatted_name = '\n'.join(parts)
+                xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
+            plt.xticks(X, xticks, rotation=0, fontsize=8)
+        else:
+            xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
+                    for m, n in zip(modalities, n_train_mod)]
+            plt.xticks(X, xticks, rotation=0)
+        
 
-        # --- BLUE annotations (now show stars here) ---
         for i, (mval, mstd, mname) in enumerate(zip(auc_mod_mean, auc_mod_std, model_names)):
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
-            plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                    fontsize=9, ha="center", color="#1a80bb")
-            # stars belong to the multimodal-vs-RWD comparison
+            if arch_name == "DLIF":
+                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f}",
+                        fontsize=9, ha="center", color="#1a80bb")
+            else:
+                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
+                        fontsize=9, ha="center", color="#1a80bb")
             star = rows[i].get("stars", "")
             if star:
-                # nudge a bit to the right of the blue text
-                plt.text(i + 0.33, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
-
+                plt.text(i + 0.36, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
 
         # --- RED annotations (keep values but REMOVE stars here) ---
         if arch_name == "MLEF":
@@ -933,7 +943,7 @@ def plot_radar_charts(
         ax.tick_params(axis='x', pad=42)
         
         ax.set_ylim(0, 1)
-        ax.set_title(f'{title_prefix} - {metric} Comparison', pad=60, fontsize=14)
+        ax.set_title(f'{title_prefix} - {metric} Comparison', pad=80, fontsize=14)
         
         # --- Annotations ---
         colors = ['#811850', '#156ba9', "#477439"]
@@ -999,6 +1009,7 @@ def plot_radar_charts(
         ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1.1), fontsize=fontsize)
         plt.tight_layout()
         plt.subplots_adjust(top=0.85, bottom=0.2)
+        plt.savefig(f"graphs/{title_prefix}_{metric}_biomarker_plot.png", dpi=600)
         plt.show()
 
 def shap_beeswarm(model, X_train: pd.DataFrame, X_test: pd.DataFrame, mapping = {}) -> None:
