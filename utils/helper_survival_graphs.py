@@ -14,7 +14,6 @@ from matplotlib.transforms import Bbox
 import shap
 from utils.DeLong_test import *
 from lifelines.utils import concordance_index
-from scipy.stats import bootstrap
 
 def plot_km_combined(datasets, stats: bool=True):
     """
@@ -230,16 +229,12 @@ def plot_cindex_results(
             pass
         return (np.nan, np.nan)
 
-    def _read_n_train_dlif(analysis_dir: Path, mod_key: str) -> int:
+    def _read_n_train_dlif() -> int:
         """Count number of training samples from DLIF prediction_train.parquet file."""
-        train_pred_path = analysis_dir / mod_key / 'seed_0'
-        num = 0
-        sites = ['INT', 'GHD', 'VHIO', 'MH', 'SZMC']
-        for site in sites:
-            site_path = train_pred_path / f'fold_{site}' / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet'
-            df = pd.read_parquet(site_path)
-            num += df.shape[0]
-        return num
+        df = pd.read_csv('data/annotations.csv')
+        df = df[(df['dataset'] == 'test') & (df['OS_MONTHS'] != ' ')]
+
+        return df.shape[0]
 
     def _read_model_name(model_path: Path) -> str:
         """
@@ -389,7 +384,7 @@ def plot_cindex_results(
         dlif_modality = _map_mlef_to_dlif_modality(modality)
 
         # Build path: base_dir / modality / seed_X /
-        mod_dir = base_dir / dlif_modality / "seed_0"
+        mod_dir = base_dir / dlif_modality
 
         if not mod_dir.exists():
             return {
@@ -571,21 +566,9 @@ def plot_cindex_results(
     
     # Normalize architecture to both string name and Path
     if isinstance(architecture, Path):
-        arch_path = architecture
         arch_name = architecture.name  # Get the last part of the path (e.g., "MLEF" or "DLIF")
     else:
-        arch_path = Path(architecture)
         arch_name = architecture
-
-    # Convert outcome to DLIF format if needed
-    def _outcome_to_dlif(outcome_str: str) -> str:
-        """Convert MLEF outcome names to DLIF format."""
-        mapping = {
-            'OS_24': 'os_months_24',
-            'OS_6': 'os_months_6',
-            'DCR': 'DCR'
-        }
-        return mapping.get(outcome_str, outcome_str)
 
     for analysis in analyses:
         # Build the correct path based on architecture
@@ -596,13 +579,12 @@ def plot_cindex_results(
         else:  # DLIF
             # DLIF: dlif_pipeline/results/analysis/outcome/classification/eval_type/feature_type/extraction/
             if dlif_base_path is None:
-                dlif_base_path = Path("dlif_pipeline/results")
+                dlif_base_path = Path("dlif_pipeline/preds")
             else:
                 dlif_base_path = Path(dlif_base_path)
 
-            analysis_dir = (dlif_base_path / analysis / 'OS_MONTHS' / "survival" /
-                          'cross_validation' / dlif_feature_type / dlif_extraction)
-
+            analysis_dir = (dlif_base_path / 'OS_MONTHS' / "survival" / 'standard')
+        
         if not analysis_dir.exists():
             continue
 
@@ -628,7 +610,7 @@ def plot_cindex_results(
                 # Read DLIF-specific files
                 cindex_m, std_m = _read_c_index_dlif(paths["mod"]["results"])
                 model_m = "MIL"  # DLIF uses MIL models
-                ntrain_m = _read_n_train_dlif(analysis_dir, mod_key)
+                ntrain_m = _read_n_train_dlif()
             else:
                 paths = _pair_paths(analysis_dir, mod_key)
                 # modality side
