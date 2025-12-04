@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 RESULTS_DIR = BASE_DIR / "dlif_pipeline/results"
 
 # Create output directories for consolidated files
-CONSOLIDATED_DIR = BASE_DIR / "dlif_pipeline/consolidated_results"
+CONSOLIDATED_DIR = BASE_DIR / "dlif_pipeline/results"
 LINE_DATA_DIR = CONSOLIDATED_DIR / "data/line"
 METRICS_DIR = CONSOLIDATED_DIR / "data/metrics"
 
