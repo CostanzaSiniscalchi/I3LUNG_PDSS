@@ -1,6 +1,6 @@
 task: classification # classification/survival
 task_settings:
-  outcomes: ["os_months_24"]
+  outcomes: ["ORR"]
   # events: DEATH_EVENT_OC # survival only variable
   loss: mm_loss # mm_survival_loss  mm_loss
   # save_monitor: c_index  # survival only variable
@@ -12,7 +12,7 @@ imp: noimp  # noimp/imp
 seed: [0]
 
 use_early_stopping: true
-prepare_dataset: true
+prepare_dataset: false
 
 train_df: [ "../data/features_dataset_radpy_fixed.parquet", "../data/features_dataset_fmrad.parquet" ]
 annotation_file: ../data/annotations.csv
@@ -85,5 +85,3 @@ hyperparameters_default:
   batch_size: 16
   reconstruction_weight: 0.1
   n_layers: 2
-
-FILTER_CHEMO_IMMUNO: "1" 

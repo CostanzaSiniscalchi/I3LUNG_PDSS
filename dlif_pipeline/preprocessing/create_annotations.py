@@ -64,8 +64,8 @@ def create_annotations(
     })
     
     # Get outcome columns
-    outcome_cols = [c for c in ann.columns if c not in ['Subject', 'FOLD', 'dataset']]
-
+    # outcome_cols = [c for c in ann.columns if c not in ['Subject', 'FOLD', 'dataset']]
+    outcome_cols = ["os_months_6", "os_months_24","DCR", "ORR", "OS_MONTHS"]
     # Create dataset_ and fold_ for each outcome
     for outcome in outcome_cols:
         ann[f'dataset_{outcome}'] = np.where(ann[outcome].notna(), ann['dataset'], None)
@@ -155,23 +155,17 @@ def create_annotations(
     print(f"Patients with all modalities: {ann['HAS_ALL_MODALITIES'].sum()}")
     
     # Add early stopping for ALL outcomes
-    np.random.seed(seed)
-    train_df = ann[ann['dataset'] == 'train']
-    
-    total_n = int(len(train_df) * val_split)
-    early_stop_indices = train_df.sample(n=total_n, random_state=seed).index.tolist()
-    print(f"Generated {total_n} early stopping subjects randomly")
+
+    with open('data/early_stopping_data.json', 'r') as f:
+        es_data = json.load(f)
 
     for outcome in outcome_cols:
         fold_col = f'fold_{outcome}'
         early_stop_col = f'early_stopping_{outcome}'
         
-        if fold_col not in ann.columns:
-            print(f"Skipping {outcome}: missing column '{fold_col}'")
-            continue
-        
         ann[early_stop_col] = "no"
-        
+        early_stop_indices = es_data[early_stop_col]
+
         for idx in early_stop_indices:
             if idx in ann.index and pd.notna(ann.at[idx, fold_col]):
                 ann.at[idx, early_stop_col] = "yes"
