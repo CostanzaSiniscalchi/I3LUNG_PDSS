@@ -522,10 +522,6 @@ def train_rwd_matched_model(
     output_dir = base_path / 'results' / 'OS' / subanalysis.value / modality_folder / 'rwd-only'
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Follow same pipeline as main training
-    with open('mlef_pipeline/split.json', 'r') as f:
-        split = json.load(f)
-    
     train_set = rwd_dataset[rwd_dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
     test_set = rwd_dataset[rwd_dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
     ext_set = rwd_dataset[rwd_dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
