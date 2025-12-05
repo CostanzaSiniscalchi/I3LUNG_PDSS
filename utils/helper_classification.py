@@ -637,8 +637,8 @@ def plot_auc_results(
         # Build the correct path based on architecture
         if architecture == "MLEF":
             # MLEF: mlef_pipeline/results/outcome/analysis/
-            # base_path = Path("mlef_pipeline/results") / outcome / analysis
-            base_path = Path("new/results") / outcome / analysis
+            base_path = Path("mlef_pipeline/results") / outcome / analysis
+            # base_path = Path("new/results") / outcome / analysis
             analysis_dir = base_path
         else:  # DLIF
             if use_preds:
@@ -2062,7 +2062,6 @@ def plot_fairness_by_group(
         for h in handles:
             h.set_hatch('')
     plt.legend(handles, labels, title=group_col, loc='upper left')
-    
     plt.tight_layout()
     plt.show()
 
