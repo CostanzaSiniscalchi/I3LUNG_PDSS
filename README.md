@@ -25,6 +25,7 @@ I3LUNG_PDSS/data/
 
 Ensure this directory exists and contains all necessary data files before proceeding.
 
+
 ---
 
 ### Pipelines
@@ -59,6 +60,14 @@ All of the notebooks can be run with the `mlef` conda environment (you can find 
 - **`Metadata_Extraction.ipynb`** - Metadata extraction and analysis
 
 These notebooks can be run independently to generate visualizations and analyze results from the pipelines.
+
+If you want to reproduce main graphs of the paper without running models, put MLEF and DLIF results into:
+
+```
+I3LUNG_PDSS/mlef_pipeline/results/
+
+I3LUNG_PDSS/dlif_pipeline/preds/
+```
 
 Using **`Metadata_Extraction.ipynb`**, you can generate metadata distribution plots for each individual center as well as for all centers combined. It uses  metadata divided by center contained in **`data/Metadata_excelfiles.zip`**.
 
