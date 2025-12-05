@@ -24,8 +24,13 @@ def get_datasets(P, training_type, config, fold, folds, outcome,
 
     # ─── your existing CV / standard logic ────────
     if training_type == "cross_validation":
-        train_filter[fold_col] = [f for f in folds if f != fold]
-        val_filter[fold_col]   = [fold]
+        int_filter = config.get("FILTER_INT", None)
+        if int_filter:
+            train_filter['INT_ONLY_FOLDS'] = [f for f in folds if f != fold]
+            val_filter['INT_ONLY_FOLDS'] = [fold]
+        else:
+            train_filter[fold_col] = [f for f in folds if f != fold]
+            val_filter[fold_col]   = [fold]
         if early_stop_col in annotations_df:
             # Check if there are any 'yes' values for early stopping
             has_early_stop = (annotations_df[early_stop_col] == "yes").any()
