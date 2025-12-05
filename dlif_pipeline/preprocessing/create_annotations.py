@@ -177,7 +177,13 @@ def create_annotations(
                 ann.at[idx, early_stop_col] = "yes"
         
         print(f"Added early stopping for {outcome}")
-        
+
+    # Add folds for INT-only
+    with open('data/int_cv_splits.json', 'r') as f:
+        int_only = json.load(f)
+    for fold_idx, slide_list in int_only.items():
+        ann.loc[ann['Subject'].isin(slide_list), 'INT_ONLY_FOLDS'] = fold_idx
+
     # Rinomina Subject in slide
     ann = ann.rename(columns={'Subject': 'patient'})
     ann['slide'] = ann['patient']
@@ -189,7 +195,7 @@ def create_annotations(
     for outcome in outcome_cols:
         split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
     
-    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_ALL_MODALITIES']
+    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_ALL_MODALITIES', 'INT_ONLY_FOLDS']
     
     early_cols = [f'early_stopping_{o}' for o in outcome_cols]
     

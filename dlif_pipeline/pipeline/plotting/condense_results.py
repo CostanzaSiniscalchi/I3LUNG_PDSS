@@ -33,10 +33,11 @@ def find_csv_files_in_structure(results_dir):
         root_path = Path(root)
         
         # Check if we're in a seed_0 directory with the target files
-        if root_path.name == "seed_0" and ("eval_auc_ci.csv" in files or "eval_classification_metrics.csv" in files):
-            # Parse the path to extract metadata
+        if root_path.name == "seed_0" and ("eval_auc_ci.csv" in files or "eval_cindex_ci.csv" in files or "eval_classification_metrics.csv" in files):           # Parse the path to extract metadata
             parts = root_path.parts
             results_idx = parts.index("results")
+            print(f"Found: {root_path}, files: {files}")  # debug
+
             
             # Extract components from path
             path_after_results = parts[results_idx + 1:]
@@ -53,13 +54,16 @@ def find_csv_files_in_structure(results_dir):
             # Check if position 2 is classification/survival (main analysis) or another folder (subanalysis)
             if path_after_results[2] in ["classification", "survival"]:
                 # Main analysis: Cohort/outcome/classification_or_survival/method/...
-                subanalysis = None
+                if cohort!='C23':
+                    subanalysis = cohort
+                else:
+                    subanalysis = None
                 outcome = path_after_results[1]
                 analysis_type = path_after_results[2]
                 method = path_after_results[3]
                 modality = path_after_results[-2]
             elif len(path_after_results) >= 9 and path_after_results[3] in ["classification", "survival"]:
-                # Subanalysis: Cohort/subanalysis/outcome/classification_or_survival/method/...
+                # Subanalysis: C23/subanalysis/outcome/classification_or_survival/method/...
                 subanalysis = path_after_results[1]
                 outcome = path_after_results[2]
                 analysis_type = path_after_results[3]
@@ -76,7 +80,7 @@ def find_csv_files_in_structure(results_dir):
                 'analysis_type': analysis_type,  # classification or survival
                 'method': method,  # cross_validation, standard, or evaluation
                 'modality': modality,
-                'auc_file': root_path / "eval_auc_ci.csv" if "eval_auc_ci.csv" in files else None,
+                'auc_file': root_path / "eval_auc_ci.csv" if "eval_auc_ci.csv" in files else (root_path / "eval_cindex_ci.csv" if "eval_cindex_ci.csv" in files else None),
                 'metrics_file': root_path / "eval_classification_metrics.csv" if "eval_classification_metrics.csv" in files else None,
                 'path': root_path
             })
@@ -130,9 +134,11 @@ for (outcome, subanalysis, method), items in auc_groups.items():
         try:
             df = pd.read_csv(item['auc_file'])
             
-            # Rename 'auc' column to 'Score' if it exists
+            # Rename 'auc' or 'cindex' column to 'Score' if it exists
             if 'auc' in df.columns:
                 df = df.rename(columns={'auc': 'Score'})
+            elif 'c_index' in df.columns:
+                df = df.rename(columns={'c_index': 'Score'})
             
             # Add modality column if not present
             if 'Modality' not in df.columns:
@@ -211,6 +217,9 @@ def parse_filename(filename):
     # Remove .csv extension and split by dashes
     base_name = filename.replace('.csv', '')
     parts = base_name.split('-')
+
+    print(f"DEBUG parsing: {filename} -> parts: {parts}")  # ADD THIS
+
     
     # Format is either:
     # line_plot-{method}-{outcome}.csv (main analysis, 3 parts after splitting)
@@ -270,12 +279,18 @@ for file_path in csv_files:
     try:
         file_df = pd.read_csv(file_path)
         
+        # Rename 'auc' or 'cindex' column to 'Score' if it exists
+        if 'auc' in file_df.columns:
+            file_df = file_df.rename(columns={'auc': 'Score'})
+        elif 'c_index' in file_df.columns:
+            file_df = file_df.rename(columns={'c_index': 'Score'})
+        
         # Process each row in the file
         for _, row in file_df.iterrows():
             modality = row['Modality']
             score = row['Score']
-            ci_lower = row['ci_lower']
-            ci_upper = row['ci_upper']
+            ci_lower = row.get('ci_lower') or row.get('CI_Lower') 
+            ci_upper = row.get('ci_upper') or row.get('CI_Upper')
             
             # Format score with confidence interval
             formatted_score = format_score_with_ci(score, ci_lower, ci_upper)
@@ -309,33 +324,12 @@ populated_df = pd.DataFrame(rows)
 
 # Group by outcome, modality, subanalysis and combine cv, test, and evaluation scores
 final_rows = []
+populated_df['subanalysis'] = populated_df['subanalysis'].fillna('None')
+
 grouped = populated_df.groupby(['outcome', 'modality', 'subanalysis'])
 
-for (outcome, modality, subanalysis), group in grouped:
-    cv_score = group[group['cv-auc/c-index'].notna()]['cv-auc/c-index'].iloc[0] if any(group['cv-auc/c-index'].notna()) else None
-    test_score = group[group['test-auc/c-index'].notna()]['test-auc/c-index'].iloc[0] if any(group['test-auc/c-index'].notna()) else None
-    ext_val_score = group[group['ext_val-auc/c-index'].notna()]['ext_val-auc/c-index'].iloc[0] if any(group['ext_val-auc/c-index'].notna()) else None
-    
-    final_rows.append({
-        'outcome': outcome,
-        'modality': modality,
-        'subanalysis': subanalysis,
-        'cv-auc/c-index': cv_score,
-        'cv-f1': None,
-        'cv-specificity': None,
-        'cv-sensitivity': None,
-        'test-auc/c-index': test_score,
-        'test-f1': None,
-        'test-specificity': None,
-        'test-sensitivity': None,
-        'ext_val-auc/c-index': ext_val_score,
-        'ext_val-f1': None,
-        'ext_val-specificity': None,
-        'ext_val-sensitivity': None
-    })
-
 # Create final dataframe
-df = pd.DataFrame(final_rows)
+df = grouped.agg(lambda x: x.dropna().iloc[0] if len(x.dropna()) > 0 else None).reset_index()
 
 print(f"\nPopulated dataframe with {len(df)} rows")
 
@@ -378,7 +372,7 @@ for file_path in metrics_files:
     if subanalysis_parts:
         subanalysis = '-'.join(subanalysis_parts)
     else:
-        subanalysis = None
+        subanalysis = 'None'  # ← CAMBIA None in 'None' stringa
     
     try:
         metrics_df = pd.read_csv(file_path)
