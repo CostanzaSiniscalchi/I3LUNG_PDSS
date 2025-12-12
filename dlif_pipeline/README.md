@@ -36,9 +36,9 @@ This pipeline provides an end-to-end solution for MIL on medical data, featuring
 
 ### Training Modes
 
-- **Standard**: Single train/validation/test split
-- **Cross-Validation**: Leave-one-center-out cross-validation
-- **Hyperparameter Tuning**: Grid search with nested cross-validation
+- **Standard**: Single train/validation/test split - runtime around 10 mins on CPUs while 5 mins on GPUs
+- **Cross-Validation**: Leave-one-center-out cross-validation - runtime 30 mins on CPUs while 15 mins on GPUs
+- **Hyperparameter Tuning**: Grid search with nested cross-validation - runtime several hours on CPUs while few hours on GPUs
 - **External Validation**: Evaluation on held-out center (UOC)
 
 ### Model Architecture
@@ -67,6 +67,7 @@ conda install -c conda-forge spacy
 # Install dependencies
 pip install -r dlif_pipeline/requirements.txt
 ```
+This takes around 10 mins to install.
 
 ## Quick Start
 
