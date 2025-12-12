@@ -15,6 +15,7 @@ conda create -n mlef python=3.11
 conda activate mlef
 pip install -r mlef_pipeline/requirements.txt
 ```
+This takes around 5 mins to install.
 ## Training Process
 
 For both analysis (classification and survival) the training process is the following:
@@ -325,7 +326,6 @@ The script requires:
 
 
 Data files needed in `mlef_pipeline/`:
-- `split.json` - Train/test split definitions
 - `submodel_features.json` - Features to exclude
 
 Data files needed in `../data/` (relative to mlef_pipeline):
@@ -415,7 +415,7 @@ If you see `Warning: Invalid model 'XYZ'`:
 
 ## Notes
 
-- Training time varies by modality and model type (5-15 min per modality)
+- Training time varies by modality and model type (around 15 min per modality)
 - Bayesian optimization uses 50 iterations per hyperparameter search
 - Results are deterministic (random_state=10) for reproducibility
 - External validation set (UOC) is automatically detected and evaluated if present
@@ -425,6 +425,7 @@ If you see `Warning: Invalid model 'XYZ'`:
 ## Survival Analysis
 
 To train survival models (CoxPH) for Overall Survival (OS), use the `train_mlef_surv.py` script.
+Training time is around 5 mins per modality.
 
 ### Usage
 
