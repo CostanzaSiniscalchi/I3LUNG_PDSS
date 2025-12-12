@@ -72,6 +72,18 @@ I3LUNG_PDSS/dlif_pipeline/preds/
 Using **`Metadata_Extraction.ipynb`**, you can generate metadata distribution plots for each individual center as well as for all centers combined. It uses  metadata divided by center contained in **`data/Metadata_excelfiles.zip`**.
 
 ---
+## System Requirements
+### Hardware requirements
+I3LUNG PDSS requires only a standard computer with enough RAM to support the in-memory operations.
+
+### Software requirements
+#### OS Requirements
+This tool is supported for macOS, Linux and Windows. The tool has been tested on the following systems:
+- Ubuntu 24.04.3 LTS
+- Windows 11
+- MacOS Sonoma 14
+
+---
 
 ## Repository Structure
 
