@@ -100,3 +100,5 @@ I3LUNG_PDSS/
 ├── Metadata_Extraction.ipynb    # Metadata extraction notebook
 └── README.md                    # This file
 ```
+# License
+This project is covered under the **Apache 2.0 License**.
