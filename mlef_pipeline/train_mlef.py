@@ -931,7 +931,7 @@ def train_rwd_matched_model(
 def main():
     parser = argparse.ArgumentParser(description='Train MLEF models for different modality combinations')
     parser.add_argument('--outcome', type=str, default='OS_6',
-                        choices=['OS_6', 'OS_24', 'DCR'],
+                        choices=['OS_6', 'OS_24', 'DCR', 'CBR', 'ORR'],
                         help='Target outcome to predict (default: OS_6)')
     parser.add_argument('--subanalysis', type=str, default='C23',
                         choices=['C23', 'C2', 'IO_ONLY', 'IO_CHT', 'LOW_PDL1', 'MID_PDL1', 
@@ -958,7 +958,7 @@ def main():
         default_model_type = Model[args.model]
         default_model_type._explicit = True
     else:
-        default_model_type = Model.LR
+        default_model_type = Model.LR.value
     base_path = Path(args.output_dir)
     select_features = not args.no_feature_selection
     

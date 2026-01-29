@@ -11,6 +11,8 @@ class Outcome(Enum):
     OS_6 = 'OS_6'
     OS_24 = 'OS_24'
     DCR = 'DCR'
+    CBR = 'CBR'
+    ORR = 'ORR'
 
 class Subanalysis(Enum):
     C23 = 'C23'
