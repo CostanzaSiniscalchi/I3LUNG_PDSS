@@ -77,7 +77,9 @@ class DataLoader:
             case Subanalysis.IO_CHT:
                 subanalysis_features = subanalysis_features[subanalysis_features['IO_CHT'] == 1]
             case Subanalysis.LOW_PDL1:
-                subanalysis_features = subanalysis_features[(subanalysis_features['PDL1 CATEGORY'] == 0) | (subanalysis_features['PDL1 CATEGORY'] == 1)]
+                subanalysis_features = subanalysis_features[subanalysis_features['PDL1 CATEGORY'] == 0]
+            case Subanalysis.MID_PDL1:
+                subanalysis_features = subanalysis_features[subanalysis_features['PDL1 CATEGORY'] == 1]
             case Subanalysis.HIGH_PDL1:
                 subanalysis_features = subanalysis_features[subanalysis_features['PDL1 CATEGORY'] == 2]
             case Subanalysis.SQUAMOUS:
