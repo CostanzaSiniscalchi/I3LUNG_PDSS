@@ -1184,91 +1184,175 @@ def generate_dlif_metric_files(
 
 #-------------------------- Fairness Functions -------------------------
 
-def load_predictions_and_data(outcome, base_path='mlef_pipeline/results'):
+def _read_dlif_predictions(parquet_path):
+    """
+    Read a DLIF predictions parquet file and return a DataFrame with
+    [Subject, y_true, y_pred] matching the MLEF prediction format.
+
+    Converts logits (y_pred0, y_pred1) to binary predictions via softmax + threshold.
+    """
+    parquet_path = Path(parquet_path)
+    df = pd.read_parquet(parquet_path)
+
+    # Convert logits to probability of class 1 via softmax
+    exp0 = np.exp(df['y_pred0'])
+    exp1 = np.exp(df['y_pred1'])
+    y_proba = exp1 / (exp0 + exp1)
+
+    # Binarize at 0.5 threshold
+    df['y_pred'] = (y_proba >= 0.5).astype(int)
+
+    # Rename slide -> Subject and convert to int to match RWD format
+    df = df.rename(columns={'slide': 'Subject'})
+    df['Subject'] = df['Subject'].astype(int)
+
+    return df[['Subject', 'y_true', 'y_pred']]
+
+
+def load_predictions_and_data(outcome, base_path='mlef_pipeline/results',
+                              architecture='MLEF',
+                              dlif_base_path=None,
+                              dlif_feature_type='hypothesis_driven',
+                              dlif_extraction='pyrad-noimp',
+                              dlif_modality='rwd',
+                              dlif_seed=0,
+                              analysis='C23'):
     """
     Load predictions and test data for a specific outcome.
-    
+
     Parameters:
     -----------
     outcome : str
         Outcome name (e.g., 'DCR', 'OS6', 'OS24')
     base_path : str
-        Base directory path (default: 'mlef_pipeline/results')
-    
+        Base directory path for MLEF (default: 'mlef_pipeline/results')
+    architecture : str
+        'MLEF' or 'DLIF'
+    dlif_base_path : str
+        Base directory for DLIF results (e.g., 'dlif_pipeline/results')
+    dlif_feature_type : str
+        DLIF feature type (default: 'hypothesis_driven')
+    dlif_extraction : str
+        DLIF extraction method (default: 'pyrad-noimp')
+    dlif_modality : str
+        DLIF modality (default: 'rwd')
+    dlif_seed : int
+        DLIF seed number (default: 0)
+    analysis : str
+        Analysis name (default: 'C23')
+
     Returns:
     --------
     tuple : (predictions_df, test_df)
         - predictions_df: DataFrame with columns [Subject, y_true, y_pred]
-        - test_df: DataFrame with columns [Subject, SEX], ordered by predictions_df
+        - test_df: DataFrame with CENTER and SEX columns, indexed by Subject
     """
-    # Load predictions from CSV
-    pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_TEST.csv')
-    predictions_df = pd.read_csv(pred_path)
-    
-    # Load RWD data
+    if architecture == 'DLIF':
+        # Build DLIF standard path
+        if dlif_base_path is None:
+            dlif_base_path = 'dlif_pipeline/results'
+        dlif_outcome = outcome_to_dlif(outcome)
+        dlif_mod = map_mlef_to_dlif_modality(dlif_modality) if dlif_modality == dlif_modality.upper() else dlif_modality
+        pred_dir = (Path(dlif_base_path) / analysis / dlif_outcome / 'classification' /
+                    'standard' / dlif_feature_type / dlif_extraction / dlif_mod /
+                    f'seed_{dlif_seed}')
+        pred_path = pred_dir / 'predictions.parquet'
+        predictions_df = _read_dlif_predictions(pred_path)
+    else:
+        # MLEF path
+        pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_TEST.csv')
+        predictions_df = pd.read_csv(pred_path)
+
+    # Load RWD data and join for CENTER/SEX
     rwd_path = 'data/rwd.csv'
     rwd_df = pd.read_csv(rwd_path)
-    
-    # Match subjects from predictions with RWD data
-    # Keep only Subject and SEX columns, in the same order as predictions
+
     test_df = predictions_df[['Subject']].merge(
-        rwd_df[['Subject', 'CENTER','SEX']], 
-        on='Subject', 
+        rwd_df[['Subject', 'CENTER', 'SEX']],
+        on='Subject',
         how='left'
     )
-    
-    # Set Subject as index
     test_df = test_df.set_index('Subject')
-    
-    print(f"Loaded predictions for {outcome}:")
+
+    print(f"Loaded predictions for {outcome} ({architecture}):")
     print(f"  Samples: {len(predictions_df)}")
     print(f"  Columns in test data: {test_df.shape[1]} ({', '.join(test_df.columns)})")
     print(f"  Subject order preserved: {(predictions_df['Subject'].values == test_df.index.values).all()}")
-    
+
     return predictions_df, test_df
 
-def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results'):
+def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results',
+                                    architecture='MLEF',
+                                    dlif_base_path=None,
+                                    dlif_feature_type='hypothesis_driven',
+                                    dlif_extraction='pyrad-noimp',
+                                    dlif_modality='rwd',
+                                    dlif_seed=0,
+                                    analysis='C23'):
     """
-    Load predictions and test data for a specific outcome.
-    
+    Load predictions and exval data for a specific outcome.
+
     Parameters:
     -----------
     outcome : str
         Outcome name (e.g., 'DCR', 'OS6', 'OS24')
     base_path : str
-        Base directory path (default: 'mlef_pipeline/results')
-    
+        Base directory path for MLEF (default: 'mlef_pipeline/results')
+    architecture : str
+        'MLEF' or 'DLIF'
+    dlif_base_path : str
+        Base directory for DLIF results (e.g., 'dlif_pipeline/results')
+    dlif_feature_type : str
+        DLIF feature type (default: 'hypothesis_driven')
+    dlif_extraction : str
+        DLIF extraction method (default: 'pyrad-noimp')
+    dlif_modality : str
+        DLIF modality (default: 'rwd')
+    dlif_seed : int
+        DLIF seed number (default: 0)
+    analysis : str
+        Analysis name (default: 'C23')
+
     Returns:
     --------
-    tuple : (predictions_df, test_df)
+    tuple : (predictions_df, exval_df)
         - predictions_df: DataFrame with columns [Subject, y_true, y_pred]
-        - test_df: DataFrame with columns [Subject, SEX, RACE], ordered by predictions_df
+        - exval_df: DataFrame with SEX and RACE columns, indexed by Subject
     """
-    # Load predictions from CSV
-    pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_EXVAL.csv')
-    predictions_df = pd.read_csv(pred_path)
-    
-    # Load RWD data
+    if architecture == 'DLIF':
+        if dlif_base_path is None:
+            dlif_base_path = 'dlif_pipeline/results'
+        dlif_outcome = outcome_to_dlif(outcome)
+        dlif_mod = map_mlef_to_dlif_modality(dlif_modality) if dlif_modality == dlif_modality.upper() else dlif_modality
+        pred_dir = (Path(dlif_base_path) / analysis / dlif_outcome / 'classification' /
+                    'evaluation' / dlif_feature_type / dlif_extraction / dlif_mod /
+                    f'seed_{dlif_seed}')
+        # Try direct predictions.parquet first, then eval subdirectory
+        pred_path = pred_dir / 'predictions.parquet'
+        if not pred_path.exists():
+            pred_path = pred_dir / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet'
+        predictions_df = _read_dlif_predictions(pred_path)
+    else:
+        pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_EXVAL.csv')
+        predictions_df = pd.read_csv(pred_path)
+
+    # Load RWD data and join for SEX/RACE
     rwd_path = 'data/rwd.csv'
     rwd_df = pd.read_csv(rwd_path)
-    
-    # Match subjects from predictions with RWD data
-    # Keep only Subject and SEX columns, in the same order as predictions
-    test_df = predictions_df[['Subject']].merge(
-        rwd_df[['Subject', 'RACE','SEX']], 
-        on='Subject', 
+
+    exval_df = predictions_df[['Subject']].merge(
+        rwd_df[['Subject', 'SEX', 'RACE']],
+        on='Subject',
         how='left'
     )
-    
-    # Set Subject as index
-    test_df = test_df.set_index('Subject')
-    
-    print(f"Loaded predictions for {outcome}:")
+    exval_df = exval_df.set_index('Subject')
+
+    print(f"Loaded EXVAL predictions for {outcome} ({architecture}):")
     print(f"  Samples: {len(predictions_df)}")
-    print(f"  Columns in test data: {test_df.shape[1]} ({', '.join(test_df.columns)})")
-    print(f"  Subject order preserved: {(predictions_df['Subject'].values == test_df.index.values).all()}")
-    
-    return predictions_df, test_df
+    print(f"  Columns in exval data: {exval_df.shape[1]} ({', '.join(exval_df.columns)})")
+    print(f"  Subject order preserved: {(predictions_df['Subject'].values == exval_df.index.values).all()}")
+
+    return predictions_df, exval_df
 
 def compute_tpr_fpr(y_true, y_pred):
     """
@@ -2070,11 +2154,18 @@ def analyze_outcome_fairness(
     outcome_name,
     base_path='mlef_pipeline/results',
     n_perms=1000,
-    random_state=42
+    random_state=42,
+    architecture='MLEF',
+    dlif_base_path=None,
+    dlif_feature_type='hypothesis_driven',
+    dlif_extraction='pyrad-noimp',
+    dlif_modality='rwd',
+    dlif_seed=0,
+    analysis='C23'
 ):
     """
     Complete fairness analysis for a single outcome.
-    
+
     Parameters:
     -----------
     outcome : str
@@ -2082,22 +2173,45 @@ def analyze_outcome_fairness(
     outcome_name : str
         Display name for outcome (e.g., 'OS 24')
     base_path : str
-        Base directory path where predictions are stored
+        Base directory path where predictions are stored (MLEF)
     n_perms : int
         Number of permutations for tests
     random_state : int
         Random seed
-    
+    architecture : str
+        'MLEF' or 'DLIF'
+    dlif_base_path : str
+        Base directory for DLIF results (e.g., 'dlif_pipeline/results')
+    dlif_feature_type : str
+        DLIF feature type (default: 'hypothesis_driven')
+    dlif_extraction : str
+        DLIF extraction method (default: 'pyrad-noimp')
+    dlif_modality : str
+        DLIF modality (default: 'rwd')
+    dlif_seed : int
+        DLIF seed number (default: 0)
+    analysis : str
+        Analysis name (default: 'C23')
+
     Returns:
     --------
     dict : Results including fairness metrics and test results
     """
     print(f"\n{'='*60}")
-    print(f"Analyzing {outcome_name}")
+    print(f"Analyzing {outcome_name} ({architecture})")
     print(f"{'='*60}\n")
-    
+
     # Load predictions and data
-    predictions_df, test = load_predictions_and_data(outcome, base_path)
+    predictions_df, test = load_predictions_and_data(
+        outcome, base_path,
+        architecture=architecture,
+        dlif_base_path=dlif_base_path,
+        dlif_feature_type=dlif_feature_type,
+        dlif_extraction=dlif_extraction,
+        dlif_modality=dlif_modality,
+        dlif_seed=dlif_seed,
+        analysis=analysis
+    )
     
     # Extract predictions
     y_test = predictions_df['y_true'].values
@@ -2425,55 +2539,19 @@ def create_fairness_summary(results_dict):
     
     return sex_fairness, center_fairness, pairwise_tpr, pairwise_fpr
 
-def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results'):
-    """
-    Load predictions and exval data for a specific outcome.
-    
-    Parameters:
-    -----------
-    outcome : str
-        Outcome name (e.g., 'DCR', 'OS6', 'OS24')
-    base_path : str
-        Base directory path (default: 'mlef_pipeline/results')
-    
-    Returns:
-    --------
-    tuple : (predictions_df, exval_df)
-        - predictions_df: DataFrame with columns [Subject, y_true, y_pred]
-        - exval_df: DataFrame with columns [Subject, SEX, RACE], ordered by predictions_df
-    """
-    # Load predictions from CSV
-    pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_EXVAL.csv')
-    predictions_df = pd.read_csv(pred_path)
-    
-    # Load RWD data
-    rwd_path = 'data/rwd.csv'
-    rwd_df = pd.read_csv(rwd_path)
-    
-    # Match subjects from predictions with RWD data
-    exval_df = predictions_df[['Subject']].merge(
-        rwd_df[['Subject', 'SEX', 'RACE']], 
-        on='Subject', 
-        how='left'
-    )
-    
-    # Set Subject as index
-    exval_df = exval_df.set_index('Subject')
-    
-    print(f"Loaded EXVAL predictions for {outcome}:")
-    print(f"  Samples: {len(predictions_df)}")
-    print(f"  Columns in exval data: {exval_df.shape[1]} ({', '.join(exval_df.columns)})")
-    print(f"  Subject order preserved: {(predictions_df['Subject'].values == exval_df.index.values).all()}")
-    
-    return predictions_df, exval_df
-
-
 def analyze_exval_outcome_fairness_by_race(
     outcome,
     outcome_name,
     base_path='mlef_pipeline/results',
     n_perms=1000,
-    random_state=42
+    random_state=42,
+    architecture='MLEF',
+    dlif_base_path=None,
+    dlif_feature_type='hypothesis_driven',
+    dlif_extraction='pyrad-noimp',
+    dlif_modality='rwd',
+    dlif_seed=0,
+    analysis='C23'
 ):
     """
     Complete fairness analysis by race for external validation set.
@@ -2502,7 +2580,16 @@ def analyze_exval_outcome_fairness_by_race(
     print(f"{'='*60}\n")
     
     # Load EXVAL predictions and data
-    predictions_df, exval = load_predictions_and_data_exval(outcome, base_path)
+    predictions_df, exval = load_predictions_and_data_exval(
+        outcome, base_path,
+        architecture=architecture,
+        dlif_base_path=dlif_base_path,
+        dlif_feature_type=dlif_feature_type,
+        dlif_extraction=dlif_extraction,
+        dlif_modality=dlif_modality,
+        dlif_seed=dlif_seed,
+        analysis=analysis
+    )
     
     # Filter to only include WHITE and BLACK OR AFRICAN AMERICAN races
     valid_races = ['WHITE', 'BLACK OR AFRICAN AMERICAN']
