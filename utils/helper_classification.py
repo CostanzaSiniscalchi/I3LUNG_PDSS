@@ -1256,7 +1256,9 @@ def load_predictions_and_data(outcome, base_path='mlef_pipeline/results',
         pred_dir = (Path(dlif_base_path) / analysis / dlif_outcome / 'classification' /
                     'standard' / dlif_feature_type / dlif_extraction / dlif_mod /
                     f'seed_{dlif_seed}')
-        pred_path = pred_dir / 'predictions.parquet'
+        # Prefer eval predictions (full test set) over root predictions (CV val fold)
+        eval_path = pred_dir / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet'
+        pred_path = eval_path if eval_path.exists() else pred_dir / 'predictions.parquet'
         predictions_df = _read_dlif_predictions(pred_path)
     else:
         # MLEF path
