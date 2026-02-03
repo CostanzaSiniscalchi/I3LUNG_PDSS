@@ -2674,50 +2674,81 @@ def create_race_fairness_summary(results_dict):
 
 
 def plot_km_combined(target, train_set, test_set, uoc_set, title):
-    # Create a single axis for the combined plot
     fig, ax = plt.subplots(figsize=(8, 4))
     
-    # Define custom colors for each dataset
     colors = {'TRAIN': '#511635', 'TEST': '#1f77b4', 'EXVAL': '#800080'}
     
-    # Container to hold datasets
     datasets = {
         'TRAIN': train_set,
         'TEST': test_set,
         'EXVAL': uoc_set
     }
     
-    # Collect median annotations
     median_annotations = []
+    followup_annotations = []
     kmfs = []
+
     for label, dataset in datasets.items():
         kdf = dataset.dropna(subset=['OS MONTHS', 'DEATH EVENT'])
+
+        # ---- KM for OS ----
         kmf = KaplanMeierFitter()
         kmf.fit(kdf['OS MONTHS'], kdf['DEATH EVENT'], label=label)
-        
-        # Plot the curve using the dataset-specific color.
         kmf.plot(ax=ax, color=colors[label], show_censors=True, ci_show=True)
         kmfs.append(kmf)
 
-        # Calculate median OS and its CI.
+        # Median OS + CI
         median_target = kmf.median_survival_time_
         median_ci = median_survival_times(kmf.confidence_interval_)
         lower_bound = median_ci.iloc[0, 0]
         upper_bound = median_ci.iloc[0, 1]
-        print(f"{label} - Median {target}: {median_target} months")
-        print(f"95% CI: {lower_bound} - {upper_bound} months")
-        
-        # Add median annotation to the list
-        median_annotations.append(f"{label}: {median_target:.1f} mo (95% CI: {lower_bound:.1f}-{upper_bound:.1f})")
-    
-    # Add median annotations at the top of the axes
-    ax.text(0.5, 0.95, "\n".join(median_annotations),
-            transform=ax.transAxes, color="black", fontsize=15,
-            horizontalalignment='center', verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5))
-    # Add at-risk counts below the plot
-    add_at_risk_counts(*kmfs, ax=ax, labels=list(datasets.keys()), rows_to_show=["At risk"], fontsize=15)
+
+        median_annotations.append(
+            f"{label}: {median_target:.1f} mo (95% CI: {lower_bound:.1f}-{upper_bound:.1f})"
+        )
+
+        # ---- Reverse KM for follow-up ----
+        kmf_fu = KaplanMeierFitter()
+        kmf_fu.fit(
+            durations=kdf['OS MONTHS'],
+            event_observed=1 - kdf['DEATH EVENT']
+        )
+
+        median_fu = kmf_fu.median_survival_time_
+        min_fu = kdf['OS MONTHS'].min()
+        max_fu = kdf['OS MONTHS'].max()
+
+        followup_annotations.append(
+            f"{label} FU: {median_fu:.1f} mo (range {min_fu:.1f}-{max_fu:.1f})"
+        )
+
+    # ---- Annotations ----
+    ax.text(
+        0.5, 0.95,
+        "\n".join(median_annotations),
+        transform=ax.transAxes,
+        fontsize=14,
+        ha='center',
+        va='top',
+        bbox=dict(facecolor='white', alpha=0.5)
+    )
+
+
+    add_at_risk_counts(
+        *kmfs,
+        ax=ax,
+        labels=list(datasets.keys()),
+        rows_to_show=["At risk"],
+        fontsize=15
+    )
+    print('FOLLOW-UP STATISTICS:')
+    for annotation in followup_annotations:
+        print(annotation)
+
     ax.set_xlim(0, 100)
     ax.set_xlabel('Months')
     ax.set_ylabel('OS Probability')
     ax.set_title(title)
     plt.show()
+
+
