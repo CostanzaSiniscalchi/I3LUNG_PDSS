@@ -29,9 +29,13 @@
 !Metadata_Extraction.ipynb
 !data_visualization.ipynb
 !requirements.txt
-!mlef_pipeline/results/**
+!mlef_pipeline/results/**!
+!vanguri/vanguri.ipynb
+!vanguri/lung_helpers.py
+
 mlef_pipeline/results/OS
 dlif_pipeline/preds
+
 # py cache
 __pycache__/
 
@@ -41,3 +45,4 @@ __pycache__/
 dlif_pipeline/bags/
 dlif_pipeline/results/
 mlef_pipeline/results/
+vanguri/results/
