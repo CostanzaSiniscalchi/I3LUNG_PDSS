@@ -963,13 +963,11 @@ class MultiModalDynamicModel(nn.Module):
         arr_MASK   = copy.deepcopy(arr_MASK)
         vector_Y   = copy.deepcopy(vector_Y)
         
-        print(f"Fit called with {len(l_X_INPUTS)} modalities, {len(vector_Y)} samples")
                         
         self.dyam = AttentionMatrix(cross_modality_enabled=self.cross_modality_enabled, attention_gate_enabled=self.attention_gate_enabled)
         self.l_scalers = []
         
         for i, X in enumerate(l_X_INPUTS):
-            print(f"Modality {i}: shape {X.shape}, noscale={i in self.noscale}")
             
             if i in self.noscale: 
                 l_X_INPUTS[i] = torch.tensor(np.nan_to_num(X)).float()
@@ -985,8 +983,6 @@ class MultiModalDynamicModel(nn.Module):
         mask    = torch.tensor(arr_MASK).float()
         targets = torch.tensor(vector_Y).float()
         
-        print(f"Mask shape: {mask.shape}, available modalities per patient: {mask.sum(dim=1).mean().item():.2f}")
-        print(f"Class balance: {targets.sum().item()}/{len(targets)} positive")
 
         self.criterion = nn.BCEWithLogitsLoss(pos_weight=sum(targets==0) / sum(targets==1))
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -1544,24 +1540,40 @@ def train_standard_split(modality_list_in, modality_mask, outcomes, l1_dfs_filte
     # Get coefficients
     df_coef = clf.get_coefs(modality_list, modality_mask)
     
+    # Predict on train set
+    train_scores = clf.predict_proba(train_feature_inputs, train_feature_mask)
+    score, train_risks, train_attentions, train_shares = clf.get_summary_scores(train_feature_inputs, train_feature_mask)
+    
     # Predict on test set
     test_scores = clf.predict_proba(test_feature_inputs, test_feature_mask)
-    score, risks, attentions, shares = clf.get_summary_scores(test_feature_inputs, test_feature_mask)
+    score, test_risks, test_attentions, test_shares = clf.get_summary_scores(test_feature_inputs, test_feature_mask)
     
     # Store results
     d_summarys_all = {}
+    
+    # Train set
+    for idx, px in enumerate(train_idx):
+        d_summarys_all[px] = {
+            'label': train_labels[idx],
+            'score': train_scores[idx],
+            'set': 'train'
+        }
+        for i, mod_name in enumerate(modality_mask.columns):
+            d_summarys_all[px][f'risk_{mod_name}'] = train_risks[idx][i]
+            d_summarys_all[px][f'attn_{mod_name}'] = train_attentions[idx][i]
+            d_summarys_all[px][f'share_{mod_name}'] = train_shares[idx][i]
+    
+    # Test set
     for idx, px in enumerate(test_idx):
         d_summarys_all[px] = {
             'label': test_labels[idx],
             'score': test_scores[idx],
             'set': 'test'
         }
-        for i, risk in enumerate(risks[idx]):
-            d_summarys_all[px][f'risk_{modality_mask.columns[i]}'] = risk
-        for i, attn in enumerate(attentions[idx]):
-            d_summarys_all[px][f'attn_{modality_mask.columns[i]}'] = attn
-        for i, share in enumerate(shares[idx]):
-            d_summarys_all[px][f'share_{modality_mask.columns[i]}'] = share
+        for i, mod_name in enumerate(modality_mask.columns):
+            d_summarys_all[px][f'risk_{mod_name}'] = test_risks[idx][i]
+            d_summarys_all[px][f'attn_{mod_name}'] = test_attentions[idx][i]
+            d_summarys_all[px][f'share_{mod_name}'] = test_shares[idx][i]
     
     # Calculate test AUC
     if 1.0 in test_labels and 0.0 in test_labels:
@@ -1577,7 +1589,7 @@ def train_standard_split(modality_list_in, modality_mask, outcomes, l1_dfs_filte
         ext_val_labels = outcomes.loc[ext_val_idx, 'label'].values
         
         ext_val_scores = clf.predict_proba(ext_val_feature_inputs, ext_val_feature_mask)
-        score, risks, attentions, shares = clf.get_summary_scores(ext_val_feature_inputs, ext_val_feature_mask)
+        score, ext_val_risks, ext_val_attentions, ext_val_shares = clf.get_summary_scores(ext_val_feature_inputs, ext_val_feature_mask)
         
         for idx, px in enumerate(ext_val_idx):
             d_summarys_all[px] = {
@@ -1585,12 +1597,10 @@ def train_standard_split(modality_list_in, modality_mask, outcomes, l1_dfs_filte
                 'score': ext_val_scores[idx],
                 'set': 'ext_val'
             }
-            for i, risk in enumerate(risks[idx]):
-                d_summarys_all[px][f'risk_{modality_mask.columns[i]}'] = risk
-            for i, attn in enumerate(attentions[idx]):
-                d_summarys_all[px][f'attn_{modality_mask.columns[i]}'] = attn
-            for i, share in enumerate(shares[idx]):
-                d_summarys_all[px][f'share_{modality_mask.columns[i]}'] = share
+            for i, mod_name in enumerate(modality_mask.columns):
+                d_summarys_all[px][f'risk_{mod_name}'] = ext_val_risks[idx][i]
+                d_summarys_all[px][f'attn_{mod_name}'] = ext_val_attentions[idx][i]
+                d_summarys_all[px][f'share_{mod_name}'] = ext_val_shares[idx][i]
         
         if 1.0 in ext_val_labels and 0.0 in ext_val_labels:
             auc, auc_cov = delong_roc_variance(ext_val_labels, ext_val_scores)
@@ -1599,10 +1609,18 @@ def train_standard_split(modality_list_in, modality_mask, outcomes, l1_dfs_filte
             print(f"External Validation AUC: {auc:.3f} (95% CI: {ci[0]:.3f}-{ci[1]:.3f})\n")
     
     return get_summary_df(d_summarys_all), df_coef
-
 def hyperparameter_search(modality_list, modality_mask, df_out, l1_dfs_filter, hyperparam_grid):
     
     import itertools
+    from sklearn.model_selection import train_test_split
+    
+    # Split 90% train, 10% validation
+    train_idx, val_idx = train_test_split(
+        df_out.index, 
+        test_size=0.1, 
+        random_state=42,
+        stratify=df_out['label']
+    )
     
     param_combinations = list(itertools.product(
         hyperparam_grid['epochs'],
@@ -1611,9 +1629,11 @@ def hyperparameter_search(modality_list, modality_mask, df_out, l1_dfs_filter, h
         hyperparam_grid['beta']
     ))
     
-    print(f"Testing {len(param_combinations)} combinations with 10-fold CV\n")
+    print(f"Testing {len(param_combinations)} combinations")
+    print(f"Train: {len(train_idx)}, Validation: {len(val_idx)}\n")
     
-    best_fold1_auc = 0
+    best_val_auc = 0
+    best_ci_lower = 0
     best_params = None
     results = []
     
@@ -1621,34 +1641,40 @@ def hyperparameter_search(modality_list, modality_mask, df_out, l1_dfs_filter, h
         params = {'epochs': epochs, 'lr': lr, 'alpha': alpha, 'beta': beta, 
                   'cross_modality_enabled': False}
         
-        # 10-fold CV completa
-        summary_df, _ = train(
+        summary_df, _ = train_standard_split(
             modality_list_in=modality_list,
             modality_mask=modality_mask,
             outcomes=df_out,
             l1_dfs_filter=l1_dfs_filter,
             model_params=params,
-            folds=10,
-            predefined_folds=None
+            train_set=train_idx,
+            test_set=val_idx
         )
         
-        # Guarda SOLO fold 0 per scegliere parametri
-        fold1_data = summary_df[summary_df['fold'] == 0]
-        fold1_auc = roc_auc_score(fold1_data['label'], fold1_data['score'])
+        val_labels = summary_df['label'].astype(float).values
+        val_scores = summary_df['score'].astype(float).values
+        
+        val_auc, auc_cov = delong_roc_variance(val_labels, val_scores)
+        auc_std = np.sqrt(auc_cov)
+        ci_lower = val_auc - 1.96 * auc_std
+        ci_upper = val_auc + 1.96 * auc_std
         
         results.append({
             'epochs': epochs, 'lr': lr, 'alpha': alpha, 'beta': beta,
-            'fold1_auc': fold1_auc
+            'val_auc': val_auc, 'ci_lower': ci_lower, 'ci_upper': ci_upper
         })
         
-        print(f"epochs={epochs}, lr={lr}, alpha={alpha}, beta={beta} -> Fold1 AUC: {fold1_auc:.3f}")
+        print(f"epochs={epochs}, lr={lr}, alpha={alpha}, beta={beta} -> Val AUC: {val_auc:.3f} (95% CI: {ci_lower:.3f}-{ci_upper:.3f})")
         
-        if fold1_auc > best_fold1_auc:
-            best_fold1_auc = fold1_auc
+        # Update best if CI doesn't overlap with current best
+        if ci_lower > best_ci_lower:
+            best_val_auc = val_auc
+            best_ci_lower = ci_lower
             best_params = params
+            print(f"  -> New best (no CI overlap)")
     
-    print(f"\nBest params (based on fold 1): {best_params}")
-    print(f"Fold 1 AUC: {best_fold1_auc:.3f}\n")
+    print(f"\nBest params: {best_params}")
+    print(f"Validation AUC: {best_val_auc:.3f}\n")
     
     return best_params, pd.DataFrame(results)
 
@@ -1823,7 +1849,6 @@ def train_LR_eval_all(df, outcomes, train_px, valid_px, filter=None):
     print ("Fold [{0}] AUC = {1:.3f} +/- {2:.3f} 95% CL".format("Test", auc, (ci[1] - ci[0]) / 2.0) )
     
     return get_summary_df(d_summarys_all)
-
 
 def get_lesion_dfs(df_by_site, df_outcomes, index_col='global_lesion_id'):
 
