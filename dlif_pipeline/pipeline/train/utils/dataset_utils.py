@@ -99,6 +99,8 @@ def get_datasets(P, training_type, config, fold, folds, outcome,
         else:
             train_filter[fold_col] = [f for f in folds if f != fold]
             val_filter[fold_col]   = [fold]
+            train_filter[f"dataset_{outcome}"] = "train"
+            val_filter[f"dataset_{outcome}"] = "train"
         if early_stop_col in annotations_df:
             # Check if there are any 'yes' values for early stopping
             has_early_stop = (annotations_df[early_stop_col] == "yes").any()
