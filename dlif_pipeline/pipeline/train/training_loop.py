@@ -139,6 +139,10 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
     bag_size = combo.get("bag_size", 32)
     recon_weight = combo.get("reconstruction_weight", 0.1)
     n_layers = combo.get("n_layers", 1)
+    lr = combo.get("lr", None)
+    if lr is not None:
+        lr = float(lr)
+    fit_one_cycle = combo.get("fit_one_cycle", True)
 
     # 6. Build MIL config
     config_mil = mil_config(
@@ -149,6 +153,8 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
         bag_size=bag_size,
         save_monitor=save_monitor,
         reconstruction_weight=recon_weight,
+        lr=lr,
+        fit_one_cycle=fit_one_cycle,
         model_kwargs={"n_layers": n_layers}
     )
     config_mil.mixed_bags = True
@@ -180,7 +186,15 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
 
         # build correct filter based on training type
         if training_type == "cross_validation":
-            test_filter = {f"fold_{outcome}": [fold]}
+            if config.get("FILTER_INT"):
+                test_filter = {f"INT_ONLY_FOLDS": [fold]}
+                if outcome != "OS_MONTHS":
+                    test_filter.update({f"{outcome}": ["0.0", "1.0"]})
+                else:
+                    pass
+                    # new column for OS_MONTHS not implemented yet
+            else:
+                test_filter = {f"fold_{outcome}": [fold]}
             print(f"cross-validation: test set is fold {fold}")
         elif training_type == "standard":
             test_filter = {
