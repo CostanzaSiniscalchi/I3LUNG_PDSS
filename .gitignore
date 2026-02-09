@@ -43,6 +43,13 @@ __pycache__/
 
 # Ignore specific dlif_pipeline subdirectories
 dlif_pipeline/bags/
+dlif_pipeline/configs/
 dlif_pipeline/results/
 mlef_pipeline/results/
 vanguri/results/
+data_backup/
+dlif_pipeline/MIL.log
+dlif_pipeline/df.parquet
+dlif_pipeline/structure.txt
+dlif_pipeline/scripts/
+dlif_pipeline/pipeline/train/MIL.log

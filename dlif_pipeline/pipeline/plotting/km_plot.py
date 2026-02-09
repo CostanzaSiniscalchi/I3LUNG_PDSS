@@ -103,13 +103,14 @@ def create_lipi_groups(merged_df):
     return datasets
 
 
-def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None, 
-                             time_col='OS_MONTHS', event_col='DEATH_EVENT_OC', 
-                             output_dir=None, modality_name='model', 
-                             training_type='standard', plot_lipi=True):
+def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
+                             time_col='OS_MONTHS', event_col='DEATH_EVENT_OC',
+                             output_dir=None, modality_name='model',
+                             training_type='standard', plot_lipi=True,
+                             save_prefix=None):
     """
     Generate KM plots from prediction parquet and clinical data.
-    
+
     Args:
         parquet_path: Path to predictions parquet file
         annotations_data: Path to CSV/Excel file with survival outcomes (uses 'slide' as ID column)
@@ -120,7 +121,9 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
         modality_name: Name of modality for plot titles
         training_type: Type of training (standard, cross_validation, etc.)
         plot_lipi: Whether to also generate LIPI comparison plot
-        
+        save_prefix: Custom filename prefix (e.g. "km_plot-C23-standard-OS_MONTHS-rwd").
+                     If None, uses default naming.
+
     Returns:
         Tuple of (pairwise_df_predictions_all, pairwise_df_lipi_subset)
         - pairwise_df_predictions_all: Stats for model predictions on all patients
@@ -185,70 +188,66 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
     # Plot KM curves for predictions (all patients)
     plt_pred, pw_df_pred = plot_km_combined(datasets_pred, stats=True)
     
+    # Build filename base
+    if save_prefix:
+        base_name = save_prefix
+    else:
+        base_name = f'km_plot-{modality_name}-{training_type}'
+
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Save prediction plot
-        pred_filename = f'km_predictions_{modality_name}_{training_type}.png'
-        pred_path = os.path.join(output_dir, pred_filename)
+        pred_path = os.path.join(output_dir, f'{base_name}.png')
         plt_pred.savefig(pred_path, bbox_inches='tight', dpi=300)
         print(f"      Saved KM plot (predictions): {pred_path}")
-        
+
         # Save pairwise comparison table
-        csv_filename = f'km_predictions_{modality_name}_{training_type}_pairwise.csv'
-        csv_path = os.path.join(output_dir, csv_filename)
+        csv_path = os.path.join(output_dir, f'{base_name}_pairwise.csv')
         pw_df_pred.to_csv(csv_path, index=False)
         print(f"      Saved pairwise comparisons: {csv_path}")
-    
+
     plt_pred.close()
 
     # Plot predictions on LIPI-subset patients
     pw_df_pred_lipi_subset = None
     if plot_lipi and 'LIPI' in merged.columns:
         merged_lipi_subset = merged[merged['LIPI'].notna()].copy()
-        
+
         if len(merged_lipi_subset) > 0:
             # Create risk groups from predictions (LIPI-subset only)
             datasets_pred_lipi_subset = create_risk_groups(merged_lipi_subset, score_col='proba1')
-            
+
             plt_pred_lipi_subset, pw_df_pred_lipi_subset = plot_km_combined(datasets_pred_lipi_subset, stats=True)
-            
+
             if output_dir:
-                # Save prediction plot (LIPI-subset)
-                pred_lipi_subset_filename = f'km_predictions_lipi_subset_{modality_name}_{training_type}.png'
-                pred_lipi_subset_path = os.path.join(output_dir, pred_lipi_subset_filename)
+                pred_lipi_subset_path = os.path.join(output_dir, f'{base_name}-lipi_subset.png')
                 plt_pred_lipi_subset.savefig(pred_lipi_subset_path, bbox_inches='tight', dpi=300)
                 print(f"      Saved KM plot (predictions, LIPI-subset): {pred_lipi_subset_path}")
-                
-                # Save pairwise comparison table
-                pred_lipi_subset_csv_filename = f'km_predictions_lipi_subset_{modality_name}_{training_type}_pairwise.csv'
-                pred_lipi_subset_csv_path = os.path.join(output_dir, pred_lipi_subset_csv_filename)
-                pw_df_pred_lipi_subset.to_csv(pred_lipi_subset_csv_path, index=False)
-                print(f"      Saved pairwise comparisons (predictions, LIPI-subset): {pred_lipi_subset_csv_path}")
-            
+
+                csv_lipi_subset_path = os.path.join(output_dir, f'{base_name}-lipi_subset_pairwise.csv')
+                pw_df_pred_lipi_subset.to_csv(csv_lipi_subset_path, index=False)
+                print(f"      Saved pairwise comparisons (predictions, LIPI-subset): {csv_lipi_subset_path}")
+
             plt_pred_lipi_subset.close()
 
     # Optionally plot LIPI comparison
     pw_df_lipi = None
     if plot_lipi and 'LIPI' in merged.columns:
         datasets_lipi = create_lipi_groups(merged)
-        
+
         if len(datasets_lipi) > 0:
             plt_lipi, pw_df_lipi = plot_km_combined(datasets_lipi, stats=True)
-            
+
             if output_dir:
-                # Save LIPI plot
-                lipi_filename = f'km_lipi_{modality_name}_{training_type}.png'
-                lipi_path = os.path.join(output_dir, lipi_filename)
+                lipi_path = os.path.join(output_dir, f'{base_name}-lipi.png')
                 plt_lipi.savefig(lipi_path, bbox_inches='tight', dpi=300)
                 print(f"      Saved KM plot (LIPI): {lipi_path}")
-                
-                # Save pairwise comparison table
-                lipi_csv_filename = f'km_lipi_{modality_name}_{training_type}_pairwise.csv'
-                lipi_csv_path = os.path.join(output_dir, lipi_csv_filename)
+
+                lipi_csv_path = os.path.join(output_dir, f'{base_name}-lipi_pairwise.csv')
                 pw_df_lipi.to_csv(lipi_csv_path, index=False)
                 print(f"      Saved LIPI pairwise comparisons: {lipi_csv_path}")
-            
+
             plt_lipi.close()
 
     return pw_df_pred, pw_df_pred_lipi_subset
@@ -327,13 +326,17 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
     time_col = 'OS_MONTHS'  # Default
     event_col = 'DEATH_EVENT_OC'  # Default
     
+    # Build naming parts from prefix_parts (skip leading "results")
+    prefix_parts = path_info['prefix_parts']
+    name_parts = list(prefix_parts[1:])  # e.g. ["C23"] or ["C23", "int"]
+
     for outcome in outcomes:
         print(f"\n   Processing outcome: {outcome}")
-        
+
         # Build base path for this outcome
         base_path = os.path.join(
             path_info['base_dir'],
-            *path_info['prefix_parts'],
+            *prefix_parts,
             outcome,
             task,
             training_type,
@@ -366,10 +369,13 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
                 continue
 
             print(f"      Processing modality: {mod_string}")
-            
+
             # Create output directory in same location as predictions (seed_0 folder)
             output_dir = seed_path
-            
+
+            # Build save_prefix: km_plot-{COHORT}-{subanalysis}-{training_type}-{outcome}-{modality}
+            save_prefix = "km_plot-" + "-".join(name_parts + [training_type, outcome, mod_string])
+
             try:
                 # Generate KM plots
                 pw_df_pred, pw_df_pred_lipi_subset = plot_km_from_predictions(
@@ -381,7 +387,8 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
                     output_dir=output_dir,
                     modality_name=mod_string,
                     training_type=training_type,
-                    plot_lipi=plot_lipi
+                    plot_lipi=plot_lipi,
+                    save_prefix=save_prefix,
                 )
                 
                 # Print pairwise comparisons

@@ -138,7 +138,8 @@ def plot_auc_results(
     dlif_feature_type: str = "hypothesis_driven",              # hypothesis_driven or data_driven
     dlif_extraction: str = "pyrad-noimp",                      # feature extraction method
     dlif_seed: int = 0,                                         # seed number
-    use_preds: bool = True                                      # whether to use prediction files for p-value computation
+    use_preds: bool = True,                                     # whether to use prediction files for p-value computation
+    save_name: Optional[str] = None                             # custom filename (without extension) for saved plot
 ):
     """
     Plot AUC results comparing different modalities for MLEF or DLIF architectures.
@@ -617,7 +618,10 @@ def plot_auc_results(
         plt.xlim(-0.4, len(modalities) - 0.55)
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{outcome}_{analysis}.png"
+            if save_name:
+                out = Path(save_dir) / f"{save_name}.png"
+            else:
+                out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{outcome}_{analysis}.png"
             plt.savefig(out, dpi=600, bbox_inches="tight")
         if show:
             plt.show()
