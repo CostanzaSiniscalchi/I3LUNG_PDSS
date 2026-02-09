@@ -22,7 +22,7 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
     
     from MIL.mil import mil_config, eval_mil
     from .utils.config_utils import get_task_settings
-    from .utils.dataset_utils import get_datasets
+    from .utils.dataset_utils import get_datasets, get_eval_dataset
     import torch, random, numpy as np
     import os
 
@@ -72,15 +72,8 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
 
         print(f"best model checkpoint found: {best_checkpoint}")
 
-        # Filter for external validation set
-        test_filter = {
-            f"dataset_{outcome}": "ext_val",
-            f"early_stopping_{outcome}": "no"
-        }
-        print(f"evaluation mode: test set = dataset=ext_val AND early_stopping=no")
-
-        # Evaluate model
-        test_dataset = P.dataset(tile_px=256, tile_um=129, filters=test_filter)
+        # Filter for external validation set (with subanalysis filters)
+        test_dataset = get_eval_dataset(P, config, outcome)
         outdir = os.path.join(results_path, "eval")
         os.makedirs(outdir, exist_ok=True)
 

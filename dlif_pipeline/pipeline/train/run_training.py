@@ -32,7 +32,7 @@ def run_training(config, mods):
      This prefix will be used to create unique paths for each experiment.
      The prefix is based on the filters that determine the subgroup analysis.
     '''
-    prefix_parts = ["results"]
+    prefix_parts = [config.get("base_dir", "results")]
 
     if config.get("USE_COHORT2_FILTER"):
         print("in run training")

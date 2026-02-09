@@ -53,3 +53,5 @@ dlif_pipeline/df.parquet
 dlif_pipeline/structure.txt
 dlif_pipeline/scripts/
 dlif_pipeline/pipeline/train/MIL.log
+dlif_pipeline/pipeline/plotting/line_no_plot_other_metrics.py
+dlif_pipeline/debug
