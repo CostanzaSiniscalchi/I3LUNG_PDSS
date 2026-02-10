@@ -112,6 +112,7 @@ def create_annotations(
             1: 'low',
             2: 'high'
         }).fillna('')
+        ann['PDL1_CATEGORY'] = ann['PDL1_CATEGORY'].astype('Int64').astype('string').replace('<NA>', '')
     else:
         ann['PDL1_GROUP'] = ''
     

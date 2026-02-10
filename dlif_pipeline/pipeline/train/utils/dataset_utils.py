@@ -40,7 +40,7 @@ def _apply_subanalysis_filters(config, annotations_df, filters, outcome):
     if pdl1_flag in ("low", "high") and "PDL1_GROUP" in annotations_df:
         print(f" Filtering PDL1_GROUP == {pdl1_flag}")
         filters["PDL1_GROUP"] = [pdl1_flag]
-    elif pdl1_flag in ("0.0", "1.0", "2.0") and "PDL1_CATEGORY" in annotations_df:
+    elif pdl1_flag in ("0","1") and "PDL1_CATEGORY" in annotations_df:
         print(f" Filtering PDL1_CATEGORY == {pdl1_flag}")
         filters["PDL1_CATEGORY"] = [pdl1_flag]
 
