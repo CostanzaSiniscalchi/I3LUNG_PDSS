@@ -35,7 +35,7 @@ def _apply_subanalysis_filters(config, annotations_df, filters, outcome):
         print(f" Filtering IO_CHT == {ci_flag}")
         filters["IO_CHT"] = [int(ci_flag)]
 
-    # ─── : apply PDL1_GROUP filter if set to "low" or "high" ──────────
+    # ─── : apply PDL1_GROUP filter if set to "low" or "high" or "0", "1", "2" ──────────
     pdl1_flag = config.get("FILTER_PDL1", None)
     if pdl1_flag in ("low", "high") and "PDL1_GROUP" in annotations_df:
         print(f" Filtering PDL1_GROUP == {pdl1_flag}")
