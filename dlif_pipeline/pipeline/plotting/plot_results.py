@@ -38,7 +38,7 @@ _DLIF_TO_MLEF_OUTCOME = {
 }
 
 
-def plot_results_from_config(config_arg, base_dir=None, use_preds=True, show=False):
+def plot_results_from_config(config_arg, base_dir=None, use_preds=True, show=False, output_dir=None):
     """
     Generate result plots for trained models based on config.
 
@@ -50,6 +50,7 @@ def plot_results_from_config(config_arg, base_dir=None, use_preds=True, show=Fal
         base_dir: Base results directory (optional, computed from script location if not provided)
         use_preds: If True, use prediction files from preds/ directory for p-value computation (classification only)
         show: If True, display plots interactively
+        output_dir: If provided, save all plots to this directory instead of the default nested path
     """
     # Load config
     if isinstance(config_arg, str):
@@ -99,15 +100,18 @@ def plot_results_from_config(config_arg, base_dir=None, use_preds=True, show=Fal
 
         # Build save_dir with full result path:
         # base_dir/prefix_parts/outcome/task/training_type/data_type/source-imp
-        save_dir = os.path.join(
-            path_info['base_dir'],
-            *prefix_parts,
-            outcome,
-            task,
-            training_type,
-            dlif_feature_type,
-            dlif_extraction,
-        )
+        if output_dir:
+            save_dir = output_dir
+        else:
+            save_dir = os.path.join(
+                path_info['base_dir'],
+                *prefix_parts,
+                outcome,
+                task,
+                training_type,
+                dlif_feature_type,
+                dlif_extraction,
+            )
         os.makedirs(save_dir, exist_ok=True)
         print(f"   Save dir: {save_dir}")
 
