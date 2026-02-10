@@ -109,6 +109,7 @@ def get_datasets(P, training_type, config, fold, folds, outcome,
             has_early_stop = (annotations_df[early_stop_col] == "yes").any()
             if has_early_stop:
                 train_filter[early_stop_col] = "no"
+                val_filter[fold_col] = [f for f in folds if f != fold]
                 val_filter[early_stop_col]   = "yes"
             else:
                 print(f" Warning: {early_stop_col} column exists but has no 'yes' values. Skipping early stopping split.")
