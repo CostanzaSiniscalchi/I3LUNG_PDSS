@@ -286,7 +286,7 @@ Apply dataset filters by uncommenting relevant flags:
 # FILTER_CHEMO_IMMUNO: "1"  # or "0"
 
 # Biomarker expression
-# FILTER_PDL1: "high"  # or "low"
+# FILTER_PDL1: "high" (PDL1>49%)  # or "low" (PDL1 0-49%) or more fine grain: "0" (PDL1 <1%) and "1" (PDL1 1-49%)
 
 # Center-specific (use only one at a time)
 # FILTER_INT: [true]

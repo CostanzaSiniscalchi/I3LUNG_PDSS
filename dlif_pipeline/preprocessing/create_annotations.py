@@ -112,7 +112,6 @@ def create_annotations(
             1: 'low',
             2: 'high'
         }).fillna('')
-        ann.drop(columns=['PDL1_CATEGORY'], inplace=True)
     else:
         ann['PDL1_GROUP'] = ''
     
@@ -195,7 +194,7 @@ def create_annotations(
     for outcome in outcome_cols:
         split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
     
-    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_ALL_MODALITIES', 'INT_ONLY_FOLDS']
+    flag_cols = ['PDL1_GROUP', 'PDL1_CATEGORY', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_ALL_MODALITIES', 'INT_ONLY_FOLDS']
     
     early_cols = [f'early_stopping_{o}' for o in outcome_cols]
     
