@@ -43,12 +43,12 @@ def calibrate_cv_scores(df_cv, exclude_slides=None):
     print(f"  [BEFORE] median threshold={np.median(scores_all):.3f}")
     print_metrics(labels_all, pred_before, prefix="[BEFORE] ")
 
-    # Subset for threshold calculation (exclude train)
+    # Subset for threshold calculation (exclude test)
     if exclude_slides is not None:
         mask = ~df_cv['slide'].astype(str).isin(exclude_slides)
         labels_thr = df_cv.loc[mask, LABEL_COL].values
         scores_thr = df_cv.loc[mask, 'score'].values
-        print(f"  Threshold on {mask.sum()}/{len(df_cv)} samples (excluded {(~mask).sum()} train)")
+        print(f"  Threshold on {mask.sum()}/{len(df_cv)} samples (excluded {(~mask).sum()} test)")
     else:
         labels_thr = labels_all
         scores_thr = scores_all
@@ -191,7 +191,7 @@ def calibrate_all():
         print(f"  Score range: [{df_cv['score'].min():.3f}, {df_cv['score'].max():.3f}]")
         print(f"  Label distribution: {dict(df_cv[LABEL_COL].value_counts().sort_index())}")
 
-        # --- Step 2: Calibrate CV (excluding train) ---
+        # --- Step 2: Calibrate CV (excluding test) ---
         df_cv_cal, cv_metrics, calibration_params = calibrate_cv_scores(df_cv, exclude_slides=test_slides)
         df_cv_cal.to_parquet(cv_base / 'predictions_calibrated.parquet')
         print(f"  Saved CV calibrated")
