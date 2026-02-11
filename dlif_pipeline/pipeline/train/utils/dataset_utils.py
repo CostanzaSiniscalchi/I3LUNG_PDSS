@@ -35,11 +35,14 @@ def _apply_subanalysis_filters(config, annotations_df, filters, outcome):
         print(f" Filtering IO_CHT == {ci_flag}")
         filters["IO_CHT"] = [int(ci_flag)]
 
-    # ─── : apply PDL1_GROUP filter if set to "low" or "high" ──────────
+    # ─── : apply PDL1_GROUP filter if set to "low" or "high" or "0", "1", "2" ──────────
     pdl1_flag = config.get("FILTER_PDL1", None)
     if pdl1_flag in ("low", "high") and "PDL1_GROUP" in annotations_df:
         print(f" Filtering PDL1_GROUP == {pdl1_flag}")
         filters["PDL1_GROUP"] = [pdl1_flag]
+    elif pdl1_flag in ("0","1") and "PDL1_CATEGORY" in annotations_df:
+        print(f" Filtering PDL1_CATEGORY == {pdl1_flag}")
+        filters["PDL1_CATEGORY"] = [pdl1_flag]
 
     # ─── : apply adenocarcinoma filter ──────────
     adeno_flag = config.get("ADENO", None)
@@ -106,6 +109,7 @@ def get_datasets(P, training_type, config, fold, folds, outcome,
             has_early_stop = (annotations_df[early_stop_col] == "yes").any()
             if has_early_stop:
                 train_filter[early_stop_col] = "no"
+                val_filter[fold_col] = [f for f in folds if f != fold]
                 val_filter[early_stop_col]   = "yes"
             else:
                 print(f" Warning: {early_stop_col} column exists but has no 'yes' values. Skipping early stopping split.")
