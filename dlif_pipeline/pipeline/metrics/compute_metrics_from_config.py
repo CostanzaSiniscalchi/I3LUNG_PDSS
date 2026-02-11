@@ -38,7 +38,7 @@ def build_path_from_config(config, mod_string, base_dir):
 
     Args:
         config: Loaded YAML config
-        base_dir: Base directory (accepted for compatibility but ROOT is computed from script location)
+        base_dir: Base directory (e.g. "results_new"). Falls back to config["base_dir"] then "results".
 
     Returns:
         Path structure components
@@ -52,7 +52,8 @@ def build_path_from_config(config, mod_string, base_dir):
     outcomes = config.get('task_settings', {}).get('outcomes', [])
 
     # Build prefix parts the same way as run_training.py
-    prefix_parts = ["results"]
+    resolved_base = base_dir or config.get("base_dir", "results")
+    prefix_parts = [resolved_base]
 
     if config.get("USE_COHORT2_FILTER"):
         prefix_parts.append("C2")
