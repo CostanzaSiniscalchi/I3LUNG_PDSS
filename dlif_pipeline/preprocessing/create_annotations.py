@@ -198,7 +198,7 @@ def create_annotations(
     for outcome in outcome_cols:
         split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
     
-    flag_cols = ['PDL1_GROUP', 'PDL1_CATEGORY', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_RWD', 'HAS_RADPY', 'HAS_DP', 'HAS_GENOMICS', 'INT_ONLY_FOLDS']
+    flag_cols = ['PDL1_GROUP', 'PDL1_CATEGORY', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_RWD', 'HAS_RADPY', 'HAS_FMRAD', 'HAS_DP', 'HAS_GENOMICS', 'INT_ONLY_FOLDS']
     
     early_cols = [f'early_stopping_{o}' for o in outcome_cols]
     

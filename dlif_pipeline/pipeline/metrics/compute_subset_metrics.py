@@ -46,10 +46,15 @@ from metrics.compute_metrics_from_config import build_path_from_config, find_res
 
 @dataclass
 class SubsetDef:
-    """Definition of a patient subset filter."""
-    name: str               # e.g., "has_radpy"
-    columns: List[str]      # e.g., ["HAS_RADPY"] or ["HAS_RADPY", "HAS_DP"]
-    value: int = 1          # value to filter on
+    """Definition of a patient subset filter.
+
+    filters is a dict mapping column names to required values, e.g.:
+        {"HAS_RADPY": 1}                      # patients WITH radpy
+        {"HAS_DP": 0}                          # patients WITHOUT dp
+        {"HAS_RADPY": 1, "HAS_DP": 0}         # with radpy but without dp
+    """
+    name: str
+    filters: dict   # {column_name: value}
 
 
 def parse_subset_definitions(subsets_config: dict) -> List[SubsetDef]:
@@ -61,23 +66,20 @@ def parse_subset_definitions(subsets_config: dict) -> List[SubsetDef]:
         has_dp: true
         has_genomics: false
 
-    Convention: subset name "has_xyz" maps to annotation column "HAS_XYZ".
+    Convention: subset name "has_xyz" maps to annotation column "HAS_XYZ" == 1.
     All pairwise+ combinations of enabled subsets are generated automatically.
     """
     # Detect simple toggle format: all values are bool
     if all(isinstance(v, bool) for v in subsets_config.values()):
         enabled = [name for name, on in subsets_config.items() if on]
         defs = []
-        # Singles
         for name in enabled:
-            col = name.upper()  # has_radpy -> HAS_RADPY
-            defs.append(SubsetDef(name=name, columns=[col]))
-        # All combinations of size 2..N
+            defs.append(SubsetDef(name=name, filters={name.upper(): 1}))
         for r in range(2, len(enabled) + 1):
             for combo in combinations(enabled, r):
-                combo_name = "_".join(combo)  # has_radpy_has_dp
-                cols = [n.upper() for n in combo]
-                defs.append(SubsetDef(name=combo_name, columns=cols))
+                combo_name = "_".join(combo)
+                filters = {n.upper(): 1 for n in combo}
+                defs.append(SubsetDef(name=combo_name, filters=filters))
         return defs
 
     # Fallback: verbose format for custom column names / values
@@ -90,24 +92,38 @@ def parse_subset_definitions(subsets_config: dict) -> List[SubsetDef]:
         else:
             raise ValueError(f"Subset '{name}' must have 'column' or 'columns' key")
         value = spec.get("value", 1)
-        defs.append(SubsetDef(name=name, columns=columns, value=value))
+        defs.append(SubsetDef(name=name, filters={col: value for col in columns}))
     return defs
 
 
 KNOWN_MODALITIES = ["has_radpy", "has_fmrad", "has_dp", "has_genomics"]
 
 
-def subsets_from_flags(flags: dict) -> List[SubsetDef]:
-    """Build SubsetDefs from a dict of {name: bool} flags (same logic as config parser)."""
-    enabled = [name for name, on in flags.items() if on]
+def subsets_from_flags(has_flags: dict, no_flags: dict) -> List[SubsetDef]:
+    """Build SubsetDefs from --has_* and --no_* CLI flags.
+
+    Each enabled flag becomes a single-filter SubsetDef, and all pairwise+
+    combinations of ALL enabled flags are generated automatically.
+    """
+    # Collect individual entries: (name, column, value)
+    entries = []
+    for name, on in has_flags.items():
+        if on:
+            entries.append((name, name.upper(), 1))
+    for name, on in no_flags.items():
+        if on:
+            entries.append((name, name.replace("no_", "HAS_", 1).upper(), 0))
+
     defs = []
-    for name in enabled:
-        defs.append(SubsetDef(name=name, columns=[name.upper()]))
-    for r in range(2, len(enabled) + 1):
-        for combo in combinations(enabled, r):
-            combo_name = "_".join(combo)
-            cols = [n.upper() for n in combo]
-            defs.append(SubsetDef(name=combo_name, columns=cols))
+    # Singles
+    for name, col, val in entries:
+        defs.append(SubsetDef(name=name, filters={col: val}))
+    # Combinations of size 2..N
+    for r in range(2, len(entries) + 1):
+        for combo in combinations(entries, r):
+            combo_name = "_".join(e[0] for e in combo)
+            filters = {e[1]: e[2] for e in combo}
+            defs.append(SubsetDef(name=combo_name, filters=filters))
     return defs
 
 
@@ -120,13 +136,13 @@ def filter_predictions_by_subset(predictions_df, annotations_df, subset_def, joi
     Filter predictions to patients matching a subset definition.
 
     Joins predictions with annotations on join_column, then filters rows where
-    all specified columns equal the target value.
+    each column matches its required value in subset_def.filters.
 
     Returns:
         Filtered predictions DataFrame (same columns as input), or empty DataFrame.
     """
     # Validate columns exist
-    for col in subset_def.columns:
+    for col in subset_def.filters:
         if col not in annotations_df.columns:
             raise ValueError(
                 f"Column '{col}' not found in annotations. "
@@ -135,8 +151,8 @@ def filter_predictions_by_subset(predictions_df, annotations_df, subset_def, joi
 
     # Build mask on annotations
     mask = pd.Series(True, index=annotations_df.index)
-    for col in subset_def.columns:
-        mask &= (annotations_df[col] == subset_def.value)
+    for col, val in subset_def.filters.items():
+        mask &= (annotations_df[col] == val)
 
     subset_patients = set(annotations_df.loc[mask, join_column])
 
@@ -391,7 +407,7 @@ def run_config_mode(args):
     # Ensure join column and filter columns are consistent types
     annotations_df[join_column] = annotations_df[join_column].astype(str)
     for subset in subsets:
-        for col in subset.columns:
+        for col in subset.filters:
             if col in annotations_df.columns:
                 annotations_df[col] = pd.to_numeric(annotations_df[col], errors="coerce")
     print(f"Annotations shape: {annotations_df.shape}")
@@ -424,17 +440,18 @@ def run_direct_mode(args):
     annotations_df = pd.read_csv(args.annotations)
     annotations_df["slide"] = annotations_df["slide"].astype(str)
 
-    # Build subsets from --has_* flags
-    flags = {name: getattr(args, name, False) for name in KNOWN_MODALITIES}
-    subsets = subsets_from_flags(flags)
+    # Build subsets from --has_* and --no_* flags
+    has_flags = {name: getattr(args, name, False) for name in KNOWN_MODALITIES}
+    no_flags = {name.replace("has_", "no_"): getattr(args, name.replace("has_", "no_"), False) for name in KNOWN_MODALITIES}
+    subsets = subsets_from_flags(has_flags, no_flags)
 
     if not subsets:
-        print("ERROR: No subsets enabled. Use --has_radpy, --has_dp, --has_genomics, etc.")
+        print("ERROR: No subsets enabled. Use --has_radpy, --no_radpy, --has_dp, etc.")
         sys.exit(1)
 
     # Coerce filter columns to numeric
     for subset in subsets:
-        for col in subset.columns:
+        for col in subset.filters:
             if col in annotations_df.columns:
                 annotations_df[col] = pd.to_numeric(annotations_df[col], errors="coerce")
 
@@ -489,11 +506,17 @@ Examples:
     direct_group.add_argument("--annotations", help="Path to annotations.csv", default="data/annotations.csv")
 
     # Modality subset toggles (used in direct path mode)
-    subset_group = parser.add_argument_group("Subset toggles")
-    subset_group.add_argument("--has_radpy", action="store_true", help="Evaluate on patients with radiomics")
-    subset_group.add_argument("--has_fmrad", action="store_true", help="Evaluate on patients with foundation model radiomics")
-    subset_group.add_argument("--has_dp", action="store_true", help="Evaluate on patients with digital pathology")
-    subset_group.add_argument("--has_genomics", action="store_true", help="Evaluate on patients with genomics")
+    subset_group = parser.add_argument_group("Subset toggles (patients WITH modality)")
+    subset_group.add_argument("--has_radpy", action="store_true", help="Patients with radiomics")
+    subset_group.add_argument("--has_fmrad", action="store_true", help="Patients with foundation model radiomics")
+    subset_group.add_argument("--has_dp", action="store_true", help="Patients with digital pathology")
+    subset_group.add_argument("--has_genomics", action="store_true", help="Patients with genomics")
+
+    no_group = parser.add_argument_group("Subset toggles (patients WITHOUT modality)")
+    no_group.add_argument("--no_radpy", action="store_true", help="Patients without radiomics")
+    no_group.add_argument("--no_fmrad", action="store_true", help="Patients without foundation model radiomics")
+    no_group.add_argument("--no_dp", action="store_true", help="Patients without digital pathology")
+    no_group.add_argument("--no_genomics", action="store_true", help="Patients without genomics")
 
     args = parser.parse_args()
     print(args)
