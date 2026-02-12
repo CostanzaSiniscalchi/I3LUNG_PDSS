@@ -140,6 +140,40 @@ def find_result_directories(path_info):
     return result_dirs
 
 
+def _compute_and_save_classification_metrics(predictions, output_dir, label=""):
+    """
+    Compute and save classification metrics for a set of predictions.
+
+    Args:
+        predictions: DataFrame with y_true, y_pred0, y_pred1 columns
+        output_dir: Directory to save CSV results
+        label: Optional label for print output
+    """
+    predictions['pred'] = np.exp(predictions['y_pred1']) / (
+        np.exp(predictions['y_pred0']) + np.exp(predictions['y_pred1'])
+    )
+
+    auc, ci = auc_roc_ci(predictions['y_true'], predictions['pred'], 0.95)
+    metrics = compute_classification_metrics(predictions['y_true'], predictions['pred'])
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    auc_file = os.path.join(output_dir, 'eval_auc_ci.csv')
+    with open(auc_file, 'w') as f:
+        f.write('auc,ci_lower,ci_upper\n')
+        f.write(f'{auc:.6f},{ci[0]:.6f},{ci[1]:.6f}\n')
+
+    metrics_file = os.path.join(output_dir, 'eval_classification_metrics.csv')
+    with open(metrics_file, 'w') as f:
+        f.write('f1,specificity,sensitivity\n')
+        f.write(f'{metrics["f1"]:.6f},{metrics["specificity"]:.6f},{metrics["sensitivity"]:.6f}\n')
+
+    prefix = f"    [{label}] " if label else "    "
+    print(f"{prefix}AUC = {auc:.4f}, CI = [{ci[0]:.4f}, {ci[1]:.4f}]")
+    print(f"{prefix}F1 = {metrics['f1']:.4f}, Spec = {metrics['specificity']:.4f}, Sens = {metrics['sensitivity']:.4f}")
+    print(f"{prefix}Saved to: {output_dir}")
+
+
 def compute_classification_metrics_for_path(path, outcome):
     """
     Compute DeLong AUC-ROC CI and classification metrics for a given path.
@@ -150,10 +184,49 @@ def compute_classification_metrics_for_path(path, outcome):
     """
     print(f"\n Computing classification metrics for: {path}")
 
-    # Check if cross-validation (no eval folder) or standard (eval folder exists)
+    # Check which evaluation mode
     has_eval = os.path.isdir(os.path.join(path, 'eval'))
+    has_eval_mask = os.path.isdir(os.path.join(path, 'eval_mask'))
 
-    if not has_eval:
+    if has_eval_mask:
+        # Masked evaluation: compute metrics for each masked subset
+        print("   Mode: Masked evaluation")
+        eval_mask_path = os.path.join(path, 'eval_mask')
+
+        for subset_dir in sorted(os.listdir(eval_mask_path)):
+            subset_path = os.path.join(eval_mask_path, subset_dir)
+            if not os.path.isdir(subset_path):
+                continue
+
+            try:
+                latest_mb_dir = find_latest_mb_attention_dir(subset_path)
+                pred_path = os.path.join(subset_path, latest_mb_dir, 'predictions.parquet')
+            except FileNotFoundError:
+                print(f"   Skipping '{subset_dir}': no mb_attention_mil directory")
+                continue
+
+            if not os.path.exists(pred_path):
+                print(f"   Skipping '{subset_dir}': no predictions.parquet")
+                continue
+
+            print(f"   Reading {subset_dir}: {pred_path}")
+            predictions = pd.read_parquet(pred_path)
+            _compute_and_save_classification_metrics(
+                predictions, subset_path, label=subset_dir
+            )
+
+    if has_eval:
+        # Standard/evaluation: use eval folder
+        print("   Mode: Standard/Evaluation")
+        eval_path = os.path.join(path, 'eval')
+        latest_mb_dir = find_latest_mb_attention_dir(eval_path)
+        pred_path = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
+
+        print(f"   Reading: {pred_path}")
+        predictions = pd.read_parquet(pred_path)
+        _compute_and_save_classification_metrics(predictions, path)
+
+    if not has_eval and not has_eval_mask:
         # Cross-validation: aggregate predictions across folds
         print("   Mode: Cross-validation")
         folders = [f.name for f in os.scandir(path) if f.is_dir()]
@@ -196,40 +269,69 @@ def compute_classification_metrics_for_path(path, outcome):
 
             # Weighted average of other metrics
             weighted_metrics = compute_weighted_metrics(fold_metrics, fold_weights)
+
+            # Save AUC results
+            auc_file = os.path.join(path, 'eval_auc_ci.csv')
+            with open(auc_file, 'w') as f:
+                f.write('auc,ci_lower,ci_upper\n')
+                f.write(f'{auc:.6f},{ci[0]:.6f},{ci[1]:.6f}\n')
+
+            # Save other metrics
+            metrics_file = os.path.join(path, 'eval_classification_metrics.csv')
+            with open(metrics_file, 'w') as f:
+                f.write('f1,specificity,sensitivity\n')
+                f.write(f'{weighted_metrics["f1"]:.6f},{weighted_metrics["specificity"]:.6f},{weighted_metrics["sensitivity"]:.6f}\n')
+
+            print(f"    AUC = {auc:.4f}, CI = [{ci[0]:.4f}, {ci[1]:.4f}]")
+            print(f"    F1 = {weighted_metrics['f1']:.4f}, Spec = {weighted_metrics['specificity']:.4f}, Sens = {weighted_metrics['sensitivity']:.4f}")
+            print(f"    Saved to: {auc_file} and {metrics_file}")
         else:
             print("    No predictions found")
             return
-    else:
-        # Standard/evaluation: use eval folder
-        print("   Mode: Standard/Evaluation")
-        eval_path = os.path.join(path, 'eval')
-        latest_mb_dir = find_latest_mb_attention_dir(eval_path)
-        pred_path = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
 
-        print(f"   Reading: {pred_path}")
-        predictions = pd.read_parquet(pred_path)
-        predictions['pred'] = np.exp(predictions['y_pred1']) / (
-            np.exp(predictions['y_pred0']) + np.exp(predictions['y_pred1'])
-        )
 
-        auc, ci = auc_roc_ci(predictions['y_true'], predictions['pred'], 0.95)
-        weighted_metrics = compute_classification_metrics(predictions['y_true'], predictions['pred'])
+def _extract_survival_data(predictions):
+    """Extract time, event, risk_score from predictions DataFrame. Returns None if columns missing."""
+    if 'y_true0' in predictions.columns and 'y_true1' in predictions.columns:
+        time = predictions['y_true0'].values.astype(float)
+        event = predictions['y_true1'].values.astype(bool)
+        risk_score = -predictions['y_pred0'].values.astype(float)
+        return time, event, risk_score
+    elif 'event' in predictions.columns and 'y_true' in predictions.columns:
+        event = predictions['event'].values.astype(bool)
+        time = predictions['y_true'].values.astype(float)
+        risk_score = -predictions['y_pred'].values.astype(float)
+        return time, event, risk_score
+    return None
 
-    # Save AUC results
-    auc_file = os.path.join(path, 'eval_auc_ci.csv')
-    with open(auc_file, 'w') as f:
-        f.write('auc,ci_lower,ci_upper\n')
-        f.write(f'{auc:.6f},{ci[0]:.6f},{ci[1]:.6f}\n')
 
-    # Save other metrics
-    metrics_file = os.path.join(path, 'eval_classification_metrics.csv')
-    with open(metrics_file, 'w') as f:
-        f.write('f1,specificity,sensitivity\n')
-        f.write(f'{weighted_metrics["f1"]:.6f},{weighted_metrics["specificity"]:.6f},{weighted_metrics["sensitivity"]:.6f}\n')
+def _compute_and_save_survival_metrics(predictions, output_dir, label=""):
+    """
+    Compute and save survival metrics (C-index with bootstrap CI) for a set of predictions.
 
-    print(f"    AUC = {auc:.4f}, CI = [{ci[0]:.4f}, {ci[1]:.4f}]")
-    print(f"    F1 = {weighted_metrics['f1']:.4f}, Spec = {weighted_metrics['specificity']:.4f}, Sens = {weighted_metrics['sensitivity']:.4f}")
-    print(f"    Saved to: {auc_file} and {metrics_file}")
+    Args:
+        predictions: DataFrame with survival columns
+        output_dir: Directory to save CSV results
+        label: Optional label for print output
+    """
+    data = _extract_survival_data(predictions)
+    if data is None:
+        print("     Required columns not found in predictions, skipping")
+        return
+
+    time, event, risk_score = data
+    result = compute_c_index_and_ci(event, time, risk_score, n_boot=1000)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    cindex_file = os.path.join(output_dir, 'eval_cindex_ci.csv')
+    with open(cindex_file, 'w') as f:
+        f.write('c_index,ci_lower,ci_upper\n')
+        f.write(f'{result["c_index"]:.6f},{result["ci"][0]:.6f},{result["ci"][1]:.6f}\n')
+
+    prefix = f"    [{label}] " if label else "    "
+    print(f"{prefix}C-index = {result['c_index']:.4f}, CI = [{result['ci'][0]:.4f}, {result['ci'][1]:.4f}]")
+    print(f"{prefix}Saved to: {output_dir}")
 
 
 def compute_survival_metrics_for_path(path, outcome):
@@ -240,12 +342,51 @@ def compute_survival_metrics_for_path(path, outcome):
         path: Path to seed_0 directory
         outcome: Outcome name (e.g., 'OS_MONTHS')
     """
-    print(f"\n🩺 Computing survival metrics for: {path}")
+    print(f"\n Computing survival metrics for: {path}")
 
-    # Check if cross-validation or standard
+    # Check which evaluation mode
     has_eval = os.path.isdir(os.path.join(path, 'eval'))
+    has_eval_mask = os.path.isdir(os.path.join(path, 'eval_mask'))
 
-    if not has_eval:
+    if has_eval_mask:
+        # Masked evaluation: compute metrics for each masked subset
+        print("   Mode: Masked evaluation")
+        eval_mask_path = os.path.join(path, 'eval_mask')
+
+        for subset_dir in sorted(os.listdir(eval_mask_path)):
+            subset_path = os.path.join(eval_mask_path, subset_dir)
+            if not os.path.isdir(subset_path):
+                continue
+
+            try:
+                latest_mb_dir = find_latest_mb_attention_dir(subset_path)
+                pred_path = os.path.join(subset_path, latest_mb_dir, 'predictions.parquet')
+            except FileNotFoundError:
+                print(f"   Skipping '{subset_dir}': no mb_attention_mil directory")
+                continue
+
+            if not os.path.exists(pred_path):
+                print(f"   Skipping '{subset_dir}': no predictions.parquet")
+                continue
+
+            print(f"   Reading {subset_dir}: {pred_path}")
+            predictions = pd.read_parquet(pred_path)
+            _compute_and_save_survival_metrics(
+                predictions, subset_path, label=subset_dir
+            )
+
+    if has_eval:
+        # Standard/evaluation: use eval folder
+        print("   Mode: Standard/Evaluation")
+        eval_path = os.path.join(path, 'eval')
+        latest_mb_dir = find_latest_mb_attention_dir(eval_path)
+        pred_path = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
+
+        print(f"   Reading: {pred_path}")
+        predictions = pd.read_parquet(pred_path)
+        _compute_and_save_survival_metrics(predictions, path)
+
+    if not has_eval and not has_eval_mask:
         # Cross-validation: aggregate predictions across folds
         print("   Mode: Cross-validation")
         folders = [f.name for f in os.scandir(path) if f.is_dir()]
@@ -267,49 +408,12 @@ def compute_survival_metrics_for_path(path, outcome):
                 print(f"   Reading: {pred_path}")
                 fold_preds = pd.read_parquet(pred_path)
                 predictions = pd.concat([predictions, fold_preds])
-    else:
-        # Standard/evaluation: use eval folder
-        print("   Mode: Standard/Evaluation")
-        eval_path = os.path.join(path, 'eval')
-        latest_mb_dir = find_latest_mb_attention_dir(eval_path)
-        pred_path = os.path.join(eval_path, latest_mb_dir, 'predictions.parquet')
 
-        print(f"   Reading: {pred_path}")
-        predictions = pd.read_parquet(pred_path)
+        if len(predictions) == 0:
+            print("    No predictions found")
+            return
 
-    if len(predictions) == 0:
-        print("    No predictions found")
-        return
-
-    # Extract survival data
-    # Handle different column name formats:
-    # Format 1: 'event', 'y_true', 'y_pred' (old format)
-    # Format 2: 'y_true0' (time), 'y_true1' (event), 'y_pred0' (risk score) (new format)
-    if 'y_true0' in predictions.columns and 'y_true1' in predictions.columns:
-        # New format
-        time = predictions['y_true0'].values.astype(float)
-        event = predictions['y_true1'].values.astype(bool)
-        risk_score = -predictions['y_pred0'].values.astype(float)
-    elif 'event' in predictions.columns and 'y_true' in predictions.columns:
-        # Old format
-        event = predictions['event'].values.astype(bool)
-        time = predictions['y_true'].values.astype(float)
-        risk_score = -predictions['y_pred'].values.astype(float)
-    else:
-        print("     Required columns not found in predictions (need y_true0/y_true1 or event/y_true), skipping")
-        return
-
-    # Compute C-index with CI
-    result = compute_c_index_and_ci(event, time, risk_score, n_boot=1000)
-
-    # Save results
-    cindex_file = os.path.join(path, 'eval_cindex_ci.csv')
-    with open(cindex_file, 'w') as f:
-        f.write('c_index,ci_lower,ci_upper\n')
-        f.write(f'{result["c_index"]:.6f},{result["ci"][0]:.6f},{result["ci"][1]:.6f}\n')
-
-    print(f"    C-index = {result['c_index']:.4f}, CI = [{result['ci'][0]:.4f}, {result['ci'][1]:.4f}]")
-    print(f"    Saved to: {cindex_file}")
+        _compute_and_save_survival_metrics(predictions, path)
 
 
 def run_task_metrics(config_arg, mod_string, base_dir):
