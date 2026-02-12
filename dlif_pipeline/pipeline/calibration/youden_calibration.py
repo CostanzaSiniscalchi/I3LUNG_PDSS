@@ -38,17 +38,17 @@ def calibrate_cv_scores(df_cv, exclude_slides=None):
     labels_all = df_cv[LABEL_COL].values
     scores_all = df_cv['score'].values
 
-    # Before calibration (median threshold)
-    pred_before = (scores_all > np.median(scores_all)).astype(int)
-    print(f"  [BEFORE] median threshold={np.median(scores_all):.3f}")
-    print_metrics(labels_all, pred_before, prefix="[BEFORE] ")
-
     # Subset for threshold calculation (exclude test)
     if exclude_slides is not None:
         mask = ~df_cv['slide'].astype(str).isin(exclude_slides)
         labels_thr = df_cv.loc[mask, LABEL_COL].values
         scores_thr = df_cv.loc[mask, 'score'].values
         print(f"  Threshold on {mask.sum()}/{len(df_cv)} samples (excluded {(~mask).sum()} test)")
+
+        # Before calibration (median threshold)
+        pred_before = (scores_all > np.median(scores_all)).astype(int)
+        print(f"  [BEFORE] median threshold={np.median(scores_all):.3f}")
+        print_metrics(labels_all, pred_before, prefix="[BEFORE] ")
     else:
         labels_thr = labels_all
         scores_thr = scores_all
@@ -175,12 +175,16 @@ def calibrate_all():
 
         cv_dfs = []
         for fold_dir in fold_dirs:
-            pred_file = fold_dir / 'predictions.parquet'
-            if pred_file.exists():
-                df_fold = pd.read_parquet(pred_file)
-                df_fold['fold'] = fold_dir.name
-                cv_dfs.append(df_fold)
-                print(f"  Read {fold_dir.name}: {len(df_fold)} samples")
+            eval_dir = fold_dir / 'eval'
+            # Find the last alphabetically sorted subdirectory (highest number)
+            eval_subdirs = sorted(eval_dir.glob('*')) if eval_dir.exists() else []
+            if eval_subdirs:
+                pred_file = eval_subdirs[-1] / 'predictions.parquet'
+                if pred_file.exists():
+                    df_fold = pd.read_parquet(pred_file)
+                    df_fold['fold'] = fold_dir.name
+                    cv_dfs.append(df_fold)
+                    print(f"  Read {fold_dir.name} ({eval_subdirs[-1].name}): {len(df_fold)} samples")
 
         if not cv_dfs:
             print("  No predictions found, skipping")
