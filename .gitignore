@@ -1,57 +1,56 @@
+# Ignore everything by default
 *
 
+# Core git files
 !.gitignore
-!*/
-!dlif_pipeline/**/*
-!images/**/*
-!rwd_features.json
-!classification_config.json
-!data_curation.py
-!enums.py
-!i3l_ml.py
-!i3l_statistics.py
-!split.json
-!submodel_features.json
-!classification.ipynb
-!survival.ipynb
-!survival_config.json
-!features.json
-!graphs_classification.ipynb
-!graphs_i3lung.ipynb
-!DeLong_test.py
-!helper_classification.py
-!helper_survival.py
-!helper_survival_fairness.py
-!helper_survival_graphs.py
-!graphs_survival_analysis.ipynb
-!graphs_survival_fairness.ipynb
-!I3LUNG_PDSS/dlif_pipeline/data/**/*
+!.gitattributes
+
+# Root-level tracked files
+!README.md
 !Metadata_Extraction.ipynb
 !data_visualization.ipynb
-!requirements.txt
-!mlef_pipeline/results/**!
-!vanguri/vanguri.ipynb
-!vanguri/lung_helpers.py
+!fairness_analysis.ipynb
+!graphs_classification.ipynb
+!graphs_survival_analysis.ipynb
 
-mlef_pipeline/results/OS
-dlif_pipeline/preds
+# data/ - only specific files
+!data/
+!data/features.json
+!data/int_cv_splits.json
 
-# py cache
-__pycache__/
-
-*.pyc
-
-# Ignore specific dlif_pipeline subdirectories
+# dlif_pipeline/ - whitelist tree, then exclude heavy dirs
+!dlif_pipeline/
+!dlif_pipeline/**
 dlif_pipeline/bags/
 dlif_pipeline/configs/
 dlif_pipeline/results/
-mlef_pipeline/results/
-vanguri/results/
-data_backup/
+dlif_pipeline/preds/
+dlif_pipeline/scripts/
+dlif_pipeline/debug/
 dlif_pipeline/MIL.log
 dlif_pipeline/df.parquet
 dlif_pipeline/structure.txt
-dlif_pipeline/scripts/
 dlif_pipeline/pipeline/train/MIL.log
 dlif_pipeline/pipeline/plotting/line_no_plot_other_metrics.py
-dlif_pipeline/debug
+
+# images/
+!images/
+!images/**
+
+# mlef_pipeline/
+!mlef_pipeline/
+!mlef_pipeline/**
+mlef_pipeline/results/
+
+# utils/
+!utils/
+!utils/**
+
+# vanguri/
+!vanguri/
+!vanguri/**
+vanguri/results/
+
+# Always ignore compiled/cache files
+__pycache__/
+*.pyc
