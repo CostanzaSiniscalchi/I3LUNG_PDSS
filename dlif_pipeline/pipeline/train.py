@@ -47,6 +47,7 @@ if __name__ == "__main__":
             print("dataset prepared")
 
         # Main processing: iterate over outcomes
+        failures = []
         for outcome in original_config['task_settings'].get('outcomes', []):
             print(f"\n --- Processing outcome: {outcome}")
             # Reset full config for each outcome
@@ -55,7 +56,21 @@ if __name__ == "__main__":
 
             for mods in config.get('mods', []):
                 print(f"\n --- Mods: {mods}")
-                pipeline(config, mods)
+                try:
+                    pipeline(config, mods)
+                except Exception as e:
+                    mod_string = "_".join([k for k, v in mods.items() if v])
+                    print(f"\n!!! FAILED: outcome={outcome}, mods={mod_string}")
+                    print(f"    Error: {e}")
+                    failures.append((outcome, mod_string, str(e)))
+
+        if failures:
+            print(f"\n{'='*60}")
+            print(f"Pipeline finished with {len(failures)} failure(s):")
+            for outcome, mod_string, error in failures:
+                print(f"  - outcome={outcome}, mods={mod_string}: {error}")
+            print(f"{'='*60}")
+            sys.exit(1)
 
     except Exception:
         raise
