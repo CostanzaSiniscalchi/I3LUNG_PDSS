@@ -112,7 +112,7 @@ class DataLoader:
         else: 
             rwd = pd.read_csv(self.data_path[Mode.RWD])
         
-        subanalysis_features = pd.merge(rwd, outcomes, on='Subject', how='inner')
+        subanalysis_features = pd.merge(rwd, outcomes, on='Subject', how='inner', suffixes=('', '_'))
         
         dataset = self._get_subanalysis_data(dataset, subanalysis, subanalysis_features)
         
