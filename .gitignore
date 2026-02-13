@@ -29,9 +29,13 @@
 !Metadata_Extraction.ipynb
 !data_visualization.ipynb
 !requirements.txt
-!mlef_pipeline/results/**
+!mlef_pipeline/results/**!
+!vanguri/vanguri.ipynb
+!vanguri/lung_helpers.py
+
 mlef_pipeline/results/OS
 dlif_pipeline/preds
+
 # py cache
 __pycache__/
 
@@ -39,5 +43,15 @@ __pycache__/
 
 # Ignore specific dlif_pipeline subdirectories
 dlif_pipeline/bags/
+dlif_pipeline/configs/
 dlif_pipeline/results/
 mlef_pipeline/results/
+vanguri/results/
+data_backup/
+dlif_pipeline/MIL.log
+dlif_pipeline/df.parquet
+dlif_pipeline/structure.txt
+dlif_pipeline/scripts/
+dlif_pipeline/pipeline/train/MIL.log
+dlif_pipeline/pipeline/plotting/line_no_plot_other_metrics.py
+dlif_pipeline/debug

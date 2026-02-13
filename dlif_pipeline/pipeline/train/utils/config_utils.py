@@ -36,7 +36,7 @@ def get_folds(training_type, config=None):
     # 1) Look for a 'folds' mapping in the provided config
     if config is not None:
         if config.get("FILTER_INT"):
-            return ["fold_0", "fold_1", "fold_2", "fold_3", "fold_4"]
+            return ["0", "1", "2", "3", "4"]
         folds_from_config = config.get("folds", {})
 
         if training_type in folds_from_config:

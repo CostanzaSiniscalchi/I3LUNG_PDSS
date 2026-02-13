@@ -137,7 +137,8 @@ def plot_cindex_results(
     dlif_eval_type: str = "standard",                          # standard, cross_validation, or evaluation
     dlif_feature_type: str = "hypothesis_driven",              # hypothesis_driven or data_driven
     dlif_extraction: str = "pyrad-noimp",                      # feature extraction method
-    dlif_seed: int = 0                                         # seed number
+    dlif_seed: int = 0,                                        # seed number
+    save_name: Optional[str] = None                            # custom filename (without extension) for saved plot
 ):
     """
     Expected per-analysis layout:
@@ -279,14 +280,14 @@ def plot_cindex_results(
         MLEF: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD
         """
         mapping = {
-            'rwd': 'RWD',
-            'rwd_dp': 'RWD_DP',
-            'rwd_radfm': 'RWD_FMRAD',
-            'rwd_radpy': 'RWD_PYRAD',
-            'rwd_radfm_dp': 'RWD_DP_FMRAD',
-            'rwd_radpy_dp': 'RWD_DP_PYRAD',
-            'rwd_radpy_dp_genomics': 'RWD_DP_PYRAD_GENOMICS',
-            'rwd_radfm_dp_genomics': 'RWD_DP_FMRAD_GENOMICS',
+            'rwd': 'CB',
+            'rwd_dp': 'CB_DP',
+            'rwd_radfm': 'CB_FMRAD',
+            'rwd_radpy': 'CB_PYRAD',
+            'rwd_radfm_dp': 'CB_DP_FMRAD',
+            'rwd_radpy_dp': 'CB_DP_PYRAD',
+            'rwd_radpy_dp_genomics': 'CB_DP_PYRAD_GENOMICS',
+            'rwd_radfm_dp_genomics': 'CB_DP_FMRAD_GENOMICS',
         }
         return mapping.get(dlif_name.lower(), dlif_name.upper())
 
@@ -295,12 +296,12 @@ def plot_cindex_results(
         Map MLEF modality names to DLIF-style names.
         """
         mapping = {
-            'RWD': 'rwd',
-            'RWD_DP': 'rwd_dp',
-            'RWD_FMRAD': 'rwd_radfm',
-            'RWD_PYRAD': 'rwd_radpy',
-            'RWD_DP_FMRAD': 'rwd_radfm_dp',
-            'RWD_DP_PYRAD': 'rwd_radpy_dp',
+            'CB': 'rwd',
+            'CB_DP': 'rwd_dp',
+            'CB_FMRAD': 'rwd_radfm',
+            'CB_PYRAD': 'rwd_radpy',
+            'CB_DP_FMRAD': 'rwd_radfm_dp',
+            'CB_DP_PYRAD': 'rwd_radpy_dp',
         }
         return mapping.get(mlef_name.upper(), mlef_name.lower())
 
@@ -493,10 +494,10 @@ def plot_cindex_results(
         if arch_name == "MLEF":
             cindex_ro_mean = np.array([r[f"{metric}_ro_mean"] for r in rows], dtype=float)
             cindex_ro_std  = np.array([r[f"{metric}_ro_std"]  for r in rows], dtype=float)
-            plt.plot(X, cindex_ro_mean, linestyle="-", marker="o", label=f"CV {metric} - RWD-only matched", color="#a00000")
+            plt.plot(X, cindex_ro_mean, linestyle="-", marker="o", label=f"CV {metric} - CB-only matched", color="#a00000")
             plt.scatter(X, cindex_ro_mean, s=sizes, color="#a00000", zorder=3)
             plt.fill_between(X, cindex_ro_mean - cindex_ro_std, cindex_ro_mean + cindex_ro_std,
-                             alpha=0.3, color="#d8a6a6", label="Confidence interval - RWD-only matched")
+                             alpha=0.3, color="#d8a6a6", label="Confidence interval - CB-only matched")
             multimodal_better = (cindex_mod_mean > cindex_ro_mean)
 
 
@@ -505,13 +506,14 @@ def plot_cindex_results(
             xticks = []
             for m, n in zip(modalities, n_train_mod):
                 parts = m.split('_')
+                parts = ['CB' if p == 'rwd' else p for p in parts]
                 # Join with newlines
                 formatted_name = '\n'.join(parts)
                 xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
             plt.xticks(X, xticks, rotation=0, fontsize=8)
         else:
             ttl = title_prefix or f"CV {metric} - {arch_name}"
-            xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})" 
+            xticks = [f"{m.replace('RWD', 'CB')}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
                     for m, n in zip(modalities, n_train_mod)]
             plt.xticks(X, xticks, rotation=0)
 
@@ -558,7 +560,10 @@ def plot_cindex_results(
         plt.xlim(-0.4, len(modalities) - 0.55)
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{analysis}.png"
+            if save_name:
+                out = Path(save_dir) / f"{save_name}.png"
+            else:
+                out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{analysis}.png"
             plt.savefig(out, dpi=600, bbox_inches="tight")
         if show:
             plt.show()

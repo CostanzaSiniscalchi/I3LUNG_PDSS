@@ -34,12 +34,14 @@ def map_dlif_to_mlef_modality(dlif_name: str) -> str:
     MLEF: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD
     """
     mapping = {
-        'rwd': 'RWD',
-        'rwd_dp': 'RWD_DP',
-        'rwd_radfm': 'RWD_FMRAD',
-        'rwd_radpy': 'RWD_PYRAD',
-        'rwd_radfm_dp': 'RWD_DP_FMRAD',
-        'rwd_radpy_dp': 'RWD_DP_PYRAD',
+        'rwd': 'CB',
+        'rwd_dp': 'CB_DP',
+        'rwd_radfm': 'CB_FMRAD',
+        'rwd_radpy': 'CB_PYRAD',
+        'rwd_radfm_dp': 'CB_DP_FMRAD',
+        'rwd_radpy_dp': 'CB_DP_PYRAD',
+        'rwd_radfm_dp_genomics': 'CB_DP_FMRAD_GENOMICS',
+        'rwd_radpy_dp_genomics': 'CB_DP_PYRAD_GENOMICS',
     }
     return mapping.get(dlif_name.lower(), dlif_name.upper())
 
@@ -48,12 +50,14 @@ def map_mlef_to_dlif_modality(mlef_name: str) -> str:
     Map MLEF modality names to DLIF-style names.
     """
     mapping = {
-        'RWD': 'rwd',
-        'RWD_DP': 'rwd_dp',
-        'RWD_FMRAD': 'rwd_radfm',
-        'RWD_PYRAD': 'rwd_radpy',
-        'RWD_DP_FMRAD': 'rwd_radfm_dp',
-        'RWD_DP_PYRAD': 'rwd_radpy_dp',
+        'CB': 'rwd',
+        'CB_DP': 'rwd_dp',
+        'CB_FMRAD': 'rwd_radfm',
+        'CB_PYRAD': 'rwd_radpy',
+        'CB_DP_FMRAD': 'rwd_radfm_dp',
+        'CB_DP_PYRAD': 'rwd_radpy_dp',
+        'CB_DP_FMRAD_GENOMICS': 'rwd_radfm_dp_genomics',
+        'CB_DP_PYRAD_GENOMICS': 'rwd_radpy_dp_genomics',
     }
     return mapping.get(mlef_name.upper(), mlef_name.lower())
 
@@ -138,7 +142,8 @@ def plot_auc_results(
     dlif_feature_type: str = "hypothesis_driven",              # hypothesis_driven or data_driven
     dlif_extraction: str = "pyrad-noimp",                      # feature extraction method
     dlif_seed: int = 0,                                         # seed number
-    use_preds: bool = True                                      # whether to use prediction files for p-value computation
+    use_preds: bool = True,                                     # whether to use prediction files for p-value computation
+    save_name: Optional[str] = None                             # custom filename (without extension) for saved plot
 ):
     """
     Plot AUC results comparing different modalities for MLEF or DLIF architectures.
@@ -564,25 +569,26 @@ def plot_auc_results(
         if arch_name == "MLEF":
             auc_ro_mean = np.array([r["auc_ro_mean"] for r in rows], dtype=float)
             auc_ro_std  = np.array([r["auc_ro_std"]  for r in rows], dtype=float)
-            plt.plot(X, auc_ro_mean, linestyle="-", marker="o", label="CV AUC - RWD-only matched", color="#a00000")
+            plt.plot(X, auc_ro_mean, linestyle="-", marker="o", label="CV AUC - CB-only matched", color="#a00000")
             if len(sizes) > 0:
                 plt.scatter(X, auc_ro_mean, s=sizes, color="#a00000", zorder=3)
             else:
                 plt.scatter(X, auc_ro_mean, s=100, color="#a00000", zorder=3)
             plt.fill_between(X, auc_ro_mean - auc_ro_std, auc_ro_mean + auc_ro_std,
-                             alpha=0.3, color="#d8a6a6", label="Confidence interval - RWD-only matched")
+                             alpha=0.3, color="#d8a6a6", label="Confidence interval - CB-only matched")
             multimodal_better = (auc_mod_mean > auc_ro_mean)
 
         if arch_name == "DLIF":
             xticks = []
             for m, n in zip(modalities, n_train_mod):
                 parts = m.split('_')
+                parts = ['CB' if p == 'rwd' else p for p in parts]
                 # Join with newlines
                 formatted_name = '\n'.join(parts)
                 xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
             plt.xticks(X, xticks, rotation=0, fontsize=8)
         else:
-            xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
+            xticks = [f"{m.replace('RWD', 'CB')}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
                     for m, n in zip(modalities, n_train_mod)]
             plt.xticks(X, xticks, rotation=0)
         
@@ -617,7 +623,10 @@ def plot_auc_results(
         plt.xlim(-0.4, len(modalities) - 0.55)
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{outcome}_{analysis}.png"
+            if save_name:
+                out = Path(save_dir) / f"{save_name}.png"
+            else:
+                out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{outcome}_{analysis}.png"
             plt.savefig(out, dpi=600, bbox_inches="tight")
         if show:
             plt.show()
@@ -2763,50 +2772,81 @@ def create_race_fairness_summary(results_dict):
 
 
 def plot_km_combined(target, train_set, test_set, uoc_set, title):
-    # Create a single axis for the combined plot
     fig, ax = plt.subplots(figsize=(8, 4))
     
-    # Define custom colors for each dataset
     colors = {'TRAIN': '#511635', 'TEST': '#1f77b4', 'EXVAL': '#800080'}
     
-    # Container to hold datasets
     datasets = {
         'TRAIN': train_set,
         'TEST': test_set,
         'EXVAL': uoc_set
     }
     
-    # Collect median annotations
     median_annotations = []
+    followup_annotations = []
     kmfs = []
+
     for label, dataset in datasets.items():
         kdf = dataset.dropna(subset=['OS MONTHS', 'DEATH EVENT'])
+
+        # ---- KM for OS ----
         kmf = KaplanMeierFitter()
         kmf.fit(kdf['OS MONTHS'], kdf['DEATH EVENT'], label=label)
-        
-        # Plot the curve using the dataset-specific color.
         kmf.plot(ax=ax, color=colors[label], show_censors=True, ci_show=True)
         kmfs.append(kmf)
 
-        # Calculate median OS and its CI.
+        # Median OS + CI
         median_target = kmf.median_survival_time_
         median_ci = median_survival_times(kmf.confidence_interval_)
         lower_bound = median_ci.iloc[0, 0]
         upper_bound = median_ci.iloc[0, 1]
-        print(f"{label} - Median {target}: {median_target} months")
-        print(f"95% CI: {lower_bound} - {upper_bound} months")
-        
-        # Add median annotation to the list
-        median_annotations.append(f"{label}: {median_target:.1f} mo (95% CI: {lower_bound:.1f}-{upper_bound:.1f})")
-    
-    # Add median annotations at the top of the axes
-    ax.text(0.5, 0.95, "\n".join(median_annotations),
-            transform=ax.transAxes, color="black", fontsize=15,
-            horizontalalignment='center', verticalalignment='top',bbox=dict(facecolor='white', alpha=0.5))
-    # Add at-risk counts below the plot
-    add_at_risk_counts(*kmfs, ax=ax, labels=list(datasets.keys()), rows_to_show=["At risk"], fontsize=15)
+
+        median_annotations.append(
+            f"{label}: {median_target:.1f} mo (95% CI: {lower_bound:.1f}-{upper_bound:.1f})"
+        )
+
+        # ---- Reverse KM for follow-up ----
+        kmf_fu = KaplanMeierFitter()
+        kmf_fu.fit(
+            durations=kdf['OS MONTHS'],
+            event_observed=1 - kdf['DEATH EVENT']
+        )
+
+        median_fu = kmf_fu.median_survival_time_
+        min_fu = kdf['OS MONTHS'].min()
+        max_fu = kdf['OS MONTHS'].max()
+
+        followup_annotations.append(
+            f"{label} FU: {median_fu:.1f} mo (range {min_fu:.1f}-{max_fu:.1f})"
+        )
+
+    # ---- Annotations ----
+    ax.text(
+        0.5, 0.95,
+        "\n".join(median_annotations),
+        transform=ax.transAxes,
+        fontsize=14,
+        ha='center',
+        va='top',
+        bbox=dict(facecolor='white', alpha=0.5)
+    )
+
+
+    add_at_risk_counts(
+        *kmfs,
+        ax=ax,
+        labels=list(datasets.keys()),
+        rows_to_show=["At risk"],
+        fontsize=15
+    )
+    print('FOLLOW-UP STATISTICS:')
+    for annotation in followup_annotations:
+        print(annotation)
+
     ax.set_xlim(0, 100)
     ax.set_xlabel('Months')
     ax.set_ylabel('OS Probability')
     ax.set_title(title)
     plt.show()
+
+

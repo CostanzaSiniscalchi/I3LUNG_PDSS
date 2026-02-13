@@ -23,12 +23,13 @@ def pipeline(config, mods):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
-    parser.add_argument("--base_dir", required=True)
+    parser.add_argument("--base_dir", default="results")
     args = parser.parse_args()
 
     # Load configuration
     with open(args.config) as f:
         config = yaml.safe_load(f)
+    config["base_dir"] = args.base_dir
     original_config = copy.deepcopy(config)
 
     try:

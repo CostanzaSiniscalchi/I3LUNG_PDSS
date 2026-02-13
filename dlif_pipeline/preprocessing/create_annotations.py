@@ -112,7 +112,7 @@ def create_annotations(
             1: 'low',
             2: 'high'
         }).fillna('')
-        ann.drop(columns=['PDL1_CATEGORY'], inplace=True)
+        ann['PDL1_CATEGORY'] = ann['PDL1_CATEGORY'].astype('Int64').astype('string').replace('<NA>', '')
     else:
         ann['PDL1_GROUP'] = ''
     
@@ -139,21 +139,24 @@ def create_annotations(
         ann.drop(columns=['IO_LINE'], inplace=True)
     else:
         ann['COHORT_2'] = 0
-    
-    # HAS_ALL_MODALITIES flag
-    features['HAS_ALL_MODALITIES'] = (
-        features['mod1'].notna() & 
-        features['mod2'].notna() & 
-        features['mod3'].notna() & 
-        features['mod4'].notna()
-    ).astype(int)
-    
-    all_mods_dict = dict(zip(features['Subject'], features['HAS_ALL_MODALITIES']))
-    ann['HAS_ALL_MODALITIES'] = ann['Subject'].map(all_mods_dict).fillna(0).astype(int)
 
-    
-    print(f"Patients with all modalities: {ann['HAS_ALL_MODALITIES'].sum()}")
-    
+    # HAS_{mod} flags based on which subjects appear in each raw data file
+    modality_files = {
+        'HAS_RWD': DATA_DIR / 'rwd.csv',
+        'HAS_RADPY': DATA_DIR / 'pyradiomics.csv',
+        'HAS_FMRAD': DATA_DIR / 'fmrad.csv',
+        'HAS_DP': DATA_DIR / 'digital_pathology.csv',
+        'HAS_GENOMICS': DATA_DIR / 'genomics.csv',
+    }
+    for col_name, filepath in modality_files.items():
+        if filepath.exists():
+            subjects = set(pd.read_csv(filepath, usecols=['Subject'])['Subject'])
+            ann[col_name] = ann['Subject'].isin(subjects).astype(int)
+            print(f"{col_name}: {ann[col_name].sum()} patients")
+        else:
+            print(f"WARNING: {filepath} not found, setting {col_name} = 0")
+            ann[col_name] = 0
+
     # Add early stopping for ALL outcomes
     np.random.seed(seed)
     train_df = ann[ann['dataset'] == 'train']
@@ -195,7 +198,7 @@ def create_annotations(
     for outcome in outcome_cols:
         split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
     
-    flag_cols = ['PDL1_GROUP', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_ALL_MODALITIES', 'INT_ONLY_FOLDS']
+    flag_cols = ['PDL1_GROUP', 'PDL1_CATEGORY', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_RWD', 'HAS_RADPY', 'HAS_FMRAD', 'HAS_DP', 'HAS_GENOMICS', 'INT_ONLY_FOLDS']
     
     early_cols = [f'early_stopping_{o}' for o in outcome_cols]
     

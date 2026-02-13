@@ -327,6 +327,12 @@ class Dataset:
                 if not isinstance(filter_vals, list):
                     filter_vals = [filter_vals]
                 filtered_df = filtered_df[filtered_df[filter_key].isin(filter_vals)]
+                if filtered_df.empty: # FIXME: remove this
+                    log.warning(
+                        f"Dataset empty after applying filter "
+                        f"{filter_key}: {filter_vals}"
+                    )
+                    return pd.DataFrame()
             return filtered_df
         return pd.DataFrame()
 
