@@ -899,7 +899,7 @@ def prepare_multimodal_mixed_bags(path: str, bags_path: str) -> None:
         TextColumn("•"),
         TextColumn("[progress.remaining]{task.completed}/{task.total}"),
     ) as progress:
-        task = progress.add_task("Processing slides...", total=len(slides))
+        task = progress.add_task("Processing patients...", total=len(slides))
         
         for slide in slides:
             slide_data = df[df['Subject'] == slide].iloc[0]
