@@ -35,6 +35,8 @@
 
 mlef_pipeline/results/OS
 dlif_pipeline/preds
+dlif_pipeline/results.tar.gz
+
 
 # py cache
 __pycache__/
