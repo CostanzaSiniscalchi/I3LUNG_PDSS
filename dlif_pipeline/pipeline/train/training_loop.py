@@ -39,7 +39,7 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
     
     # 3. Handle evaluation-only mode vs training
     if training_type == "evaluation":
-        print(f" Evaluation mode: skipping training, only evaluating on ext_val")
+        print(f" Evaluation mode: skipping training, only evaluating")
 
         # Select hyperparameters for config building
         combo = config.get("hyper_combo", config.get("hyperparameters_default", {}))
@@ -62,9 +62,9 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
         )
         config_mil.mixed_bags = True
 
-        # Evaluation on external validation set
-        print(f" Evaluating on external validation set (ext_val)")
-        standard_results_path = results_path.replace("/evaluation/", "/standard/")
+        # Locate pre-trained model checkpoint
+        eval_source = config.get("eval_model_training_type", "standard")
+        standard_results_path = results_path.replace("/evaluation/", f"/{eval_source}/")
         best_checkpoint = os.path.join(standard_results_path)
 
         if not os.path.exists(best_checkpoint):
@@ -72,30 +72,78 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
 
         print(f"best model checkpoint found: {best_checkpoint}")
 
-        # Filter for external validation set (with subanalysis filters)
-        test_dataset = get_eval_dataset(P, config, outcome)
-        outdir = os.path.join(results_path, "eval")
-        os.makedirs(outdir, exist_ok=True)
+        if config.get("masked_mods"):
+            # --- MASKED BAG EVALUATION ---
+            from .mask_modalities import build_output_dirname, ALL_MODALITIES
 
-        print(f"evaluation outputs will be saved to: {outdir}")
+            source = 'radfm' if mods.get('radfm') else 'radpy'
+            all_mods = ALL_MODALITIES[source]
+            bags_root = os.path.dirname(bag_path)
+            evaluated = set()
 
-        # build evaluation kwargs for Slideflow
-        eval_kwargs = {
-            "weights": best_checkpoint,
-            "config": config_mil,
-            "outcomes": outcome,
-            "dataset": test_dataset,
-            "bags": bag_path,
-            "outdir": os.path.abspath(outdir),
-        }
+            for masked_entry in config["masked_mods"]:
+                keep = [m for m in all_mods
+                        if m == 'rwd' or not masked_entry.get(m, False)]
+                dirname = build_output_dirname(keep, all_mods)
+                subset_name = dirname.replace("bags_", "")
 
-        # Optional event-based evaluation (for survival)
-        if events:
-            eval_kwargs["events"] = events
+                if dirname in evaluated:
+                    print(f"[SKIP] Already evaluated {subset_name} for {source} source, skipping duplicate")
+                    continue
+                evaluated.add(dirname)
 
-        # run evaluation
-        eval_mil(**eval_kwargs)
-        print(f"evaluation done on external validation set!\n")
+                masked_bag_path = os.path.join(bags_root, dirname)
+
+                if not os.path.exists(masked_bag_path):
+                    print(f"[WARN] Masked bag directory not found, skipping: {masked_bag_path}")
+                    continue
+
+                print(f"\n Evaluating masked subset: {subset_name}")
+                print(f"  bags: {masked_bag_path}")
+
+                test_dataset = get_eval_dataset(P, config, outcome)
+                outdir = os.path.join(results_path, "eval_mask", subset_name)
+                os.makedirs(outdir, exist_ok=True)
+
+                print(f"  outdir: {outdir}")
+
+                eval_kwargs = {
+                    "weights": best_checkpoint,
+                    "config": config_mil,
+                    "outcomes": outcome,
+                    "dataset": test_dataset,
+                    "bags": masked_bag_path,
+                    "outdir": os.path.abspath(outdir),
+                }
+                if events:
+                    eval_kwargs["events"] = events
+
+                eval_mil(**eval_kwargs)
+                print(f"  masked eval done: {subset_name}\n")
+        else:
+            # --- STANDARD EVALUATION (ext_val, unchanged behavior) ---
+            eval_split = config.get("eval_dataset_split", "ext_val")
+            print(f" Evaluating on dataset split: {eval_split}")
+
+            test_dataset = get_eval_dataset(P, config, outcome)
+            outdir = os.path.join(results_path, "eval")
+            os.makedirs(outdir, exist_ok=True)
+
+            print(f"evaluation outputs will be saved to: {outdir}")
+
+            eval_kwargs = {
+                "weights": best_checkpoint,
+                "config": config_mil,
+                "outcomes": outcome,
+                "dataset": test_dataset,
+                "bags": bag_path,
+                "outdir": os.path.abspath(outdir),
+            }
+            if events:
+                eval_kwargs["events"] = events
+
+            eval_mil(**eval_kwargs)
+            print(f"evaluation done!\n")
 
     else:
         # 4. Prepare dataset for fold

@@ -453,12 +453,17 @@ def plot_auc_results(
                 "rwd_only": None
             }
 
+        # Find eval predictions: directly in mod_dir or in eval/<model>/
+        pred_path = mod_dir / "predictions.parquet"
+        if not pred_path.exists():
+            pred_path = next(mod_dir.glob("eval/*/predictions.parquet"), None)
+
         paths = {
             "mod": {
                 "results": mod_dir / "eval_auc_ci.csv" if (mod_dir / "eval_auc_ci.csv").exists() else None,
-                "pred": mod_dir / "predictions.parquet" if (mod_dir / "predictions.parquet").exists() else None,
+                "pred": pred_path,
                 "model": None,  # DLIF stores models differently
-                "train": mod_dir / "predictions_train.parquet" if (mod_dir / "predictions_train.parquet").exists() else None,
+                "train": None,
             },
             "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
         }

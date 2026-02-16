@@ -170,7 +170,7 @@ def run_training(config, mods):
                 compute_weighted_average(final_seed_path, config["task"])
 
             # Compute extended metrics (DeLong CI, F1, etc.)
-            run_task_metrics(config, mod_string, ROOT)
+            run_task_metrics(config, mod_string, config.get("base_dir", "results"))
 
             final_results.append({
                 "seed": seed,
@@ -271,7 +271,7 @@ def run_training(config, mods):
                 compute_weighted_average(base_seed_path, config["task"])
 
             # Compute extended metrics (DeLong CI, F1, etc.)
-            run_task_metrics(config, mod_string, ROOT)
+            run_task_metrics(config, mod_string, config.get("base_dir", "results"))
            
 
             print(f"Training completed for seed {seed}, fold {fold} at {full_path}")

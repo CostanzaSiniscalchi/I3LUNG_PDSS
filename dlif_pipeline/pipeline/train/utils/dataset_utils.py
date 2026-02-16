@@ -164,10 +164,13 @@ def get_eval_dataset(P, config, outcome, tile_px=256, tile_um=129):
     annotations_df = pd.read_csv(P.annotations)
     print(" Annotations shape:", annotations_df.shape)
 
+    eval_split = config.get("eval_dataset_split", "ext_val")
+
     eval_filter = {
-        f"dataset_{outcome}": "ext_val",
         f"early_stopping_{outcome}": "no",
     }
+    if eval_split:
+        eval_filter[f"dataset_{outcome}"] = eval_split
 
     _apply_subanalysis_filters(config, annotations_df, eval_filter, outcome)
 
