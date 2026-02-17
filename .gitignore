@@ -41,6 +41,7 @@ dlif_pipeline/pipeline/plotting/line_no_plot_other_metrics.py
 !mlef_pipeline/
 !mlef_pipeline/**
 mlef_pipeline/results/
+mlef_pipeline/scripts/
 
 # utils/
 !utils/
