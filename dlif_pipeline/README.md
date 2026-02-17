@@ -275,21 +275,21 @@ hyperparameters_default:
 Apply dataset filters by uncommenting relevant flags:
 
 ```yaml
-# Cohort selection
-# USE_COHORT2_FILTER: [true]
+Cohort selection
+USE_COHORT2_FILTER: [true]
 
-# Histology subtype
-# FILTER_SQUAMOUS: 1  # or 0 for non-squamous
-# ADENO: "1.0"
+Histology subtype
+FILTER_SQUAMOUS: "1"  # or "0" for non-squamous
+ADENO: "1"
 
-# Treatment regimen
-# FILTER_CHEMO_IMMUNO: "1"  # or "0"
+Treatment regimen
+FILTER_CHEMO_IMMUNO: "1"  # or "0"
 
-# Biomarker expression
-# FILTER_PDL1: "high" (PDL1>49%)  # or "low" (PDL1 0-49%) or more fine grain: "0" (PDL1 <1%) and "1" (PDL1 1-49%)
+Biomarker expression
+FILTER_PDL1: "high" #(PDL1>49%) or "low" (PDL1 0-49%) or more fine grain: "0" (PDL1 <1%) or "1" (PDL1 1-49%)
 
-# Center-specific (use only one at a time)
-# FILTER_INT: [true]
+Center-specific (use only one at a time)
+FILTER_INT: [true]
 ```
 
 before applying subanalysis for unicenter, make sure to have generated the specific annotations.

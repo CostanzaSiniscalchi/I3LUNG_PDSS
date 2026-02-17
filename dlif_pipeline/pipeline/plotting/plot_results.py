@@ -129,9 +129,12 @@ def plot_results_from_config(config_arg, base_dir=None, use_preds=True, show=Fal
             else:
                 title_prefix = 'C-Index - DLIF'
 
-            # plot_cindex_results for DLIF hardcodes path to
-            # dlif_base_path / 'OS_MONTHS' / 'survival' / 'standard'
-            # so dlif_eval_type/dlif_feature_type/dlif_extraction are not used
+            # Build dlif_base_path for survival (same logic as classification use_preds=False)
+            if use_preds:
+                surv_dlif_base_path = None
+            else:
+                surv_dlif_base_path = os.path.join(path_info['base_dir'], prefix_parts[0])
+
             plot_cindex_results(
                 architecture="DLIF",
                 outcome=mlef_outcome,
@@ -142,7 +145,7 @@ def plot_results_from_config(config_arg, base_dir=None, use_preds=True, show=Fal
                 show=show,
                 save_dir=save_dir,
                 save_name=save_name,
-                dlif_base_path=None,  # defaults to "dlif_pipeline/preds"
+                dlif_base_path=surv_dlif_base_path,
                 dlif_eval_type=dlif_eval_type,
                 dlif_feature_type=dlif_feature_type,
                 dlif_extraction=dlif_extraction,

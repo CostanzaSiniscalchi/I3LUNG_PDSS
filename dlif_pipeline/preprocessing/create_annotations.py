@@ -8,6 +8,15 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).parent
 DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
 
+def _to_str_flag(series):
+    """Convert a binary flag column (int/float/mixed) to clean '0'/'1'/'' strings."""
+    def _convert(x):
+        if pd.isna(x) or x == '':
+            return ''
+        return str(int(float(x)))
+    return series.apply(_convert)
+
+
 def create_annotations(
     outcomes_path=None,
     rwd_path=None,
@@ -66,6 +75,12 @@ def create_annotations(
     # Get outcome columns
     outcome_cols = [c for c in ann.columns if c not in ['Subject', 'FOLD', 'dataset']]
 
+    # Normalize binary outcome columns to string '0'/'1' (keep NaN as NaN)
+    binary_outcomes = ['os_months_6', 'os_months_24', 'DCR', 'ORR', 'CBR']
+    for col in binary_outcomes:
+        if col in ann.columns:
+            ann[col] = ann[col].apply(lambda x: str(int(float(x))) if pd.notna(x) else np.nan)
+
     # Create dataset_ and fold_ for each outcome
     for outcome in outcome_cols:
         ann[f'dataset_{outcome}'] = np.where(ann[outcome].notna(), ann['dataset'], None)
@@ -116,29 +131,28 @@ def create_annotations(
     else:
         ann['PDL1_GROUP'] = ''
     
-    # Fill NaN in flags with empty string
+    # Normalize binary flag columns to clean string '0'/'1'/''
     if 'NSCLC_HISTOLOGY_SQUAMOUS' in ann.columns:
-        ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ann['NSCLC_HISTOLOGY_SQUAMOUS'].fillna('')
+        ann['NSCLC_HISTOLOGY_SQUAMOUS'] = _to_str_flag(ann['NSCLC_HISTOLOGY_SQUAMOUS'])
     else:
         ann['NSCLC_HISTOLOGY_SQUAMOUS'] = ''
-        
+
     if 'NSCLC_HISTOLOGY_ADENOCARCINOMA' in ann.columns:
-        ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'].fillna('')
+        ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = _to_str_flag(ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'])
     else:
         ann['NSCLC_HISTOLOGY_ADENOCARCINOMA'] = ''
-    
-    # Riempi IO_CHT solo se non esiste
+
     if 'IO_CHT' not in ann.columns:
         ann['IO_CHT'] = ''
     else:
-        ann['IO_CHT'] = ann['IO_CHT'].fillna('')
+        ann['IO_CHT'] = _to_str_flag(ann['IO_CHT'])
     
     # COHORT_2 flag: IO LINE == 1 if column exists
     if 'IO_LINE' in ann.columns:
-        ann['COHORT_2'] = (ann['IO_LINE'] == 1).astype(int)
+        ann['COHORT_2'] = (ann['IO_LINE'] == 1).astype(int).astype(str)
         ann.drop(columns=['IO_LINE'], inplace=True)
     else:
-        ann['COHORT_2'] = 0
+        ann['COHORT_2'] = '0'
 
     # HAS_{mod} flags based on which subjects appear in each raw data file
     modality_files = {
@@ -151,11 +165,11 @@ def create_annotations(
     for col_name, filepath in modality_files.items():
         if filepath.exists():
             subjects = set(pd.read_csv(filepath, usecols=['Subject'])['Subject'])
-            ann[col_name] = ann['Subject'].isin(subjects).astype(int)
-            print(f"{col_name}: {ann[col_name].sum()} patients")
+            ann[col_name] = ann['Subject'].isin(subjects).astype(int).astype(str)
+            print(f"{col_name}: {(ann[col_name] == '1').sum()} patients")
         else:
             print(f"WARNING: {filepath} not found, setting {col_name} = 0")
-            ann[col_name] = 0
+            ann[col_name] = '0'
 
     # Add early stopping for ALL outcomes
     np.random.seed(seed)

@@ -385,7 +385,7 @@ def plot_cindex_results(
         dlif_modality = _map_mlef_to_dlif_modality(modality)
 
         # Build path: base_dir / modality / seed_X /
-        mod_dir = base_dir / dlif_modality
+        mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
 
         if not mod_dir.exists():
             return {
@@ -586,13 +586,14 @@ def plot_cindex_results(
             base_path = Path("mlef_pipeline/results") / outcome / analysis
             analysis_dir = base_path
         else:  # DLIF
-            # DLIF: dlif_pipeline/results/analysis/outcome/classification/eval_type/feature_type/extraction/
             if dlif_base_path is None:
-                dlif_base_path = Path("dlif_pipeline/preds")
+                dlif_base_path = Path("dlif_pipeline/results")
             else:
                 dlif_base_path = Path(dlif_base_path)
 
-            analysis_dir = (dlif_base_path / 'OS_MONTHS' / "survival" / 'standard')
+            # Build full path: base / analysis / OS_MONTHS / survival / eval_type / feature_type / extraction
+            analysis_dir = (dlif_base_path / analysis / 'OS_MONTHS' / "survival" /
+                          dlif_eval_type / dlif_feature_type / dlif_extraction)
         
         if not analysis_dir.exists():
             continue

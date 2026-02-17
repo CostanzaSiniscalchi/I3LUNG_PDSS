@@ -9,9 +9,9 @@ def _apply_subanalysis_filters(config, annotations_df, filters, outcome):
     use_all_mods = config.get("FILTER_ALL_MODS", False)
 
     # ─── binary‐outcome filter ────────────────────
-    for b in ["os_months_6","os_months_24","DCR","ORR"]:
+    for b in ["os_months_6","os_months_24","DCR","ORR","CBR"]:
         if outcome.lower() == b.lower():
-            filters[outcome] = ["1.0","0.0"]
+            filters[outcome] = ["1","0"]
 
     # ─── : apply cohort-2 if requested ────────
     if use_cohort2 and "COHORT_2" in annotations_df:
@@ -25,7 +25,7 @@ def _apply_subanalysis_filters(config, annotations_df, filters, outcome):
 
     # ─── : apply squamous filter if set to 0 or 1 ──────────────
     sq_flag = config.get("FILTER_SQUAMOUS", None)
-    if sq_flag in {"0.0", "1.0"} and "NSCLC_HISTOLOGY_SQUAMOUS" in annotations_df:
+    if sq_flag in {"0", "1"} and "NSCLC_HISTOLOGY_SQUAMOUS" in annotations_df:
         print(f" Filtering NSCLC_HISTOLOGY_SQUAMOUS == {sq_flag}")
         filters["NSCLC_HISTOLOGY_SQUAMOUS"] = [sq_flag]
 
@@ -33,7 +33,7 @@ def _apply_subanalysis_filters(config, annotations_df, filters, outcome):
     ci_flag = config.get("FILTER_CHEMO_IMMUNO", None)
     if ci_flag in ("0", "1") and "IO_CHT" in annotations_df:
         print(f" Filtering IO_CHT == {ci_flag}")
-        filters["IO_CHT"] = [int(ci_flag)]
+        filters["IO_CHT"] = [ci_flag]
 
     # ─── : apply PDL1_GROUP filter if set to "low" or "high" or "0", "1", "2" ──────────
     pdl1_flag = config.get("FILTER_PDL1", None)
@@ -46,7 +46,7 @@ def _apply_subanalysis_filters(config, annotations_df, filters, outcome):
 
     # ─── : apply adenocarcinoma filter ──────────
     adeno_flag = config.get("ADENO", None)
-    if adeno_flag in {"0.0", "1.0"} and "NSCLC_HISTOLOGY_ADENOCARCINOMA" in annotations_df:
+    if adeno_flag in {"0", "1"} and "NSCLC_HISTOLOGY_ADENOCARCINOMA" in annotations_df:
         print(f" Filtering NSCLC_HISTOLOGY_ADENOCARCINOMA == {adeno_flag}")
         filters["NSCLC_HISTOLOGY_ADENOCARCINOMA"] = [adeno_flag]
 
