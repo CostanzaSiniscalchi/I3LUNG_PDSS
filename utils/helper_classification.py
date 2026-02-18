@@ -591,24 +591,24 @@ def plot_auc_results(
                 # Join with newlines
                 formatted_name = '\n'.join(parts)
                 xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
-            plt.xticks(X, xticks, rotation=0, fontsize=8)
+            plt.xticks(X, xticks, rotation=0, fontsize=12)
         else:
             xticks = [f"{m.replace('RWD', 'CB')}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
                     for m, n in zip(modalities, n_train_mod)]
-            plt.xticks(X, xticks, rotation=0)
+            plt.xticks(X, xticks, rotation=0, fontsize=12)
         
 
         for i, (mval, mstd, mname) in enumerate(zip(auc_mod_mean, auc_mod_std, model_names)):
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
             if arch_name == "DLIF":
                 plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f}",
-                        fontsize=9, ha="center", color="#1a80bb")
+                        fontsize=11, ha="center", color="#1a80bb")
             else:
                 plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                        fontsize=9, ha="center", color="#1a80bb")
+                        fontsize=11, ha="center", color="#1a80bb")
             star = rows[i].get("stars", "")
             if star:
-                plt.text(i + 0.36, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
+                plt.text(i + 0.40, base_y + 0.006, star, fontsize=11, ha="left", va="center", color="black")
 
         # --- RED annotations (keep values but REMOVE stars here) ---
         if arch_name == "MLEF":
@@ -617,15 +617,15 @@ def plot_auc_results(
                 base_y = 0.02 if multimodal_better[i] else 0.06
                 if np.isfinite(rv) and np.isfinite(rs):
                     plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=9, ha="center", color="#a00000")
+                            fontsize=11, ha="center", color="#a00000")
 
         ttl = title_prefix or f"CV AUC - {arch_name}"
         plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
         plt.ylabel("AUC")
         plt.ylim(0, 1)
         plt.grid(True, linestyle="--", alpha=0.6)
-        plt.legend()
-        plt.xlim(-0.4, len(modalities) - 0.55)
+        plt.legend(fontsize=12)
+        plt.xlim(-0.5, len(modalities) - 0.50)
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
             if save_name:
@@ -2528,8 +2528,6 @@ def create_fairness_summary(results_dict):
         ).set_index('center').sort_index()
         
         center_df['outcome'] = outcome_name
-        center_df['TPR_omnibus_p'] = results['tpr_by_center'].get('omnibus_pvalue', np.nan)
-        center_df['FPR_omnibus_p'] = results['fpr_by_center'].get('omnibus_pvalue', np.nan)
         
         center_fairness_list.append(center_df)
         
