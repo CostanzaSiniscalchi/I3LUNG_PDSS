@@ -11,6 +11,7 @@ import joblib
 import warnings
 from itertools import combinations
 from scipy.stats import norm
+from .dlif_mappings import outcome_to_dlif, map_dlif_to_mlef_modality, map_mlef_to_dlif_modality
 warnings.filterwarnings('ignore')
 
 
@@ -45,7 +46,14 @@ def plot_cindex_results(
     max_bubble: float = 250,
     n_boot: int = 1000,
     show: bool = True,
-    save_dir: Optional[Union[str, Path]] = None
+    save_dir: Optional[Union[str, Path]] = None,
+    dlif_base_path: Optional[Union[str, Path]] = None,
+    dlif_eval_type: str = "standard",
+    dlif_feature_type: str = "hypothesis_driven",
+    dlif_extraction: str = "pyrad-noimp",
+    dlif_seed: int = 0,
+    use_preds: bool = True,
+    save_name: Optional[str] = None,
 ):
     """
     Expected per-analysis layout (e.g. 'C23'):
@@ -110,6 +118,84 @@ def plot_cindex_results(
             return int(pd.read_excel(train_path).shape[0])
         except:
             return int(np.nan)
+
+    def _read_cindex_dlif(auc_csv_path: Path) -> Tuple[float, float]:
+        """Read C-index from DLIF's eval_auc_ci.csv file."""
+        if auc_csv_path is None or not auc_csv_path.exists():
+            return (np.nan, np.nan)
+        try:
+            df = pd.read_csv(auc_csv_path)
+            if 'auc' in df.columns:
+                cindex = float(df['auc'].iloc[0])
+                if 'ci_lower' in df.columns and 'ci_upper' in df.columns:
+                    ci_lower = float(df['ci_lower'].iloc[0])
+                    ci_upper = float(df['ci_upper'].iloc[0])
+                    std = (ci_upper - ci_lower) / 2
+                    return (cindex, std)
+                return (cindex, 0.0)
+        except Exception:
+            pass
+        return (np.nan, np.nan)
+
+    def _read_n_train_dlif(predictions_path) -> float:
+        """Read number of samples from DLIF prediction files.
+
+        Args:
+            predictions_path: Single Path (standard/evaluation) or list of Paths
+                (cross-validation folds). For CV, concatenates all fold predictions
+                to get total dataset size.
+        """
+        if predictions_path is None:
+            return np.nan
+        try:
+            if isinstance(predictions_path, list):
+                dfs = [pd.read_parquet(p) for p in predictions_path if p.exists()]
+                if not dfs:
+                    return np.nan
+                return int(len(pd.concat(dfs, ignore_index=True)))
+            else:
+                if not predictions_path.exists():
+                    return np.nan
+                df = pd.read_parquet(predictions_path)
+                return int(len(df))
+        except Exception:
+            return np.nan
+
+    def _pair_paths_dlif(base_dir: Path, modality: str) -> dict:
+        """Path resolver for DLIF architecture."""
+        dlif_modality = map_mlef_to_dlif_modality(modality)
+
+        if use_preds:
+            mod_dir = base_dir / dlif_modality
+        else:
+            mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
+
+        if not mod_dir.exists():
+            return {
+                "mod": {"results": None, "pred": None, "model": None, "train": None},
+                "rwd_only": None
+            }
+
+        # Find eval predictions based on evaluation type
+        if dlif_eval_type == "cross_validation":
+            pred_fold_paths = sorted(mod_dir.glob("fold_*/eval/predictions.parquet"))
+            pred_path = pred_fold_paths if pred_fold_paths else None
+        else:
+            pred_path = mod_dir / "predictions.parquet"
+            if not pred_path.exists():
+                pred_path = next(mod_dir.glob("eval/*/predictions.parquet"), None)
+
+        paths = {
+            "mod": {
+                "results": mod_dir / "eval_auc_ci.csv" if (mod_dir / "eval_auc_ci.csv").exists() else None,
+                "pred": pred_path,
+                "model": None,
+                "train": None,
+            },
+            "rwd_only": None
+        }
+
+        return paths
 
     def _scale_sizes(raw_sizes: Iterable[Union[int, float]]) -> np.ndarray:
         arr = np.array(list(raw_sizes), dtype=float)
@@ -211,60 +297,87 @@ def plot_cindex_results(
     def _plot_one(analysis: str, rows: List[dict]) -> plt.Figure:
         modalities = [r["modality"] for r in rows]
         X = np.arange(len(modalities))
-        
+
         cindex_mod_mean = np.array([r["cindex_mod_mean"] for r in rows], dtype=float)
         cindex_mod_std = np.array([r["cindex_mod_std"] for r in rows], dtype=float)
         n_train_mod = np.array([r["n_train_mod"] for r in rows], dtype=float)
         sizes = _scale_sizes(n_train_mod)
         model_names = [r["model_mod"] for r in rows]
-        
+
         fig = plt.figure(figsize=(12, 6))
-        
-        plt.plot(X, cindex_mod_mean, linestyle="-", marker="o", label="C-INDEX CV", color="#1a80bb")
-        plt.scatter(X, cindex_mod_mean, s=sizes, color="#1a80bb", zorder=3)
+
+        if architecture == "DLIF":
+            label = "TEST C-INDEX"
+        else:
+            label = "C-INDEX CV"
+        plt.plot(X, cindex_mod_mean, linestyle="-", marker="o", label=label, color="#1a80bb")
+        if len(sizes) > 0:
+            plt.scatter(X, cindex_mod_mean, s=sizes, color="#1a80bb", zorder=3)
+        else:
+            plt.scatter(X, cindex_mod_mean, s=100, color="#1a80bb", zorder=3)
         plt.fill_between(X, cindex_mod_mean - cindex_mod_std, cindex_mod_mean + cindex_mod_std,
                          alpha=0.3, color="#8cc5e3", label="Confidence interval")
-        
+
         multimodal_better = None
-        
+
         if architecture == "MLEF":
             cindex_ro_mean = np.array([r["cindex_ro_mean"] for r in rows], dtype=float)
             cindex_ro_std = np.array([r["cindex_ro_std"] for r in rows], dtype=float)
-            plt.plot(X, cindex_ro_mean, linestyle="-", marker="o", label="C-INDEX CV - RWD-only matched", color="#a00000")
-            plt.scatter(X, cindex_ro_mean, s=sizes, color="#a00000", zorder=3)
+            plt.plot(X, cindex_ro_mean, linestyle="-", marker="o", label="C-INDEX CV - CB-only matched", color="#a00000")
+            if len(sizes) > 0:
+                plt.scatter(X, cindex_ro_mean, s=sizes, color="#a00000", zorder=3)
+            else:
+                plt.scatter(X, cindex_ro_mean, s=100, color="#a00000", zorder=3)
             plt.fill_between(X, cindex_ro_mean - cindex_ro_std, cindex_ro_mean + cindex_ro_std,
-                             alpha=0.3, color="#d8a6a6", label="Confidence interval - RWD-only matched")
+                             alpha=0.3, color="#d8a6a6", label="Confidence interval - CB-only matched")
             multimodal_better = (cindex_mod_mean > cindex_ro_mean)
-        
-        xticks = [f"{m}\n(n. {int(n) if np.isfinite(n) else 'NA'})" for m, n in zip(modalities, n_train_mod)]
-        plt.xticks(X, xticks)
-        
+
+        if architecture == "DLIF":
+            xticks = []
+            for m, n in zip(modalities, n_train_mod):
+                parts = m.split('_')
+                parts = ['CB' if p == 'rwd' else p for p in parts]
+                formatted_name = '\n'.join(parts)
+                xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
+            plt.xticks(X, xticks, rotation=0, fontsize=12)
+        else:
+            xticks = [f"{m.replace('RWD', 'CB')}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
+                    for m, n in zip(modalities, n_train_mod)]
+            plt.xticks(X, xticks, rotation=0, fontsize=12)
+
         for i, (mval, mstd, mname) in enumerate(zip(cindex_mod_mean, cindex_mod_std, model_names)):
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
-            plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                    fontsize=9, ha="center", color="#1a80bb")
+            if architecture == "DLIF":
+                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f}",
+                        fontsize=11, ha="center", color="#1a80bb")
+            else:
+                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
+                        fontsize=11, ha="center", color="#1a80bb")
             if (star := rows[i].get("stars", "")):
-                plt.text(i + 0.33, base_y + 0.006, star, fontsize=10, ha="left", va="center", color="black")
-        
+                plt.text(i + 0.40, base_y + 0.006, star, fontsize=11, ha="left", va="center", color="black")
+
         if architecture == "MLEF":
             for i, rrow in enumerate(rows):
                 rv, rs, rname = rrow["cindex_ro_mean"], rrow["cindex_ro_std"], rrow["model_ro"]
                 base_y = 0.02 if multimodal_better[i] else 0.06
                 if np.isfinite(rv) and np.isfinite(rs):
                     plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=9, ha="center", color="#a00000")
-        
+                            fontsize=11, ha="center", color="#a00000")
+
         ttl = title_prefix or f"C-INDEX CV - {architecture}"
         plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
         plt.ylabel("C-INDEX")
         plt.ylim(0, 1)
         plt.grid(True, linestyle="--", alpha=0.6)
-        plt.legend()
-        plt.xlim(-0.4, len(modalities) - 0.55)
-        
+        plt.legend(fontsize=12)
+        plt.xlim(-0.5, len(modalities) - 0.50)
+
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
-            out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{analysis}.png"
+            if save_name:
+                out = Path(save_dir) / f"{save_name}.png"
+            else:
+                out = Path(save_dir) / f"{ttl.replace(' ', '_')}_{outcome}_{analysis}.png"
             plt.savefig(out, dpi=600, bbox_inches="tight")
         if show:
             plt.show()
@@ -272,22 +385,55 @@ def plot_cindex_results(
 
     if isinstance(analyses, str):
         analyses = [analyses]
-    
+
     for analysis in analyses:
-        analysis_dir = Path(architecture) / outcome / analysis
+        # Build the correct path based on architecture
+        if architecture == "MLEF":
+            analysis_dir = Path(architecture) / outcome / analysis
+        else:  # DLIF
+            if use_preds:
+                if dlif_base_path is None:
+                    _dlif_base = Path("dlif_pipeline/preds")
+                else:
+                    _dlif_base = Path(dlif_base_path)
+                dlif_outcome = outcome_to_dlif(outcome)
+                analysis_dir = _dlif_base / dlif_outcome / "classification" / dlif_eval_type
+            else:
+                if dlif_base_path is None:
+                    _dlif_base = Path("dlif_pipeline/results")
+                else:
+                    _dlif_base = Path(dlif_base_path)
+                dlif_outcome = outcome_to_dlif(outcome)
+                analysis_dir = (_dlif_base / analysis / dlif_outcome / "classification" /
+                              dlif_eval_type / dlif_feature_type / dlif_extraction)
+
         if not analysis_dir.exists():
             continue
-        
-        modalities = _collect_modalities(analysis_dir)
+
+        # Collect modalities
+        if architecture == "DLIF":
+            dlif_modalities = [p.name for p in analysis_dir.iterdir()
+                             if p.is_dir() and p.name.lower().startswith("rwd")]
+            modalities = [map_dlif_to_mlef_modality(m) for m in dlif_modalities]
+            modalities = _ordered_modalities(modalities)
+        else:
+            modalities = _collect_modalities(analysis_dir)
+
         if not modalities:
             continue
-        
+
         rows = []
         for mod in modalities:
-            paths = _pair_paths(analysis_dir, mod)
-            cindex_m, std_m = _read_cindex_cv(paths["mod"]["results"])
-            model_m = _read_model_name(paths["mod"]["model"])
-            ntrain_m = _read_n_train(paths["mod"]["train"])
+            if architecture == "DLIF":
+                paths = _pair_paths_dlif(analysis_dir, mod)
+                cindex_m, std_m = _read_cindex_dlif(paths["mod"]["results"])
+                model_m = "DLIF"
+                ntrain_m = _read_n_train_dlif(paths["mod"]["pred"])
+            else:
+                paths = _pair_paths(analysis_dir, mod)
+                cindex_m, std_m = _read_cindex_cv(paths["mod"]["results"])
+                model_m = _read_model_name(paths["mod"]["model"])
+                ntrain_m = _read_n_train(paths["mod"]["train"])
             
             row = {
                 "modality": mod,
