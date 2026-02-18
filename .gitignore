@@ -34,6 +34,8 @@ dlif_pipeline/structure.txt
 dlif_pipeline/pipeline/train/MIL.log
 dlif_pipeline/pipeline/plotting/line_no_plot_other_metrics.py
 
+
+
 # images/
 !images/
 !images/**
@@ -42,16 +44,18 @@ dlif_pipeline/pipeline/plotting/line_no_plot_other_metrics.py
 !mlef_pipeline/
 !mlef_pipeline/**
 mlef_pipeline/results/
-mlef_pipeline/scripts/
+
+
+# vanguri/
+!other_models/
+!other_models/**
+other_models/vanguri/.ipynb_checkpoints/
+other_models/vanguri/results/
 
 # utils/
 !utils/
 !utils/**
 
-# vanguri/
-!other-models/vanguri/lung_helper.py
-!other-models/vanguri/vanguri.ipynb
-!other-models/vanguri/.ipynb_checkpoints
 
 
 # Always ignore compiled/cache files
