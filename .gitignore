@@ -18,6 +18,7 @@
 !data/features.json
 !data/int_cv_splits.json
 
+
 # dlif_pipeline/ - whitelist tree, then exclude heavy dirs
 !dlif_pipeline/
 !dlif_pipeline/**
@@ -47,9 +48,10 @@ mlef_pipeline/results/
 !utils/**
 
 # vanguri/
-!vanguri/
-!vanguri/**
-vanguri/results/
+!other-models/vanguri/lung_helper.py
+!other-models/vanguri/vanguri.ipynb
+!other-models/vanguri/.ipynb_checkpoints
+
 
 # Always ignore compiled/cache files
 __pycache__/
