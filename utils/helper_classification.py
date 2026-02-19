@@ -600,7 +600,7 @@ def plot_auc_results(
 
         ttl = title_prefix or f"CV AUC - {arch_name}"
         plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
-        plt.ylabel("AUC")
+        plt.ylabel("AUC", fontsize=14)
         plt.ylim(0, 1)
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.legend(fontsize=12)
