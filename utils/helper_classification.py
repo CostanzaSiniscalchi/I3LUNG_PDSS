@@ -458,10 +458,14 @@ def plot_auc_results(
 
         fig = plt.figure(figsize=(12, 6))
         # BLUE: modality
-        if arch_name == "DLIF":
-            label = 'TEST AUC'
-        else:
+        if arch_name == "MLEF":
             label = "CV AUC"
+        elif dlif_eval_type == "cross_validation":
+            label = "CV AUC"
+        elif dlif_eval_type == "evaluation":
+            label = "Ext-Val AUC"
+        else:
+            label = "Test AUC"
         plt.plot(X, auc_mod_mean, linestyle="-", marker="o", label=label, color="#1a80bb")
         if len(sizes) > 0:
             plt.scatter(X, auc_mod_mean, s=sizes, color="#1a80bb", zorder=3)
@@ -494,8 +498,10 @@ def plot_auc_results(
                 xticks.append(f"{formatted_name}")
             plt.xticks(X, xticks, rotation=0, fontsize=12)
         else:
-            xticks = [f"{m.replace('RWD', 'CB')}"
-                    for m, n in zip(modalities, n_train_mod)]
+            xticks = []
+            for m, n in zip(modalities, n_train_mod):
+                parts = m.replace('RWD', 'CB').split('_')
+                xticks.append('\n'.join(parts))
             plt.xticks(X, xticks, rotation=0, fontsize=12)
         
 
@@ -503,13 +509,13 @@ def plot_auc_results(
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
             if arch_name == "DLIF":
                 plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f}",
-                        fontsize=11, ha="center", color="#1a80bb")
+                        fontsize=12, ha="center", color="#1a80bb")
             else:
                 plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                        fontsize=11, ha="center", color="#1a80bb")
+                        fontsize=12, ha="center", color="#1a80bb")
             star = rows[i].get("stars", "")
             if star:
-                plt.text(i + 0.40, base_y + 0.006, star, fontsize=11, ha="left", va="center", color="black")
+                plt.text(i + 0.40, base_y + 0.006, star, fontsize=12, ha="left", va="center", color="black")
 
         # --- RED annotations (keep values but REMOVE stars here) ---
         if arch_name == "MLEF":
@@ -518,11 +524,20 @@ def plot_auc_results(
                 base_y = 0.02 if multimodal_better[i] else 0.06
                 if np.isfinite(rv) and np.isfinite(rs):
                     plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=11, ha="center", color="#a00000")
+                            fontsize=12, ha="center", color="#a00000")
 
-        ttl = title_prefix or f"CV AUC - {arch_name}"
+        if arch_name == "MLEF":
+            _auc_prefix = "CV AUC"
+        elif dlif_eval_type == "cross_validation":
+            _auc_prefix = "CV AUC"
+        elif dlif_eval_type == "evaluation":
+            _auc_prefix = "Ext-Val AUC"
+        else:
+            _auc_prefix = "Test AUC"
+        ttl = title_prefix or f"{_auc_prefix} - {arch_name}"
         plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
-        plt.ylabel("AUC")
+        plt.ylabel("AUC", fontsize = 14)
+        plt.tick_params(axis='y', labelsize=13)
         plt.ylim(0, 1)
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.legend(fontsize=12)
