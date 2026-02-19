@@ -11,7 +11,7 @@ import joblib
 import warnings
 from itertools import combinations
 from scipy.stats import norm
-from .dlif_mappings import outcome_to_dlif, map_dlif_to_mlef_modality, map_mlef_to_dlif_modality
+from .dlif_helper import *
 warnings.filterwarnings('ignore')
 
 

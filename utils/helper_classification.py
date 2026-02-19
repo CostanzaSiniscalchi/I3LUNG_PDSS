@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import os
 from .DeLong_test import auc_roc_ci, delong_roc_variance, fastDeLong_no_weights, compute_ground_truth_statistics
+from .dlif_helper import *
 from scipy import stats
 import shap
 from sklearn.linear_model import LogisticRegression
@@ -15,10 +16,6 @@ import seaborn as sns
 from lifelines import KaplanMeierFitter
 from lifelines.utils import median_survival_times
 from lifelines.plotting import add_at_risk_counts
-
-
-from .dlif_mappings import outcome_to_dlif, map_dlif_to_mlef_modality, map_mlef_to_dlif_modality
-
 
 def delong_test_comparison(y_true, y_pred1, y_pred2, alpha=0.05):
     """
@@ -251,31 +248,6 @@ def plot_auc_results(
             pass
         return (np.nan, np.nan)
 
-    def _read_n_train_dlif(predictions_path) -> float:
-        """Read number of samples from DLIF prediction files.
-
-        Args:
-            predictions_path: Single Path (standard/evaluation) or list of Paths
-                (cross-validation folds). For CV, concatenates all fold predictions
-                to get total dataset size.
-        """
-        if predictions_path is None:
-            return np.nan
-        try:
-            if isinstance(predictions_path, list):
-                # CV: concatenate all fold predictions
-                dfs = [pd.read_parquet(p) for p in predictions_path if p.exists()]
-                if not dfs:
-                    return np.nan
-                return int(len(pd.concat(dfs, ignore_index=True)))
-            else:
-                if not predictions_path.exists():
-                    return np.nan
-                df = pd.read_parquet(predictions_path)
-                return int(len(df))
-        except Exception:
-            return np.nan
-
     def _read_model_name(model_path: Path) -> str:
         """
         Model files are named like 'model_LR' or 'model_RF'.
@@ -399,56 +371,6 @@ def plot_auc_results(
                 }
         return paths
 
-    def _pair_paths_dlif(base_dir: Path, modality: str) -> dict:
-        """
-        Path resolver for DLIF architecture.
-        Returns dict with paths to DLIF files.
-        """
-        # DLIF modality directories use lowercase with underscores
-        dlif_modality = map_mlef_to_dlif_modality(modality)
-
-        # Build path based on whether we're using preds or results directory
-        if use_preds:
-            # Simpler structure: base_dir / modality /
-            mod_dir = base_dir / dlif_modality
-        else:
-            # Full structure: base_dir / modality / seed_X /
-            mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
-
-        if not mod_dir.exists():
-            return {
-                "mod": {
-                    "results": None,
-                    "pred": None,
-                    "model": None,
-                    "train": None,
-                },
-                "rwd_only": None
-            }
-
-        # Find eval predictions based on evaluation type
-        if dlif_eval_type == "cross_validation":
-            # CV: predictions are split across fold_*/eval/predictions.parquet
-            pred_fold_paths = sorted(mod_dir.glob("fold_*/eval/predictions.parquet"))
-            pred_path = pred_fold_paths if pred_fold_paths else None
-        else:
-            # Standard / evaluation: single predictions file
-            pred_path = mod_dir / "predictions.parquet"
-            if not pred_path.exists():
-                pred_path = next(mod_dir.glob("eval/*/predictions.parquet"), None)
-
-        paths = {
-            "mod": {
-                "results": mod_dir / "eval_auc_ci.csv" if (mod_dir / "eval_auc_ci.csv").exists() else None,
-                "pred": pred_path,
-                "model": None,  # DLIF stores models differently
-                "train": None,
-            },
-            "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
-        }
-
-        return paths
-
 
     def _compute_pvalue(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
         """
@@ -536,10 +458,14 @@ def plot_auc_results(
 
         fig = plt.figure(figsize=(12, 6))
         # BLUE: modality
-        if arch_name == "DLIF":
-            label = 'TEST AUC'
-        else:
+        if arch_name == "MLEF":
             label = "CV AUC"
+        elif dlif_eval_type == "cross_validation":
+            label = "CV AUC"
+        elif dlif_eval_type == "evaluation":
+            label = "Ext-Val AUC"
+        else:
+            label = "Test AUC"
         plt.plot(X, auc_mod_mean, linestyle="-", marker="o", label=label, color="#1a80bb")
         if len(sizes) > 0:
             plt.scatter(X, auc_mod_mean, s=sizes, color="#1a80bb", zorder=3)
@@ -569,11 +495,13 @@ def plot_auc_results(
                 parts = ['CB' if p == 'rwd' else p for p in parts]
                 # Join with newlines
                 formatted_name = '\n'.join(parts)
-                xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
+                xticks.append(f"{formatted_name}")
             plt.xticks(X, xticks, rotation=0, fontsize=12)
         else:
-            xticks = [f"{m.replace('RWD', 'CB')}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
-                    for m, n in zip(modalities, n_train_mod)]
+            xticks = []
+            for m, n in zip(modalities, n_train_mod):
+                parts = m.replace('RWD', 'CB').split('_')
+                xticks.append('\n'.join(parts))
             plt.xticks(X, xticks, rotation=0, fontsize=12)
         
 
@@ -581,13 +509,13 @@ def plot_auc_results(
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
             if arch_name == "DLIF":
                 plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f}",
-                        fontsize=11, ha="center", color="#1a80bb")
+                        fontsize=12, ha="center", color="#1a80bb")
             else:
                 plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                        fontsize=11, ha="center", color="#1a80bb")
+                        fontsize=12, ha="center", color="#1a80bb")
             star = rows[i].get("stars", "")
             if star:
-                plt.text(i + 0.40, base_y + 0.006, star, fontsize=11, ha="left", va="center", color="black")
+                plt.text(i + 0.40, base_y + 0.006, star, fontsize=12, ha="left", va="center", color="black")
 
         # --- RED annotations (keep values but REMOVE stars here) ---
         if arch_name == "MLEF":
@@ -596,11 +524,20 @@ def plot_auc_results(
                 base_y = 0.02 if multimodal_better[i] else 0.06
                 if np.isfinite(rv) and np.isfinite(rs):
                     plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=11, ha="center", color="#a00000")
+                            fontsize=12, ha="center", color="#a00000")
 
-        ttl = title_prefix or f"CV AUC - {arch_name}"
+        if arch_name == "MLEF":
+            _auc_prefix = "CV AUC"
+        elif dlif_eval_type == "cross_validation":
+            _auc_prefix = "CV AUC"
+        elif dlif_eval_type == "evaluation":
+            _auc_prefix = "Ext-Val AUC"
+        else:
+            _auc_prefix = "Test AUC"
+        ttl = title_prefix or f"{_auc_prefix} - {arch_name}"
         plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
-        plt.ylabel("AUC", fontsize=14)
+        plt.ylabel("AUC", fontsize = 14)
+        plt.tick_params(axis='y', labelsize=13)
         plt.ylim(0, 1)
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.legend(fontsize=12)
@@ -678,11 +615,11 @@ def plot_auc_results(
         for mod in modalities:
             # Get paths based on architecture
             if architecture == "DLIF":
-                paths = _pair_paths_dlif(analysis_dir, mod)
+                paths = pair_paths_dlif(analysis_dir, mod, dlif_eval_type, 'classification', dlif_seed, use_preds = use_preds)
                 # Read DLIF-specific files
                 auc_m, std_m = _read_auc_dlif(paths["mod"]["results"])
                 model_m = "DLIF"  # DLIF uses MIL models
-                ntrain_m = _read_n_train_dlif(paths["mod"]["pred"])
+                ntrain_m = read_n_train_dlif(paths["mod"]["pred"])
             else:
                 paths = _pair_paths(analysis_dir, mod)
                 # modality side
