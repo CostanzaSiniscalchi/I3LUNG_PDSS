@@ -13,6 +13,7 @@ from matplotlib.patches import Rectangle
 from matplotlib.transforms import Bbox
 import shap
 from utils.DeLong_test import *
+from .dlif_helper import *
 from lifelines.utils import concordance_index
 
 def plot_km_combined(datasets, stats: bool=True):
@@ -230,13 +231,6 @@ def plot_cindex_results(
             pass
         return (np.nan, np.nan)
 
-    def _read_n_train_dlif() -> int:
-        """Count number of training samples from DLIF prediction_train.parquet file."""
-        df = pd.read_csv('data/annotations.csv')
-        df = df[(df['dataset'] == 'test') & (df['OS_MONTHS'] != ' ')]
-
-        return df.shape[0]
-
     def _read_model_name(model_path: Path) -> str:
         """
         Model files are named like 'model_LR' or 'model_RF'.
@@ -272,38 +266,6 @@ def plot_cindex_results(
             leftovers = [m for m in filtered if m not in in_order]
             return in_order + leftovers
         return filtered
-
-    def _map_dlif_to_mlef_modality(dlif_name: str) -> str:
-        """
-        Map DLIF modality names to MLEF-style names.
-        DLIF: rwd, rwd_dp, rwd_radfm, rwd_radpy, rwd_radfm_dp, rwd_radpy_dp
-        MLEF: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD
-        """
-        mapping = {
-            'rwd': 'CB',
-            'rwd_dp': 'CB_DP',
-            'rwd_radfm': 'CB_FMRAD',
-            'rwd_radpy': 'CB_PYRAD',
-            'rwd_radfm_dp': 'CB_DP_FMRAD',
-            'rwd_radpy_dp': 'CB_DP_PYRAD',
-            'rwd_radpy_dp_genomics': 'CB_DP_PYRAD_GENOMICS',
-            'rwd_radfm_dp_genomics': 'CB_DP_FMRAD_GENOMICS',
-        }
-        return mapping.get(dlif_name.lower(), dlif_name.upper())
-
-    def _map_mlef_to_dlif_modality(mlef_name: str) -> str:
-        """
-        Map MLEF modality names to DLIF-style names.
-        """
-        mapping = {
-            'CB': 'rwd',
-            'CB_DP': 'rwd_dp',
-            'CB_FMRAD': 'rwd_radfm',
-            'CB_PYRAD': 'rwd_radpy',
-            'CB_DP_FMRAD': 'rwd_radfm_dp',
-            'CB_DP_PYRAD': 'rwd_radpy_dp',
-        }
-        return mapping.get(mlef_name.upper(), mlef_name.lower())
 
     def _collect_modalities(analysis_dir: Path) -> List[str]:
         return _ordered_modalities([p.name for p in analysis_dir.iterdir()
@@ -374,40 +336,6 @@ def plot_cindex_results(
                     "model":   find_first(ro_dir, ["model_", "model"]),
                     "train":   find_first(ro_dir, ["train_set", "Train_set", "train"]),
                 }
-        return paths
-
-    def _pair_paths_dlif(base_dir: Path, modality: str) -> dict:
-        """
-        Path resolver for DLIF architecture.
-        Returns dict with paths to DLIF files.
-        """
-        # DLIF modality directories use lowercase with underscores
-        dlif_modality = _map_mlef_to_dlif_modality(modality)
-
-        # Build path: base_dir / modality / seed_X /
-        mod_dir = base_dir / dlif_modality / f"seed_{dlif_seed}"
-
-        if not mod_dir.exists():
-            return {
-                "mod": {
-                    "results": None,
-                    "pred": None,
-                    "model": None,
-                    "train": None,
-                },
-                "rwd_only": None
-            }
-
-        paths = {
-            "mod": {
-                "results": mod_dir / "eval_cindex_ci.csv" if (mod_dir / "eval_cindex_ci.csv").exists() else None,
-                "pred": None,
-                "model": None,
-                "train": None,
-            },
-            "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
-        }
-
         return paths
  
 
@@ -509,11 +437,11 @@ def plot_cindex_results(
                 parts = ['CB' if p == 'rwd' else p for p in parts]
                 # Join with newlines
                 formatted_name = '\n'.join(parts)
-                xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
+                xticks.append(f"{formatted_name}")
             plt.xticks(X, xticks, rotation=0, fontsize=8)
         else:
             ttl = title_prefix or f"CV {metric} - {arch_name}"
-            xticks = [f"{m.replace('RWD', 'CB')}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
+            xticks = [f"{m.replace('RWD', 'CB')}"
                     for m, n in zip(modalities, n_train_mod)]
             plt.xticks(X, xticks, rotation=0)
 
@@ -602,7 +530,7 @@ def plot_cindex_results(
         if architecture == "DLIF":
             # For DLIF, list directories and map them to MLEF names
             dlif_modalities = [el for el in os.listdir(analysis_dir) if el.startswith('rwd')]
-            modalities = [_map_dlif_to_mlef_modality(m) for m in dlif_modalities]
+            modalities = [map_dlif_to_mlef_modality(m) for m in dlif_modalities]
             modalities = _ordered_modalities(modalities)
             modalities_map = {dlif: mlef for dlif, mlef in zip(dlif_modalities, modalities)}
         else:
@@ -616,11 +544,11 @@ def plot_cindex_results(
         for mod_key, mod_value in modalities_map.items():
             # Get paths based on architecture
             if architecture == "DLIF":
-                paths = _pair_paths_dlif(analysis_dir, mod_key)
+                paths = pair_paths_dlif(analysis_dir, mod_key, dlif_eval_type, "survival", dlif_seed)
                 # Read DLIF-specific files
                 cindex_m, std_m = _read_c_index_dlif(paths["mod"]["results"])
                 model_m = "MIL"  # DLIF uses MIL models
-                ntrain_m = _read_n_train_dlif()
+                ntrain_m = read_n_train_dlif(paths["mod"]["pred"])
             else:
                 paths = _pair_paths(analysis_dir, mod_key)
                 # modality side
