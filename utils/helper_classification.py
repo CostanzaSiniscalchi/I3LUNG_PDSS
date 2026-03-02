@@ -2062,9 +2062,28 @@ def plot_fairness_by_group(
                 continue
             start_x = min(b.get_x() for b in bars)
             end_x = max(b.get_x() + b.get_width() for b in bars)
-            ax.plot([start_x, end_x], [threshold, threshold], 
+            ax.plot([start_x, end_x], [threshold, threshold],
                     color='black', linestyle='--', linewidth=0.8, alpha=0.7)
-    
+
+    # Add significance brackets between the two groups per outcome
+    if 'p-value' in df_plot.columns:
+        for i, outcome in enumerate(outcomes):
+            sub = df_plot[df_plot['outcome'] == outcome]
+            p = sub['p-value'].dropna()
+            if p.empty or p.iloc[0] >= 0.05:
+                continue
+            p = p.iloc[0]
+            groups_list = list(groups)
+            x_coords, y_tops = [], []
+            for j, group in enumerate(groups_list):
+                x_coords.append(i + (j - (len(groups_list) - 1) / 2) * bar_width)
+                row = sub[sub[group_col] == group]
+                ci_up = row['ci_up'].values[0] if not row.empty else 0
+                y_tops.append(ci_up if not np.isnan(ci_up) else (row['Value'].values[0] if not row.empty else 0))
+            if len(x_coords) == 2:
+                y_bracket = max(y_tops) + (0.12 if patients_per_outcome is not None else 0.04)
+                _bracket(ax, x_coords[0], x_coords[1], y_bracket, h=0.025, star=p_to_stars(p))
+
     # Formatting
     direction = '↑ higher is better' if metric == 'TPR' else '↓ lower is better'
     plt.ylabel(f'{metric} - {direction}')
