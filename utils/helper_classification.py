@@ -448,7 +448,10 @@ def plot_auc_results(
 
     def _plot_one(analysis: str, rows: List[dict]) -> plt.Figure:
         modalities = [r["modality"] for r in rows]
-        X = np.arange(len(modalities))
+        if arch_name == "MLEF":
+            X = np.arange(len(modalities)) * 1.6
+        else:
+            X = np.arange(len(modalities))
 
         auc_mod_mean = np.array([r["auc_mod_mean"] for r in rows], dtype=float)
         auc_mod_std  = np.array([r["auc_mod_std"]  for r in rows], dtype=float)
@@ -508,14 +511,14 @@ def plot_auc_results(
         for i, (mval, mstd, mname) in enumerate(zip(auc_mod_mean, auc_mod_std, model_names)):
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
             if arch_name == "DLIF":
-                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f}",
+                plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f}",
                         fontsize=12, ha="center", color="#1a80bb")
             else:
-                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                        fontsize=12, ha="center", color="#1a80bb")
+                plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
+                        fontsize=11, ha="center", color="#1a80bb")
             star = rows[i].get("stars", "")
             if star:
-                plt.text(i + 0.40, base_y + 0.006, star, fontsize=12, ha="left", va="center", color="black")
+                plt.text(X[i] + 0.63, base_y + 0.006, star, fontsize=11, ha="left", va="center", color="black")
 
         # --- RED annotations (keep values but REMOVE stars here) ---
         if arch_name == "MLEF":
@@ -523,8 +526,8 @@ def plot_auc_results(
                 rv, rs, rname = rrow["auc_ro_mean"], rrow["auc_ro_std"], rrow["model_ro"]
                 base_y = 0.02 if multimodal_better[i] else 0.06
                 if np.isfinite(rv) and np.isfinite(rs):
-                    plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=12, ha="center", color="#a00000")
+                    plt.text(X[i], base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
+                            fontsize=11, ha="center", color="#a00000")
 
         if arch_name == "MLEF":
             _auc_prefix = "CV AUC"
@@ -541,7 +544,7 @@ def plot_auc_results(
         plt.ylim(0, 1)
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.legend(fontsize=12)
-        plt.xlim(-0.5, len(modalities) - 0.50)
+        plt.xlim(X[0] - 0.65, X[-1] + 0.8) if len(X) > 0 else None
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
             if save_name:
