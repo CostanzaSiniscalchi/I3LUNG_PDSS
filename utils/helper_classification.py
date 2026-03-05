@@ -263,14 +263,14 @@ def plot_auc_results(
             return stem.split("_", 1)[1] or "UnknownModel"
         return "UnknownModel"
 
-    def _read_n_train(train_path: Path) -> float:
-        if train_path is None or not train_path.exists():
+    def _read_n_samples(pred_path: Path) -> float:
+        if pred_path is None or not pred_path.exists():
             return np.nan
         try:
-            if train_path.suffix.lower() in ['.xlsx', '.xls']:
-                return int(pd.read_excel(train_path).shape[0])
+            if pred_path.suffix.lower() in ['.xlsx', '.xls']:
+                return int(pd.read_excel(pred_path).shape[0])
             else:
-                return int(pd.read_csv(train_path).shape[0])
+                return int(pd.read_csv(pred_path).shape[0])
         except Exception:
             return np.nan
 
@@ -295,7 +295,15 @@ def plot_auc_results(
     def _ordered_modalities(mods: List[str]) -> List[str]:
         filtered = [m for m in mods if m not in exclude_modalities]
         if modality_order:
-            in_order = [m for m in modality_order if m in filtered]
+            # Build a lookup that maps both "CB…" and "RWD…" forms to the actual name in filtered
+            def _normalise(name: str) -> str:
+                return name.upper().replace("CB", "RWD")
+            norm_to_actual = {_normalise(m): m for m in filtered}
+            in_order = []
+            for req in modality_order:
+                actual = norm_to_actual.get(_normalise(req))
+                if actual is not None:
+                    in_order.append(actual)
             leftovers = [m for m in filtered if m not in in_order]
             return in_order + leftovers
         return filtered
@@ -504,7 +512,10 @@ def plot_auc_results(
             xticks = []
             for m, n in zip(modalities, n_train_mod):
                 parts = m.replace('RWD', 'CB').split('_')
-                xticks.append('\n'.join(parts))
+                label_text = '\n'.join(parts)
+                if np.isfinite(n):
+                    label_text += f"\n(n={int(n)})"
+                xticks.append(label_text)
             plt.xticks(X, xticks, rotation=0, fontsize=12)
         
 
@@ -544,7 +555,7 @@ def plot_auc_results(
         plt.ylim(0, 1)
         plt.grid(True, linestyle="--", alpha=0.6)
         plt.legend(fontsize=12)
-        plt.xlim(X[0] - 0.65, X[-1] + 0.8) if len(X) > 0 else None
+        plt.xlim(X[0] - 0.7, X[-1] + 0.85) if len(X) > 0 else None
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
             if save_name:
@@ -569,7 +580,7 @@ def plot_auc_results(
     for analysis in analyses:
         # Build the correct path based on architecture
         if architecture == "MLEF":
-            # MLEF: mlef_pipeline/results/outcome/analysis/
+            # MLEF: mlef_pipeline/results/outcome/analysis/ 
             base_path = Path("mlef_pipeline/results") / outcome / analysis
             # base_path = Path("new/results") / outcome / analysis
             analysis_dir = base_path
@@ -628,7 +639,7 @@ def plot_auc_results(
                 # modality side
                 auc_m, std_m = _read_auc_cv(paths["mod"]["results"])
                 model_m = _read_model_name(paths["mod"]["model"])
-                ntrain_m = _read_n_train(paths["mod"]["train"])
+                ntrain_m = _read_n_samples(paths["mod"]["pred"])
 
             row = {
                 "modality": mod,
@@ -658,7 +669,7 @@ def plot_auc_results(
                         row.update({
                             "auc_ro_mean": float(auc_r),
                             "auc_ro_std":  float(std_r) if np.isfinite(std_r) else 0.0,
-                            "n_train_ro":  _read_n_train(ro["train"]),
+                            "n_train_ro":  _read_n_samples(ro["pred"]),
                             "model_ro":    _read_model_name(ro["model"]),
                             "pvalue":      pval,
                             "stars":       p_to_stars(pval) if (pval is not None and np.isfinite(pval)) else ""
