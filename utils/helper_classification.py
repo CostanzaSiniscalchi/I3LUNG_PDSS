@@ -856,10 +856,10 @@ def plot_radar_charts(
     N = len(biomarkers)
     angles = np.linspace(0, 2 * np.pi, N, endpoint=False).tolist()
     angles += angles[:1] # Close the loop
-    fontsize = 12
+    fontsize = 15
     # --- Plotting Loop ---
     for metric in metrics:
-        plt.figure(figsize=(8, 8))
+        plt.figure(figsize=(9, 9))
         ax = plt.subplot(111, projection='polar')
         
         vals_bio = [biomarker_scores[bio][metric] for bio in biomarkers] + [biomarker_scores[biomarkers[0]][metric]]
@@ -884,10 +884,10 @@ def plot_radar_charts(
         
         ax.set_xticks(angles[:-1])
         ax.set_xticklabels(tick_labels, fontsize=fontsize)
-        ax.tick_params(axis='x', pad=42)
+        ax.tick_params(axis='x', pad=46)
         
         ax.set_ylim(0, 1)
-        ax.set_title(f'{title_prefix} - {metric} Comparison', pad=80, fontsize=14)
+        ax.set_title(f'{title_prefix} - {metric} Comparison', pad=84, fontsize=14)
         
         # --- Annotations ---
         colors = ['#811850', '#156ba9', "#477439"]
@@ -906,8 +906,8 @@ def plot_radar_charts(
 
             if 85 < angle_deg < 95: # Top
                 ha = 'center'
-                ax.text(angle, 1.14, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
-                ax.text(angle, 1.0, bio_val_text, color=colors[0], ha=ha, va='bottom', fontsize=fontsize)
+                ax.text(angle, 1.15, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
+                ax.text(angle, 1, bio_val_text, color=colors[0], ha=ha, va='bottom', fontsize=fontsize)
                 if vals_dl is not None:
                     ax.text(angle, 1.07, dl_val_text, color=colors[2], ha=ha, va='bottom', fontsize=fontsize)
             elif 265 < angle_deg < 275: # Bottom
@@ -915,17 +915,17 @@ def plot_radar_charts(
                 ax.text(angle, 1.01, model_val_text, color=colors[1], ha=ha, va='top', fontsize=fontsize)
                 ax.text(angle, 1.16, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
                 if vals_dl is not None:
-                    ax.text(angle, 1.08, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
+                    ax.text(angle, 1.09, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
             elif angle_deg < 15 or angle_deg > 345: # Right
                 ha = 'left'
                 ax.text(angle - 0.16, 1.1, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
-                ax.text(angle - 0.22, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
+                ax.text(angle - 0.23, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
                 if vals_dl is not None:
                     ax.text(angle - 0.16, 1.11, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
             else: # Left
                 ha = 'right'
                 ax.text(angle + 0.16, 1.1, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
-                ax.text(angle + 0.22, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
+                ax.text(angle + 0.23, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
                 if vals_dl is not None:
                     ax.text(angle + 0.16, 1.1, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
 
@@ -942,15 +942,15 @@ def plot_radar_charts(
             )
             # Add text to the figure, positioned at the bottom left
             plt.figtext(
-                0.2, 0.9,
+                0.25, 0.9,
                 significance_text,
                 ha="right", va="top",
-                fontsize=9,
+                fontsize=14,
                 color="#474545",
                 bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5')
             )
 
-        ax.legend(loc='upper right', bbox_to_anchor=(1.2, 1.1), fontsize=fontsize)
+        ax.legend(loc='upper left', bbox_to_anchor=(0.9, 1.1), fontsize=17)
         plt.tight_layout()
         plt.subplots_adjust(top=0.85, bottom=0.2)
         plt.savefig(f"graphs/{title_prefix}_{metric}_biomarker_plot.png", dpi=600)
