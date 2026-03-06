@@ -85,16 +85,16 @@ def create_lipi_groups(merged_df):
     
     # LIPI is categorical: 0=low risk, 1=intermediate risk, 2=high risk
     lipi_data['LIPI'] = lipi_data['LIPI'].astype(int)
-    
+
     # Create groups by LIPI categories
     low = lipi_data[lipi_data['LIPI'] == 0][['TIME', 'EVENT']]
     mid = lipi_data[lipi_data['LIPI'] == 1][['TIME', 'EVENT']]
     high = lipi_data[lipi_data['LIPI'] == 2][['TIME', 'EVENT']]
-    
+
     datasets = {
-        'LIPI 0 (LOW RISK)': low,
-        'LIPI 1 (INTERMEDIATE RISK)': mid,
-        'LIPI 2 (HIGH RISK)': high,
+        'LOW RISK': low,
+        'INTERMEDIATE RISK': mid,
+        'HIGH RISK': high,
     }
     
     # Filter out empty groups if any
@@ -199,7 +199,7 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
 
         # Save prediction plot
         pred_path = os.path.join(output_dir, f'{base_name}.png')
-        plt_pred.savefig(pred_path, bbox_inches='tight', dpi=300)
+        plt_pred.savefig(pred_path, bbox_inches='tight', dpi=600)
         print(f"      Saved KM plot (predictions): {pred_path}")
 
         # Save pairwise comparison table
@@ -222,7 +222,7 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
 
             if output_dir:
                 pred_lipi_subset_path = os.path.join(output_dir, f'{base_name}-lipi_subset.png')
-                plt_pred_lipi_subset.savefig(pred_lipi_subset_path, bbox_inches='tight', dpi=300)
+                plt_pred_lipi_subset.savefig(pred_lipi_subset_path, bbox_inches='tight', dpi=600)
                 print(f"      Saved KM plot (predictions, LIPI-subset): {pred_lipi_subset_path}")
 
                 csv_lipi_subset_path = os.path.join(output_dir, f'{base_name}-lipi_subset_pairwise.csv')
@@ -241,7 +241,7 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
 
             if output_dir:
                 lipi_path = os.path.join(output_dir, f'{base_name}-lipi.png')
-                plt_lipi.savefig(lipi_path, bbox_inches='tight', dpi=300)
+                plt_lipi.savefig(lipi_path, bbox_inches='tight', dpi=600)
                 print(f"      Saved KM plot (LIPI): {lipi_path}")
 
                 lipi_csv_path = os.path.join(output_dir, f'{base_name}-lipi_pairwise.csv')
@@ -362,8 +362,9 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
                 print(f"      seed_0 folder not found in: {folder_path}")
                 continue
 
-            # Look for predictions parquet
-            parquet_path = os.path.join(seed_path, 'predictions.parquet')
+            # Look for test-set predictions in eval subfolder
+            eval_path = os.path.join(seed_path, 'eval', '00000-mb_attention_mil')
+            parquet_path = os.path.join(eval_path, 'predictions.parquet')
             if not os.path.exists(parquet_path):
                 print(f"      Predictions parquet not found: {parquet_path}")
                 continue

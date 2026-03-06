@@ -67,9 +67,9 @@ def plot_km_combined(datasets, stats: bool=True):
     lines.extend(median_ann)
     if stats:
         lines.append("")
-        lines.append(f"Global log-rank: χ²={chi2_glob:.2f}, p={p_glob:.2g}")
+        lines.append(f"Global log-rank: p={p_glob:.2g}")
         for _, r in pw_df.iterrows():
-            lines.append(f"{r['g1']} vs {r['g2']}: χ²={r['chi2']:.2f}, p_adj={r['p_bonferroni']:.2g}")
+            lines.append(f"{r['g1']} vs {r['g2']}: p={r['p_bonferroni']:.2g}")
 
     text_artists = []
     x0_text, y0_text = 0.5, 0.97
@@ -79,7 +79,7 @@ def plot_km_combined(datasets, stats: bool=True):
             x0_text, y0_text - i*line_h, txt,
             transform=ax.transAxes,
             ha='center', va='top',
-            fontsize=9, zorder=2
+            fontsize=12, zorder=2
         )
         text_artists.append(ta)
 
@@ -111,13 +111,14 @@ def plot_km_combined(datasets, stats: bool=True):
         t.set_ha('left')
         t.set_position((x0 + pad_x, y))
 
-    ax.legend(loc='upper right', fontsize=8)
+    ax.legend(loc='upper right', fontsize=10)
 
-    add_at_risk_counts(*kmfs, ax=ax, labels=list(datasets.keys()), fontsize=11)
+    add_at_risk_counts(*kmfs, ax=ax, labels=list(datasets.keys()), fontsize=13, ypos=-0.5)
     ax.set_xlim(0, 100)
-    ax.set_xlabel('Months')
-    ax.set_ylabel('Survival Probability')
-    ax.set_title(f'KM Plot (test set, {df_size} patients) - COX - OS')
+    ax.set_xlabel('Months', fontsize=13)
+    ax.set_ylabel('Survival Probability', fontsize=13)
+    ax.tick_params(axis='both', labelsize=13)
+    ax.set_title(f'KM Plot (test set, {df_size} patients) - COX - OS', fontsize=14)
 
     return plt, pw_df
 
