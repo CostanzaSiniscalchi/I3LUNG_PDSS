@@ -199,7 +199,7 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
 
         # Save prediction plot
         pred_path = os.path.join(output_dir, f'{base_name}.png')
-        plt_pred.savefig(pred_path, bbox_inches='tight', dpi=300)
+        plt_pred.savefig(pred_path, bbox_inches='tight', dpi=600)
         print(f"      Saved KM plot (predictions): {pred_path}")
 
         # Save pairwise comparison table
@@ -222,7 +222,7 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
 
             if output_dir:
                 pred_lipi_subset_path = os.path.join(output_dir, f'{base_name}-lipi_subset.png')
-                plt_pred_lipi_subset.savefig(pred_lipi_subset_path, bbox_inches='tight', dpi=300)
+                plt_pred_lipi_subset.savefig(pred_lipi_subset_path, bbox_inches='tight', dpi=600)
                 print(f"      Saved KM plot (predictions, LIPI-subset): {pred_lipi_subset_path}")
 
                 csv_lipi_subset_path = os.path.join(output_dir, f'{base_name}-lipi_subset_pairwise.csv')
@@ -241,7 +241,7 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
 
             if output_dir:
                 lipi_path = os.path.join(output_dir, f'{base_name}-lipi.png')
-                plt_lipi.savefig(lipi_path, bbox_inches='tight', dpi=300)
+                plt_lipi.savefig(lipi_path, bbox_inches='tight', dpi=600)
                 print(f"      Saved KM plot (LIPI): {lipi_path}")
 
                 lipi_csv_path = os.path.join(output_dir, f'{base_name}-lipi_pairwise.csv')
