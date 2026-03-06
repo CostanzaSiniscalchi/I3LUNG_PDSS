@@ -362,8 +362,9 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
                 print(f"      seed_0 folder not found in: {folder_path}")
                 continue
 
-            # Look for predictions parquet
-            parquet_path = os.path.join(seed_path, 'predictions.parquet')
+            # Look for test-set predictions in eval subfolder
+            eval_path = os.path.join(seed_path, 'eval', '00000-mb_attention_mil')
+            parquet_path = os.path.join(eval_path, 'predictions.parquet')
             if not os.path.exists(parquet_path):
                 print(f"      Predictions parquet not found: {parquet_path}")
                 continue
