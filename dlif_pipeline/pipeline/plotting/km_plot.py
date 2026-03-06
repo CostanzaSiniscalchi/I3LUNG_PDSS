@@ -85,16 +85,16 @@ def create_lipi_groups(merged_df):
     
     # LIPI is categorical: 0=low risk, 1=intermediate risk, 2=high risk
     lipi_data['LIPI'] = lipi_data['LIPI'].astype(int)
-    
+
     # Create groups by LIPI categories
     low = lipi_data[lipi_data['LIPI'] == 0][['TIME', 'EVENT']]
     mid = lipi_data[lipi_data['LIPI'] == 1][['TIME', 'EVENT']]
     high = lipi_data[lipi_data['LIPI'] == 2][['TIME', 'EVENT']]
-    
+
     datasets = {
-        'LIPI 0 (LOW RISK)': low,
-        'LIPI 1 (INTERMEDIATE RISK)': mid,
-        'LIPI 2 (HIGH RISK)': high,
+        'LOW RISK': low,
+        'INTERMEDIATE RISK': mid,
+        'HIGH RISK': high,
     }
     
     # Filter out empty groups if any
