@@ -1143,14 +1143,15 @@ def _read_dlif_predictions(parquet_path):
     exp1 = np.exp(df['y_pred1'])
     y_proba = exp1 / (exp0 + exp1)
 
-    # Binarize at 0.5 threshold
+    # Store probability for AUC and binarize at 0.5 for TPR/FPR
+    df['y_proba'] = y_proba
     df['y_pred'] = (y_proba >= 0.5).astype(int)
 
     # Rename slide -> Subject and convert to int to match RWD format
     df = df.rename(columns={'slide': 'Subject'})
     df['Subject'] = df['Subject'].astype(int)
 
-    return df[['Subject', 'y_true', 'y_pred']]
+    return df[['Subject', 'y_true', 'y_proba', 'y_pred']]
 
 
 def load_predictions_and_data(outcome, base_path='mlef_pipeline/results',
@@ -1675,8 +1676,9 @@ def _pairwise_df_to_matrix(pairwise_df, centers=None, pcol='pvalue_maxT', outcom
     if centers is None:
         centers = sorted(pd.unique(pairwise_df[['group_a', 'group_b']].values.ravel()))
 
-    mat = pd.DataFrame(np.ones((len(centers), len(centers))), index=centers, columns=centers)
-    np.fill_diagonal(mat.values, 0.0)
+    arr = np.ones((len(centers), len(centers)))
+    np.fill_diagonal(arr, 0.0)
+    mat = pd.DataFrame(arr, index=centers, columns=centers)
 
     for _, row in pairwise_df.iterrows():
         a, b = row['group_a'], row['group_b']
@@ -2181,15 +2183,17 @@ def analyze_outcome_fairness(
     # Extract predictions
     y_test = predictions_df['y_true'].values
     y_pred = predictions_df['y_pred'].values
-    
+    # Use probabilities for AUC when available (DLIF), fall back to binary (MLEF)
+    y_score = predictions_df['y_proba'].values if 'y_proba' in predictions_df.columns else y_pred
+
     # Overall performance
-    auc = roc_auc_score(y_test, y_pred)
+    auc = roc_auc_score(y_test, y_score)
     tpr, fpr = compute_tpr_fpr(y_test, y_pred)
     print(f"Overall Test Performance:")
     print(f"  AUC: {auc:.3f}")
     print(f"  TPR (threshold): {tpr:.3f}")
     print(f"  FPR (threshold): {fpr:.3f}\n")
-    
+
     # Fairness by center
     print("Analyzing fairness by center...")
     test_folds = test['CENTER']
@@ -2221,11 +2225,11 @@ def analyze_outcome_fairness(
             sex_fair = permutation_test_two_groups(
                 df_outcome, 
                 group_col='sex', 
-                groups=df_outcome['sex'].unique(), 
-                n_perms=n_perms, 
+                groups=(0, 1),  # 0=Female, 1=Male
+                n_perms=n_perms,
                 random_state=random_state
             )
-            
+
             print(f"  TPR - Female: {sex_fair['TPR']['rate_A']:.3f}, Male: {sex_fair['TPR']['rate_B']:.3f}, p={sex_fair['TPR']['p_value']:.4f}")
             print(f"  FPR - Female: {sex_fair['FPR']['rate_A']:.3f}, Male: {sex_fair['FPR']['rate_B']:.3f}, p={sex_fair['FPR']['p_value']:.4f}")
         except Exception as e:
@@ -2233,7 +2237,7 @@ def analyze_outcome_fairness(
             sex_fair = None
     else:
         sex_fair = None
-    
+
     # Center-based fairness
     print("\nCenter-based fairness analysis...")
     tpr_out = permutation_fairness_TPR(
@@ -2309,9 +2313,10 @@ def analyze_outcome_fairness_exval(
     # Extract predictions
     y_test = predictions_df['y_true'].values
     y_pred = predictions_df['y_pred'].values
-    
+    y_score = predictions_df['y_proba'].values if 'y_proba' in predictions_df.columns else y_pred
+
     # Overall performance
-    auc = roc_auc_score(y_test, y_pred)
+    auc = roc_auc_score(y_test, y_score)
     tpr, fpr = compute_tpr_fpr(y_test, y_pred)
     print(f"Overall ExVal Performance:")
     print(f"  AUC: {auc:.3f}")
@@ -2353,13 +2358,13 @@ def analyze_outcome_fairness_exval(
         print("\nSex-based fairness analysis (exval set)...")
         try:
             sex_fair = permutation_test_two_groups(
-                df_outcome, 
-                group_col='sex', 
-                groups=df_outcome['sex'].unique(), 
-                n_perms=n_perms, 
+                df_outcome,
+                group_col='sex',
+                groups=(0, 1),  # 0=Female, 1=Male
+                n_perms=n_perms,
                 random_state=random_state
             )
-            
+
             print(f"  TPR - Female: {sex_fair['TPR']['rate_A']:.3f}, Male: {sex_fair['TPR']['rate_B']:.3f}, p={sex_fair['TPR']['p_value']:.4f}")
             print(f"  FPR - Female: {sex_fair['FPR']['rate_A']:.3f}, Male: {sex_fair['FPR']['rate_B']:.3f}, p={sex_fair['FPR']['p_value']:.4f}")
         except Exception as e:
@@ -2576,7 +2581,7 @@ def analyze_exval_outcome_fairness_by_race(
     
     # Overall performance (filtered)
     tpr, fpr = compute_tpr_fpr(y_true_sex, y_pred_sex)
-    print(f"\nOverall EXVAL Performance (filtered by race):")
+    print(f"\nOverall EXVAL Performance (all patients):")
     print(f"  TPR (threshold): {tpr:.3f}")
     print(f"  FPR (threshold): {fpr:.3f}\n")
     
@@ -2624,10 +2629,10 @@ def analyze_exval_outcome_fairness_by_race(
     print("\nSex-based fairness analysis (EXVAL set)...")
     try:
         sex_fair = permutation_test_two_groups(
-            df_outcome_sex, 
-            group_col='sex', 
-            groups=df_outcome_sex['sex'].unique(), 
-            n_perms=n_perms, 
+            df_outcome_sex,
+            group_col='sex',
+            groups=(0, 1),  # 0=Female, 1=Male
+            n_perms=n_perms,
             random_state=random_state
         )
         
