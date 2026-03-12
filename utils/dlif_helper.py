@@ -26,8 +26,8 @@ def map_dlif_to_mlef_modality(dlif_name: str) -> str:
         'rwd_radpy': 'CB_PYRAD',
         'rwd_radfm_dp': 'CB_DP_FMRAD',
         'rwd_radpy_dp': 'CB_DP_PYRAD',
-        'rwd_radfm_dp_genomics': 'CB_DP_FMRAD_GENOMICS',
-        'rwd_radpy_dp_genomics': 'CB_DP_PYRAD_GENOMICS',
+        'rwd_radfm_dp_genomics': 'CB_DP_FMRAD_G',
+        'rwd_radpy_dp_genomics': 'CB_DP_PYRAD_G',
     }
     return mapping.get(dlif_name.lower(), dlif_name.upper())
 
@@ -43,8 +43,8 @@ def map_mlef_to_dlif_modality(mlef_name: str) -> str:
         'CB_PYRAD': 'rwd_radpy',
         'CB_DP_FMRAD': 'rwd_radfm_dp',
         'CB_DP_PYRAD': 'rwd_radpy_dp',
-        'CB_DP_FMRAD_GENOMICS': 'rwd_radfm_dp_genomics',
-        'CB_DP_PYRAD_GENOMICS': 'rwd_radpy_dp_genomics',
+        'CB_DP_FMRAD_G': 'rwd_radfm_dp_genomics',
+        'CB_DP_PYRAD_G': 'rwd_radpy_dp_genomics',
     }
     return mapping.get(mlef_name.upper(), mlef_name.lower())
 
