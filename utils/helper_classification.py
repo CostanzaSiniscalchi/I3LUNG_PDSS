@@ -526,10 +526,10 @@ def plot_auc_results(
                         fontsize=12, ha="center", color="#1a80bb")
             else:
                 plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                        fontsize=11, ha="center", color="#1a80bb")
+                        fontsize=12, ha="center", color="#1a80bb")
             star = rows[i].get("stars", "")
             if star:
-                plt.text(X[i] + 0.63, base_y + 0.006, star, fontsize=11, ha="left", va="center", color="black")
+                plt.text(X[i] + 0.63, base_y + 0.006, star, fontsize=12, ha="left", va="center", color="black")
 
         # --- RED annotations (keep values but REMOVE stars here) ---
         if arch_name == "MLEF":
@@ -538,7 +538,7 @@ def plot_auc_results(
                 base_y = 0.02 if multimodal_better[i] else 0.06
                 if np.isfinite(rv) and np.isfinite(rs):
                     plt.text(X[i], base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=11, ha="center", color="#a00000")
+                            fontsize=12, ha="center", color="#a00000")
 
         if arch_name == "MLEF":
             _auc_prefix = "CV AUC"
@@ -1710,9 +1710,9 @@ def annotate_pairwise_significance(ax, pairwise_df, hue_order, alpha=0.05):
     centers = list(hue_order)
 
     y0, y1 = ax.get_ylim()
-    step = (y1 - y0) * 0.06
-    bump = (y1 - y0) * 0.08
-    tick_extra = (y1 - y0) * 0.08
+    step = (y1 - y0) * 0.07
+    bump = (y1 - y0) * 0.4
+    tick_extra = (y1 - y0) * 0.10
 
     max_needed = y1
 
@@ -1814,11 +1814,12 @@ def plot_fairness_by_center(
     yerr_lower = []
     yerr_upper = []
     
-    group_width = 0.9
-    bar_width = group_width / len(centers)
-    
-    for i, outcome in enumerate(outcomes):
-        for j, center in enumerate(centers):
+    # Extract actual bar positions from the plot patches
+    n_outcomes = len(outcomes)
+    n_centers = len(centers)
+    # seaborn lays out patches as: all bars for center0, then all bars for center1, ...
+    for j, center in enumerate(centers):
+        for i, outcome in enumerate(outcomes):
             sub = center_fairness.loc[
                 (center_fairness['outcome'] == outcome) &
                 (center_fairness['center'] == center)
@@ -1828,7 +1829,9 @@ def plot_fairness_by_center(
                 ci_low = sub[f'{metric}_ci_lower'].values[0]
                 ci_up = sub[f'{metric}_ci_upper'].values[0]
                 
-                x_pos = i + (j - (len(centers) - 1) / 2) * bar_width
+                patch_idx = j * n_outcomes + i
+                patch = ax.patches[patch_idx]
+                x_pos = patch.get_x() + patch.get_width() / 2
                 
                 x_positions.append(x_pos)
                 y_values.append(val)
@@ -1877,9 +1880,10 @@ def plot_fairness_by_center(
                             
                             bar_x = patch.get_x() + patch.get_width() / 2
                             bar_y = val + (ci_upper - val) + label_offset
+                            ci_half = ci_upper - val
                             
-                            ax.text(bar_x, bar_y, f"{val:.2f} ± {ci_upper - val:.2f}\n(n. {n})",
-                                    ha='center', va='bottom', fontsize=8, color='black')
+                            ax.text(bar_x, bar_y, f"{val:.2f}\n±\n{ci_half:.2f}\n(n={n})",
+                                    ha='center', va='bottom', fontsize=13, color='black')
             except Exception as e:
                 print(f"Failed to add labels: {e}")
     
@@ -1910,11 +1914,13 @@ def plot_fairness_by_center(
     
     # Formatting
     direction = '↑ higher is better' if metric == 'TPR' else '↓ lower is better'
-    plt.ylabel(f'{metric} - {direction}')
-    plt.title(f'{metric} by Center and Outcome (with 95% CI)', pad=20)
-    plt.ylim(0, 1.4)
+    plt.ylabel(f'{metric} - {direction}', fontsize=16)
+    plt.xlabel('', fontsize=14)
+    plt.title(f'{metric} by Center and Outcome (with 95% CI)', pad=20, fontsize=16)
+    plt.ylim(0, 2)
     plt.yticks(np.arange(0, 1.1, 0.2))
-    plt.legend(title='Center', loc='upper left')
+    ax.tick_params(axis='both', labelsize=16)
+    plt.legend(title='Center', loc='upper left', fontsize=15, title_fontsize=14, ncol=2)
     plt.tight_layout()
     plt.show()
 
@@ -1989,11 +1995,12 @@ def plot_fairness_by_group(
     yerr_lower = []
     yerr_upper = []
     
-    group_width = 0.8
-    bar_width = group_width / len(groups)
-    
-    for i, outcome in enumerate(outcomes):
-        for j, group in enumerate(groups):
+    # Extract actual bar positions from the plot patches
+    n_outcomes = len(outcomes)
+    n_groups = len(groups)
+    # seaborn lays out patches as: all bars for group0, then all bars for group1, ...
+    for j, group in enumerate(groups):
+        for i, outcome in enumerate(outcomes):
             sub = df_plot[
                 (df_plot['outcome'] == outcome) & (df_plot[group_col] == group)
             ]
@@ -2002,7 +2009,9 @@ def plot_fairness_by_group(
                 ci_low = sub['ci_low'].values[0]
                 ci_up = sub['ci_up'].values[0]
                 
-                x_pos = i + (j - (len(groups) - 1) / 2) * bar_width
+                patch_idx = j * n_outcomes + i
+                patch = ax.patches[patch_idx]
+                x_pos = patch.get_x() + patch.get_width() / 2
                 
                 x_positions.append(x_pos)
                 y_values.append(val)
@@ -2052,9 +2061,10 @@ def plot_fairness_by_group(
                             
                             bar_x = patch.get_x() + patch.get_width() / 2
                             bar_y = val + (ci_upper - val) + label_offset
+                            ci_half = ci_upper - val
                             
-                            ax.text(bar_x, bar_y, f"{val:.2f} ± {ci_upper - val:.2f}\n(n. {n})",
-                                    ha='center', va='bottom', fontsize=8, color='black')
+                            ax.text(bar_x, bar_y, f"{val:.2f}\n±\n{ci_half:.2f}\n(n={n})",
+                                    ha='center', va='bottom', fontsize=13, color='black')
             except Exception as e:
                 print(f"Failed to add labels: {e}")
     
@@ -2081,6 +2091,7 @@ def plot_fairness_by_group(
 
     # Add significance brackets between the two groups per outcome
     if 'p-value' in df_plot.columns:
+        bar_width = 0.8 / n_groups
         for i, outcome in enumerate(outcomes):
             sub = df_plot[df_plot['outcome'] == outcome]
             p = sub['p-value'].dropna()
@@ -2090,27 +2101,31 @@ def plot_fairness_by_group(
             groups_list = list(groups)
             x_coords, y_tops = [], []
             for j, group in enumerate(groups_list):
-                x_coords.append(i + (j - (len(groups_list) - 1) / 2) * bar_width)
+                patch_idx = j * n_outcomes + i
+                patch = ax.patches[patch_idx]
+                x_coords.append(patch.get_x() + patch.get_width() / 2)
                 row = sub[sub[group_col] == group]
                 ci_up = row['ci_up'].values[0] if not row.empty else 0
                 y_tops.append(ci_up if not np.isnan(ci_up) else (row['Value'].values[0] if not row.empty else 0))
             if len(x_coords) == 2:
-                y_bracket = max(y_tops) + (0.12 if patients_per_outcome is not None else 0.04)
+                y_bracket = max(y_tops) + (0.18 if patients_per_outcome is not None else 0.08)
                 _bracket(ax, x_coords[0], x_coords[1], y_bracket, h=0.025, star=p_to_stars(p))
 
     # Formatting
     direction = '↑ higher is better' if metric == 'TPR' else '↓ lower is better'
-    plt.ylabel(f'{metric} - {direction}')
-    plt.title(f'{metric} by {group_col} and Outcome (with 95% CI)', pad=20)
-    plt.ylim(0, 1.3)
+    plt.ylabel(f'{metric} - {direction}', fontsize=16)
+    plt.xlabel('', fontsize=14)
+    plt.title(f'{metric} by {group_col} and Outcome (with 95% CI)', pad=20, fontsize=16)
+    plt.ylim(0, 1.26)
     plt.yticks(np.arange(0, 1.1, 0.2))
+    ax.tick_params(axis='both', labelsize=16)
     
     # Legend
     handles, labels = ax.get_legend_handles_labels()
     if metric == 'FPR':
         for h in handles:
             h.set_hatch('')
-    plt.legend(handles, labels, title=group_col, loc='upper left')
+    plt.legend(handles, labels, title=group_col, loc='upper right', fontsize=15, title_fontsize=16, ncol=2)
     plt.tight_layout()
     plt.show()
 
