@@ -732,7 +732,7 @@ def train_rwd_matched_model(
 def main():
     parser = argparse.ArgumentParser(description='Train MLEF CoxPH survival models for different modality combinations')
     parser.add_argument('--subanalysis', type=str, default='C23',
-                        choices=['C23', 'C2', 'IO_ONLY', 'IO_CHT', 'LOW_PDL1', 'MID_PDL1',
+                        choices=['C23', 'C2', 'IO_ONLY', 'IO_CHT', 'LOW_PDL1', 'NEGATIVE_PDL1', 'MID_PDL1',
                                 'HIGH_PDL1', 'SQUAMOUS', 'ADENOCARCINOMA', 'INT'],
                         help='Subgroup analysis to perform (default: C23)')
     parser.add_argument('--modalities', type=str, nargs='+', default=None,
