@@ -934,7 +934,7 @@ def main():
                         choices=['OS_6', 'OS_24', 'DCR', 'CBR', 'ORR'],
                         help='Target outcome to predict (default: OS_6)')
     parser.add_argument('--subanalysis', type=str, default='C23',
-                        choices=['C23', 'C2', 'IO_ONLY', 'IO_CHT', 'LOW_PDL1', 'MID_PDL1', 
+                        choices=['C23', 'C2', 'IO_ONLY', 'IO_CHT', 'LOW_PDL1', 'NEGATIVE_PDL1', 'MID_PDL1', 
                                 'HIGH_PDL1', 'SQUAMOUS', 'ADENOCARCINOMA', 'INT'],
                         help='Subgroup analysis to perform (default: C23)')
     parser.add_argument('--modalities', type=str, nargs='+', default=None,

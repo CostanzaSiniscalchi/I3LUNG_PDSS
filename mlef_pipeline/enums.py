@@ -20,6 +20,7 @@ class Subanalysis(Enum):
     IO_ONLY = 'IO_ONLY'
     IO_CHT = 'IOCHT'
     LOW_PDL1 = 'LOW_PDL1'
+    NEGATIVE_PDL1 = 'NEGATIVE_PDL1'
     MID_PDL1 = 'MID_PDL1'
     HIGH_PDL1 = 'HIGH_PDL1'
     SQUAMOUS = 'SQUAMOUS'
