@@ -869,7 +869,7 @@ def plot_radar_charts(
         # Plotting the data
         ax.plot(angles, vals_bio, color="#811850", linewidth=2, label='Biomarkers')
         ax.fill(angles, vals_bio, color='#811850', alpha=0.1)
-        ax.plot(angles, vals_model, color="#156ba9", linewidth=2, label='MLEF')
+        ax.plot(angles, vals_model, color="#156ba9", linewidth=2, label='ML CB-only')
         ax.fill(angles, vals_model, color='#156ba9', alpha=0.1)
         if vals_dl is not None:
             ax.plot(angles, vals_dl, color="#477439", linewidth=2, label='DLIF')
@@ -887,47 +887,47 @@ def plot_radar_charts(
         ax.tick_params(axis='x', pad=46)
         
         ax.set_ylim(0, 1)
-        ax.set_title(f'{title_prefix} - {metric} Comparison', pad=84, fontsize=14)
+        ax.set_title(f'{title_prefix} - {metric} Comparison', pad=120, fontsize=14)
         
         # --- Annotations ---
         colors = ['#811850', '#156ba9', "#477439"]
         for i, angle in enumerate(angles[:-1]):
             if metric == 'AUC':
                 bio_val_text = f"Biomarker: {vals_bio[i]:.2f}"
-                model_val_text = f"MLEF: {vals_model[i]:.2f} {p_to_stars(p_values_ml[i])}"
+                model_val_text = f"ML CB-only: {vals_model[i]:.2f} {p_to_stars(p_values_ml[i])}"
                 if vals_dl is not None:
                     dl_val_text = f"DLIF: {vals_dl[i]:.2f} {p_to_stars(p_values_dl[i])}"
             else:
                 bio_val_text = f"Biomarker: {vals_bio[i]:.2f}"
-                model_val_text = f"MLEF: {vals_model[i]:.2f}"
+                model_val_text = f"ML CB-only: {vals_model[i]:.2f}"
                 if vals_dl is not None:
                     dl_val_text = f"DLIF: {vals_dl[i]:.2f}"
             angle_deg = np.rad2deg(angle)
 
             if 85 < angle_deg < 95: # Top
                 ha = 'center'
-                ax.text(angle, 1.15, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
+                ax.text(angle, 1.16, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
                 ax.text(angle, 1, bio_val_text, color=colors[0], ha=ha, va='bottom', fontsize=fontsize)
                 if vals_dl is not None:
                     ax.text(angle, 1.07, dl_val_text, color=colors[2], ha=ha, va='bottom', fontsize=fontsize)
             elif 265 < angle_deg < 275: # Bottom
                 ha = 'center'
                 ax.text(angle, 1.01, model_val_text, color=colors[1], ha=ha, va='top', fontsize=fontsize)
-                ax.text(angle, 1.16, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
+                ax.text(angle, 1.17, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
                 if vals_dl is not None:
                     ax.text(angle, 1.09, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
             elif angle_deg < 15 or angle_deg > 345: # Right
                 ha = 'left'
-                ax.text(angle - 0.16, 1.1, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
-                ax.text(angle - 0.23, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
+                ax.text(angle - 0.17, 1.1, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
+                ax.text(angle - 0.26, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
                 if vals_dl is not None:
-                    ax.text(angle - 0.16, 1.11, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
+                    ax.text(angle - 0.18, 1.11, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
             else: # Left
                 ha = 'right'
-                ax.text(angle + 0.16, 1.1, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
-                ax.text(angle + 0.23, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
+                ax.text(angle + 0.17, 1.1, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
+                ax.text(angle + 0.26, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
                 if vals_dl is not None:
-                    ax.text(angle + 0.16, 1.1, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
+                    ax.text(angle + 0.18, 1.1, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
 
 
          # --- ADD SIGNIFICANCE LEGEND ONLY FOR AUC PLOT ---
@@ -942,7 +942,7 @@ def plot_radar_charts(
             )
             # Add text to the figure, positioned at the bottom left
             plt.figtext(
-                0.25, 0.9,
+                0.27, 0.9,
                 significance_text,
                 ha="right", va="top",
                 fontsize=14,
@@ -950,7 +950,7 @@ def plot_radar_charts(
                 bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5')
             )
 
-        ax.legend(loc='upper left', bbox_to_anchor=(0.9, 1.1), fontsize=17)
+        ax.legend(loc='upper left', bbox_to_anchor=(0.9, 1.1), fontsize=16.5)
         plt.tight_layout()
         plt.subplots_adjust(top=0.85, bottom=0.2)
         plt.savefig(f"graphs/{title_prefix}_{metric}_biomarker_plot.png", dpi=600)
