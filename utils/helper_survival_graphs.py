@@ -400,7 +400,10 @@ def plot_cindex_results(
 
     def _plot_one(analysis: str, rows: List[dict]) -> plt.Figure:
         modalities = [r["modality"] for r in rows]
-        X = np.arange(len(modalities))
+        if arch_name == "MLEF":
+            X = np.arange(len(modalities)) * 1.6
+        else:
+            X = np.arange(len(modalities))
 
         cindex_mod_mean = np.array([r[f"{metric}_mod_mean"] for r in rows], dtype=float)
         cindex_mod_std  = np.array([r[f"{metric}_mod_std"]  for r in rows], dtype=float)
@@ -408,7 +411,7 @@ def plot_cindex_results(
         sizes        = _scale_sizes(n_train_mod)
         model_names  = [r["model_mod"] for r in rows]
 
-        fig = plt.figure(figsize=(12, 6))
+        fig = plt.figure(figsize=(13, 6))
         # BLUE: modality
         if arch_name == 'MLEF':
             _eval_prefix = "CV"
@@ -450,21 +453,24 @@ def plot_cindex_results(
             xticks = []
             for m, n in zip(modalities, n_train_mod):
                 parts = m.replace('RWD', 'CB').split('_')
-                xticks.append('\n'.join(parts))
+                label_text = '\n'.join(parts)
+                if np.isfinite(n):
+                    label_text += f"\n(n={int(n)})"
+                xticks.append(label_text)
             plt.xticks(X, xticks, rotation=0, fontsize=12)
 
         
         for i, (mval, mstd, mname) in enumerate(zip(cindex_mod_mean, cindex_mod_std, model_names)):
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
             if arch_name == "DLIF":
-                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f}",
-                        fontsize=12, ha="center", color="#1a80bb")
+                plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f}",
+                        fontsize=11, ha="center", color="#1a80bb")
             else:
-                plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                        fontsize=12, ha="center", color="#1a80bb")
+                plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
+                        fontsize=11, ha="center", color="#1a80bb")
             star = rows[i].get("stars", "")
             if star:
-                plt.text(i + 0.36, base_y + 0.006, star, fontsize=12, ha="left", va="center", color="black")
+                plt.text(X[i] + 0.66, base_y + 0.006, star, fontsize=11, ha="left", va="center", color="black")
 
         '''
         # --- BLUE annotations (now show stars here) ---
@@ -485,16 +491,16 @@ def plot_cindex_results(
                 rv, rs, rname = rrow[f"{metric}_ro_mean"], rrow[f"{metric}_ro_std"], rrow["model_ro"]
                 base_y = 0.02 if multimodal_better[i] else 0.06
                 if np.isfinite(rv) and np.isfinite(rs):
-                    plt.text(i, base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=13, ha="center", color="#a00000")
+                    plt.text(X[i], base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
+                            fontsize=11, ha="center", color="#a00000")
 
         plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
         plt.ylabel(metric, fontsize=14)
         plt.tick_params(axis='y', labelsize=13)
         plt.ylim(0, 1)
         plt.grid(True, linestyle="--", alpha=0.6)
-        plt.legend()
-        plt.xlim(-0.4, len(modalities) - 0.55)
+        plt.legend(fontsize=13)
+        plt.xlim(X[0] - 0.7, X[-1] + 0.85) if len(X) > 0 else None
         if save_dir:
             os.makedirs(save_dir, exist_ok=True)
             if save_name:

@@ -868,12 +868,12 @@ def plot_radar_charts(
 
         # Plotting the data
         ax.plot(angles, vals_bio, color="#811850", linewidth=2, label='Biomarkers')
-        ax.fill(angles, vals_bio, color='#811850', alpha=0.5)
+        ax.fill(angles, vals_bio, color='#811850', alpha=0.1)
         ax.plot(angles, vals_model, color="#156ba9", linewidth=2, label='MLEF')
-        ax.fill(angles, vals_model, color='#156ba9', alpha=0.5)
+        ax.fill(angles, vals_model, color='#156ba9', alpha=0.1)
         if vals_dl is not None:
             ax.plot(angles, vals_dl, color="#477439", linewidth=2, label='DLIF')
-            ax.fill(angles, vals_dl, color="#477439", alpha=0.5)
+            ax.fill(angles, vals_dl, color="#477439", alpha=0.1)
 
         
         # --- Labels and Ticks ---
