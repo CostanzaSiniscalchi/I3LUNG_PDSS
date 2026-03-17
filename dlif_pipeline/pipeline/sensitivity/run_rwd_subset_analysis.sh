@@ -21,7 +21,7 @@ fi
 TEMPLATE_PATH="$1"
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 METRICS_SCRIPT="${SCRIPT_DIR}/pipeline/metrics/compute_subset_metrics.py"
-AGG_SCRIPT="${SCRIPT_DIR}/scripts/collect_subset_results.py"
+AGG_SCRIPT="${SCRIPT_DIR}/sensitivity/collect_subset_results.py"
 
 OUTCOMES=(CBR ORR DCR os_months_24 os_months_6)
 
