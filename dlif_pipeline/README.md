@@ -399,6 +399,16 @@ For KM curves:
 python dlif_pipeline/pipeline/plotting/km_plot.py --config /path/to/your/config.yaml
 ```
 
+## Sensitivity Analysis
+
+Robustness analyses are provided under [`dlif_pipeline/pipeline/sensitivity/`](pipeline/sensitivity/README.md), covering:
+
+1. **CB model on patient subsets** – performance of the CB-only model on subsets defined by modality availability.
+2. **All models on the complete-data cohort** – all modality models evaluated on patients with all data modalities available.
+3. **Masked-modality analysis** – performance of full-modality models with individual modalities masked to assess their contribution.
+
+See [`dlif_pipeline/pipeline/sensitivity/README.md`](pipeline/sensitivity/README.md) for full details and usage instructions.
+
 ## Project Structure
 ```
 dlif_pipeline/
@@ -414,6 +424,17 @@ dlif_pipeline/
 │   │   ├── delong_n.py               # AUC calculation with DeLong CI
 │   │   ├── other_metrics.py          # F1, sensitivity, specificity
 │   │   └── survival_cindex_ci.py     # C-index calculation
+│   │
+│   ├── sensitivity/          # Sensitivity analysis scripts
+│   │   ├── README.md
+│   │   ├── collect_subset_results.py
+│   │   ├── collect_all_models_on_full_population.py
+│   │   ├── collect_mask_results.py
+│   │   ├── plot_rwd_subsets.py
+│   │   ├── plot_subset_vs_baseline.py
+│   │   ├── plot_mask_results.py
+│   │   ├── run_rwd_subset_analysis.sh
+│   │   └── run_all_models_on_full_population.sh
 │   │
 │   ├── plotting/             # Visualization scripts
 │   │   ├── __init__.py
