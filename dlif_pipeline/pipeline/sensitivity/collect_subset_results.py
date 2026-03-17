@@ -6,7 +6,7 @@ Usage:
     python collect_subset_results.py <path_to_any_outcome_eval_dir>
 
 Example:
-    python dlif_pipeline/scripts/collect_subset_results.py \
+    python dlif_pipeline/pipeline/sensitivity/collect_subset_results.py \
         dlif_pipeline/results/C2/CBR/classification/standard/hypothesis_driven/pyrad-noimp/rwd/seed_0/eval/00000-mb_attention_mil
 
 The script swaps the outcome in the path to iterate over all outcomes
