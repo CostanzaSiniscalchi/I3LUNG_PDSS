@@ -62,9 +62,134 @@ In these plots:
 
 ### How to Run
 
-```bash
-# First, run mask_modalities.py to evaluate with masked inputs (see train/README for details)
+**Step 1 – Generate masked bags** using `mask_modalities.py`:
 
+```bash
+# Generate all masked subset combinations for radpy source
+python dlif_pipeline/pipeline/train/mask_modalities.py --source radpy
+
+# Generate for both radiomics sources
+python dlif_pipeline/pipeline/train/mask_modalities.py --source radpy radfm
+```
+
+**Step 2 – Evaluate models with masked inputs** using `train.py` in evaluation mode.
+Create a config file (e.g., `dlif_pipeline/configs/mask-config.yaml`) with the following content:
+
+```yaml
+task: classification
+task_settings:
+  outcomes: ["CBR", "ORR", "os_months_24", "os_months_6", "DCR"]
+  loss: mm_loss
+
+training_type: evaluation
+data-type: hypothesis_driven
+source: pyrad
+imp: noimp
+seed: [0]
+
+use_early_stopping: true
+prepare_dataset: false
+
+annotation_file: ../data/annotations.csv
+
+# Keep mods matching the TRAINED model (for path resolution)
+# (find the model trained on all modalities)
+mods:
+  - rwd: true
+    radpy: true
+    dp: true
+    genomics: true
+  - rwd: true
+    radfm: true
+    dp: true
+    genomics: true
+
+eval_dataset_split: "test"
+
+masked_mods: # which modalities to mask (true = mask, rwd always kept)
+  # rwd_mask_dp_rad_genomics
+  - dp: true
+    radpy: true
+    radfm: true
+    genomics: true
+  # rwd_radpy_mask_dp_genomics
+  - dp: true
+    radpy: false
+    radfm: true
+    genomics: true
+  # rwd_radfm_mask_dp_genomics
+  - dp: true
+    radpy: true
+    radfm: false
+    genomics: true
+  # rwd_dp_mask_rad_genomics
+  - dp: false
+    radpy: true
+    radfm: true
+    genomics: true
+  # rwd_radfm_dp_mask_genomics
+  - dp: false
+    radpy: true
+    radfm: false
+    genomics: true
+  # rwd_radpy_dp_mask_genomics
+  - dp: false
+    radpy: false
+    radfm: true
+    genomics: true
+  # rwd_genomics_mask_dp_rad
+  - dp: true
+    radpy: true
+    radfm: true
+    genomics: false
+  # rwd_radfm_genomics_mask_dp
+  - dp: true
+    radpy: true
+    radfm: false
+    genomics: false
+  # rwd_radfm_genomics_mask_dp
+  - dp: true
+    radpy: false
+    radfm: true
+    genomics: false
+  # rwd_dp_genomics_mask_radpy
+  - dp: false
+    radpy: true
+    radfm: false
+    genomics: false
+  # rwd_dp_genomics_mask_radfm
+  - dp: false
+    radpy: false
+    radfm: true
+    genomics: false
+
+folds:
+  cross_validation:
+    - GHD
+    - INT
+    - MH
+    - SZMC
+    - VHIO
+  standard:
+    - ALL
+
+hyperparameters_default:
+  batch_size: 16
+  reconstruction_weight: 0.1
+  n_layers: 2
+```
+
+Then run:
+
+```bash
+python dlif_pipeline/pipeline/train.py \
+    --config dlif_pipeline/configs/mask-config.yaml \
+    --base_dir dlif_pipeline/results
+```
+
+**Step 3 – Collect and plot results:**
+
+```bash
 # Collect masked-modality results into CSVs
 python dlif_pipeline/pipeline/sensitivity/collect_mask_results.py
 
