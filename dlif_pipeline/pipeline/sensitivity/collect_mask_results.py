@@ -6,7 +6,7 @@ For each model (rwd_radpy_dp_genomics, rwd_radfm_dp_genomics),
 reads baseline and eval_mask results across all cohorts and outcomes.
 
 Usage:
-    python dlif_pipeline/scripts/collect_mask_results.py
+    python dlif_pipeline/pipeline/sensitivity/collect_mask_results.py
 
 Output:
     dlif_pipeline/results/mask_analysis/rwd_radpy_dp_genomics_mask_results.csv
