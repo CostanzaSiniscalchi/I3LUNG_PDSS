@@ -93,6 +93,8 @@ I3LUNG_PDSS/
 │   └── README.md               # Detailed instructions for MLEF pipeline
 ├── dlif_pipeline/               # Deep Learning Intermediate Fusion pipeline
 │   └── README.md               # Detailed instructions for DLIF pipeline
+├── other_models/                # Other deep learning models implemented
+│   └── vanguri/          		 # Vanguri et. al dyam model implementation
 ├── data/                        # Data directory (user must populate)
 ├── data_visualization.ipynb     # Data visualization notebook
 ├── graphs_classification.ipynb  # Classification results visualization
