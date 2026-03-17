@@ -11,6 +11,7 @@ Usage:
 """
 
 import os
+import sys
 import argparse
 import pandas as pd
 import numpy as np
@@ -232,6 +233,18 @@ def main():
     args = parser.parse_args()
 
     master_path = os.path.join(DATA_DIR, "mask_results_all.csv")
+
+    if not os.path.exists(master_path):
+        msg_lines = [
+            f"ERROR: Expected consolidated mask results CSV not found at:",
+            f"  {master_path}",
+            "",
+            "Please generate the input CSVs by running collect_mask_results.py",
+            "before running this plotting script.",
+        ]
+        print("\n".join(msg_lines), file=sys.stderr)
+        sys.exit(1)
+
     df = pd.read_csv(master_path)
 
     for cohort in COHORTS:
