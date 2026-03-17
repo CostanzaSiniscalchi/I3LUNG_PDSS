@@ -75,7 +75,7 @@ def load_results(cohort: str) -> dict[str, pd.DataFrame]:
 # ---------------------------------------------------------------------------
 # Plotting
 # ---------------------------------------------------------------------------
-def plot_dumbbell(cohort: str, outcomes, suffix: str, save: bool = True):
+def plot_dumbbell(cohort: str, outcomes, suffix: str, save: bool = True, show: bool = True):
     """Create dumbbell plot for given outcomes."""
     data = load_results(cohort)
 
@@ -197,7 +197,8 @@ def plot_dumbbell(cohort: str, outcomes, suffix: str, save: bool = True):
         fig.savefig(out_path, dpi=600, bbox_inches="tight")
         print(f"Saved: {out_path}")
 
-    plt.show()
+    if show:
+        plt.show()
     plt.close(fig)
 
 
