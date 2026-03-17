@@ -25,7 +25,7 @@ fi
 BASE_DIR="${1%/}"
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 METRICS_SCRIPT="${SCRIPT_DIR}/pipeline/metrics/compute_subset_metrics.py"
-COLLECT_SCRIPT="${SCRIPT_DIR}/scripts/collect_all_models_on_full_population.py"
+COLLECT_SCRIPT="${SCRIPT_DIR}/sensitivity/collect_all_models_on_full_population.py"
 
 OUTCOMES=(CBR ORR DCR os_months_24 os_months_6)
 
