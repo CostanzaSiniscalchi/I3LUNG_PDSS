@@ -53,6 +53,12 @@ MODALITY_ORDER = [
 def load_cohort_data(cohort: str) -> pd.DataFrame:
     """Load all per-modality CSVs for a cohort into one DataFrame."""
     rows = []
+    if not os.path.isdir(RESULTS_DIR):
+        print(
+            f"Results directory '{RESULTS_DIR}' does not exist. "
+            "Please run the model training pipeline to generate results before plotting."
+        )
+        return pd.DataFrame()
     for fname in sorted(os.listdir(RESULTS_DIR)):
         if not fname.startswith(f"{cohort}_") or not fname.endswith("_on_all.csv"):
             continue
