@@ -6,8 +6,8 @@ Reads the consolidated CSVs from collect_mask_results.py and produces
 dumbbell plots showing baseline vs masked AUC with CIs (one per model/cohort).
 
 Usage:
-    python dlif_pipeline/scripts/plot_mask_results.py
-    python dlif_pipeline/scripts/plot_mask_results.py --show
+    python dlif_pipeline/pipeline/sensitivity/plot_mask_results.py
+    python dlif_pipeline/pipeline/sensitivity/plot_mask_results.py --show
 """
 
 import os
