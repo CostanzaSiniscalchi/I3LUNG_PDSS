@@ -23,7 +23,7 @@ This pipeline provides an end-to-end solution for MIL on medical data, featuring
 - **Attention Mechanisms**: Multi-bag attention-based architecture for interpretable predictions
 
 ## Features
-
+**Note:** `RWD` refers to *Clinical Blood Data*, as described in the manuscript.
 ### Data Modalities
 
 | Modality       | Description                                                           |

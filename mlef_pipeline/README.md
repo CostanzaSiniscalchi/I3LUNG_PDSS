@@ -2,6 +2,8 @@
 
 This guide explains how to use the [`train_mlef.py`](#classification-analysis) and [`train_mlef_surv.py`](#survival-analysis) script to train MLEF (Machine Learning Early Fusion) classification and survival models.
 
+**Note:** `RWD` refers to *Clinical Blood Data*, as described in the manuscript.
+
 ## Overview
 
 The script trains MLEF models for different data modality combinations and saves results in a structured folder format compatible with your analysis pipeline.

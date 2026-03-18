@@ -7,7 +7,7 @@ This is the repository accompanying the manuscript:
 "I3LUNG: Clinical Validation of a Multimodal AI Tool to Support Immunotherapy Decisions in NSCLC"
 This repository contains all code and materials necessary to reproduce the core analyses and figures from the study.
 
-We developed and validated a multimodal AI-based physician decision support tool using real-world data (RWD) from six international centers. The study included two main model architectures (machine learning early fusion (MLEF) and deep learning intermediate fusion (DLIF)) and additional components for fairness auditing, explainability, and clinical usability testing.
+We developed and validated a multimodal AI-based physician decision support tool using real-world data from six international centers. The study included two main model architectures (machine learning early fusion (MLEF) and deep learning intermediate fusion (DLIF)) and additional components for fairness auditing, explainability, and clinical usability testing.
 
 <p align="center">
 	<img src="images/I3LUNG_Overview.png" alt="I3LUNG Overview" width="600"/>
@@ -57,7 +57,7 @@ All of the notebooks can be run with the `mlef` conda environment (you can find 
 - **`data_visualization.ipynb`** - General data visualization and exploration
 - **`graphs_classification.ipynb`** - Visualization of classification results
 - **`graphs_survival_analysis.ipynb`** - Visualization of survival analysis results
-- **`Metadata_Extraction.ipynb`** - Metadata extraction and analysis
+- **`fairness_analysis.ipynb`** - Visualization of fairness analysis results
 
 These notebooks can be run independently to generate visualizations and analyze results from the pipelines.
 
@@ -69,7 +69,6 @@ I3LUNG_PDSS/mlef_pipeline/results/
 I3LUNG_PDSS/dlif_pipeline/preds/
 ```
 
-Using **`Metadata_Extraction.ipynb`**, you can generate metadata distribution plots for each individual center as well as for all centers combined. It uses  metadata divided by center contained in **`data/Metadata_excelfiles.zip`**.
 
 ---
 ## System Requirements
