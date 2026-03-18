@@ -58,6 +58,7 @@ All of the notebooks can be run with the `mlef` conda environment (you can find 
 - **`graphs_classification.ipynb`** - Visualization of classification results
 - **`graphs_survival_analysis.ipynb`** - Visualization of survival analysis results
 - **`Metadata_Extraction.ipynb`** - Metadata extraction and analysis
+- **`fairness_analysis.ipynb`** - Visualization of fairness analysis results
 
 These notebooks can be run independently to generate visualizations and analyze results from the pipelines.
 
