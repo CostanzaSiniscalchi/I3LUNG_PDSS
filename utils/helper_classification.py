@@ -990,7 +990,7 @@ def generate_dlif_metric_files(
                  If None, processes all outcomes found.
         modalities: List of modalities to process (e.g., ['rwd', 'rwd_dp']).
                    If None, processes all modalities found.
-        task: Task type ('classification' or 'survival')
+        task: Task type ('classification' or 'survival').
         training_type: Training type ('standard', 'cross_validation', or 'evaluation')
         overwrite: If True, regenerate files even if they already exist
 
@@ -1047,8 +1047,11 @@ def generate_dlif_metric_files(
         outcome_name = outcome_dir.name
         print(f"\n📊 Processing outcome: {outcome_name}")
 
+        # OS_MONTHS lives under survival/, not classification/
+        effective_task = "survival" if outcome_name.upper() == "OS_MONTHS" else task
+
         # Navigate to task/training_type
-        task_dir = outcome_dir / task / training_type
+        task_dir = outcome_dir / effective_task / training_type
         if not task_dir.exists():
             print(f"  ⚠️  Task directory not found: {task_dir}")
             continue
@@ -1073,9 +1076,25 @@ def generate_dlif_metric_files(
             # Check if metric files already exist
             auc_file = modality_dir / "eval_auc_ci.csv"
             metrics_file = modality_dir / "eval_classification_metrics.csv"
+            cindex_file = modality_dir / "eval_cindex_ci.csv"
 
-            if not overwrite and auc_file.exists() and metrics_file.exists():
-                print(f"  ⏭️  {modality_name}: Metrics already exist (use overwrite=True to regenerate)")
+            if effective_task == "classification":
+                if not overwrite and auc_file.exists() and metrics_file.exists():
+                    print(f"  ⏭️  {modality_name}: Metrics already exist (use overwrite=True to regenerate)")
+                    total_skipped += 1
+                    continue
+            else:
+                if not overwrite and cindex_file.exists():
+                    print(f"  ⏭️  {modality_name}: Survival metrics already exist (use overwrite=True to regenerate)")
+                    total_skipped += 1
+                    continue
+
+                if overwrite:
+                    print(f"  ⚠️  {modality_name}: Survival metric regeneration is not implemented; skipping")
+                    total_skipped += 1
+                    continue
+
+                print(f"  ⚠️  {modality_name}: Expected survival metric file not found ({cindex_file.name}); skipping")
                 total_skipped += 1
                 continue
 
