@@ -523,10 +523,10 @@ def plot_auc_results(
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
             if arch_name == "DLIF":
                 plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f}",
-                        fontsize=12, ha="center", color="#1a80bb")
+                        fontsize=10, ha="center", color="#1a80bb")
             else:
                 plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                        fontsize=12, ha="center", color="#1a80bb")
+                        fontsize=10, ha="center", color="#1a80bb")
             star = rows[i].get("stars", "")
             if star:
                 plt.text(X[i] + 0.63, base_y + 0.006, star, fontsize=12, ha="left", va="center", color="black")
@@ -538,7 +538,7 @@ def plot_auc_results(
                 base_y = 0.02 if multimodal_better[i] else 0.06
                 if np.isfinite(rv) and np.isfinite(rs):
                     plt.text(X[i], base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=12, ha="center", color="#a00000")
+                            fontsize=10, ha="center", color="#a00000")
 
         if arch_name == "MLEF":
             _auc_prefix = "CV AUC"
