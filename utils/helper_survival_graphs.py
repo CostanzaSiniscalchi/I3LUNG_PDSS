@@ -172,17 +172,17 @@ def plot_cindex_results(
             standard/ (or cross_validation/, evaluation/)
              hypothesis_driven/ (or data_driven/)
               pyrad-noimp/ (or other extraction methods)
-               rwd/
+               cb/
                 seed_0/
                  predictions.parquet
                  predictions_train.parquet
                  eval_auc_ci.csv
                  eval_classification_metrics.csv
-               rwd_dp/
-               rwd_radfm/
-               rwd_radpy/
-               rwd_radfm_dp/
-               rwd_radpy_dp/
+               cb_dp/
+               cb_radfm/
+               cb_radpy/
+               cb_radfm_dp/
+               cb_radpy_dp/
     """
     metric = 'C-INDEX'
     # ------------------------- utilities -------------------------
@@ -322,7 +322,7 @@ def plot_cindex_results(
                 "model":   find_first(mod_dir, ["model_", "model"]),   # picks model_LR / model_RF
                 "train":   find_first(mod_dir, ["train_set", "Train_set", "train"]),
             },
-            "rwd_only": None
+            "cb_only": None
         }
 
         if arch_name == "MLEF":
@@ -331,7 +331,7 @@ def plot_cindex_results(
                 ["RWD_ONLY", "rwd-only", "Rwd_only", "RWD-ONLY"]
             )
             if ro_dir:
-                paths["rwd_only"] = {
+                paths["cb_only"] = {
                     "results": find_first(ro_dir, ["results", "Results"]),
                     "pred":    find_first(ro_dir, ["prediction_CV", "prediction", "Prediction"]),
                     "model":   find_first(ro_dir, ["model_", "model"]),
@@ -443,7 +443,7 @@ def plot_cindex_results(
             xticks = []
             for m, n in zip(modalities, n_train_mod):
                 parts = m.split('_')
-                parts = ['CB' if p == 'rwd' else p for p in parts]
+                parts = ['CB' if p == 'cb' else p for p in parts]
                 # Join with newlines
                 formatted_name = '\n'.join(parts)
                 xticks.append(f"{formatted_name}")
@@ -478,7 +478,7 @@ def plot_cindex_results(
             base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
             plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
                     fontsize=12, ha="center", color="#1a80bb")
-            # stars belong to the multimodal-vs-RWD comparison
+            # stars belong to the multimodal-vs-CB comparison
             star = rows[i].get("stars", "")
             if star:
                 # nudge a bit to the right of the blue text
@@ -544,7 +544,7 @@ def plot_cindex_results(
         # Collect modalities
         if architecture == "DLIF":
             # For DLIF, list directories and map them to MLEF names
-            dlif_modalities = [el for el in os.listdir(analysis_dir) if el.startswith('rwd')]
+            dlif_modalities = [el for el in os.listdir(analysis_dir) if el.startswith('cb')]
             modalities = [map_dlif_to_mlef_modality(m) for m in dlif_modalities]
             modalities = _ordered_modalities(modalities)
             modalities_map = {dlif: mlef for dlif, mlef in zip(dlif_modalities, modalities)}
@@ -579,10 +579,10 @@ def plot_cindex_results(
                 "model_mod": model_m,
             }
 
-            # paired RWD_ONLY (MLEF only) with RWD red==blue behavior
+            # paired CB_ONLY (MLEF only) with CB red==blue behavior
             if arch_name == "MLEF":
                 if mod_key == "RWD":
-                    # enforce coincidence for RWD: red == blue; no p-value
+                    # enforce coincidence for CB: red == blue; no p-value
                     row.update({
                         f"{metric}_ro_mean": row[f"{metric}_mod_mean"],
                         f"{metric}_ro_std":  row[f"{metric}_mod_std"],
@@ -592,7 +592,7 @@ def plot_cindex_results(
                         "stars":       ""
                     })
                 else:
-                    ro = paths["rwd_only"]
+                    ro = paths["cb_only"]
                     if ro['results'] is not None:
                         cindex_r, std_r = _read_result_cv(ro["results"])
                         pval = _compute_pvalue(paths["mod"]["pred"], ro["pred"])

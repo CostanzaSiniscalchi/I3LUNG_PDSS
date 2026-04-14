@@ -19,7 +19,7 @@ def _to_str_flag(series):
 
 def create_annotations(
     outcomes_path=None,
-    rwd_path=None,
+    cb_path=None,
     features_path=None,
     output_path=None,
     n_sub=5,
@@ -30,8 +30,8 @@ def create_annotations(
     # Set default paths if not provided
     if outcomes_path is None:
         outcomes_path = DATA_DIR / 'outcomes.csv'
-    if rwd_path is None:
-        rwd_path = DATA_DIR / 'rwd.csv'
+    if cb_path is None:
+        cb_path = DATA_DIR / 'rwd.csv'
     if features_path is None:
         features_path = DATA_DIR / 'features_dataset_radpy_fixed.parquet'
     if output_path is None:
@@ -39,7 +39,7 @@ def create_annotations(
     
     # Load data
     outcomes = pd.read_csv(outcomes_path)
-    rwd = pd.read_csv(rwd_path)
+    cb = pd.read_csv(cb_path)
     features = pd.read_parquet(features_path)
     
     # Rename outcomes columns
@@ -55,14 +55,14 @@ def create_annotations(
         'TTF MONTHS': 'TTF_MONTHS',
     })
     
-    # Filter only RWD subjects
-    rwd_subjects = set(rwd['Subject'])
-    ann = outcomes[outcomes['Subject'].isin(rwd_subjects)].copy()
+    # Filter only CB subjects
+    cb_subjects = set(cb['Subject'])
+    ann = outcomes[outcomes['Subject'].isin(cb_subjects)].copy()
     
     
-    # Get FOLD and dataset from RWD
-    rwd_info = rwd[['Subject', 'CENTER', 'SET']].copy()
-    ann = ann.merge(rwd_info, on='Subject', how='left')  # merge su Subject direttamente
+    # Get FOLD and dataset from CB
+    cb_info = cb[['Subject', 'CENTER', 'SET']].copy()
+    ann = ann.merge(cb_info, on='Subject', how='left')  # merge su Subject direttamente
     ann = ann.rename(columns={'CENTER': 'FOLD', 'SET': 'dataset'})
     
     # Map dataset values
@@ -101,11 +101,11 @@ def create_annotations(
                     ann.loc[split_ids, fold_col] = f"{center}_sub{i}"
         print(f"Created {n_sub} subfolds per center")
     
-    # Merge additional flags from RWD - only use columns that exist
+    # Merge additional flags from CB - only use columns that exist
     flag_cols = ['Subject', 'PDL1 CATEGORY', 'HISTOLOGY ADENOCARCINOMA', 'HISTOLOGY SQUAMOUS', 'IO LINE', 'IO IOCHT']
-    available_flag_cols = [col for col in flag_cols if col in rwd.columns]
+    available_flag_cols = [col for col in flag_cols if col in cb.columns]
     
-    rwd_flags = rwd[available_flag_cols].copy()
+    cb_flags = cb[available_flag_cols].copy()
     
     # Rename columns
     rename_map = {
@@ -116,9 +116,9 @@ def create_annotations(
         'IO IOCHT': 'IO_CHT',
     }
     
-    rwd_flags = rwd_flags.rename(columns={k: v for k, v in rename_map.items() if k in rwd_flags.columns})
+    cb_flags = cb_flags.rename(columns={k: v for k, v in rename_map.items() if k in cb_flags.columns})
     
-    ann = ann.merge(rwd_flags, on='Subject', how='left')  # merge su Subject
+    ann = ann.merge(cb_flags, on='Subject', how='left')  # merge su Subject
     
     # Map PDL1 to low/high if column exists
     if 'PDL1_CATEGORY' in ann.columns:
@@ -156,7 +156,7 @@ def create_annotations(
 
     # HAS_{mod} flags based on which subjects appear in each raw data file
     modality_files = {
-        'HAS_RWD': DATA_DIR / 'rwd.csv',
+        'HAS_CB': DATA_DIR / 'cb.csv',
         'HAS_RADPY': DATA_DIR / 'pyradiomics.csv',
         'HAS_FMRAD': DATA_DIR / 'fmrad.csv',
         'HAS_DP': DATA_DIR / 'digital_pathology.csv',
@@ -212,7 +212,7 @@ def create_annotations(
     for outcome in outcome_cols:
         split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
     
-    flag_cols = ['PDL1_GROUP', 'PDL1_CATEGORY', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_RWD', 'HAS_RADPY', 'HAS_FMRAD', 'HAS_DP', 'HAS_GENOMICS', 'INT_ONLY_FOLDS']
+    flag_cols = ['PDL1_GROUP', 'PDL1_CATEGORY', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_CB', 'HAS_RADPY', 'HAS_FMRAD', 'HAS_DP', 'HAS_GENOMICS', 'INT_ONLY_FOLDS']
     
     early_cols = [f'early_stopping_{o}' for o in outcome_cols]
     

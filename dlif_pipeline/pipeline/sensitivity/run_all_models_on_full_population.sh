@@ -56,8 +56,8 @@ echo ""
 for MOD_DIR in "$BASE_DIR"/*/; do
     MOD_NAME=$(basename "$MOD_DIR")
 
-    # Only process directories that look like modality folders (start with rwd)
-    if [[ "$MOD_NAME" != rwd* ]]; then
+    # Only process directories that look like modality folders (start with cb)
+    if [[ "$MOD_NAME" != cb* ]]; then
         continue
     fi
 

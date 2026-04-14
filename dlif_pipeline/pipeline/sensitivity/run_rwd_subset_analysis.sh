@@ -6,7 +6,7 @@
 #
 # Example:
 #   bash dlif_pipeline/scripts/run_subset_analysis.sh \
-#       dlif_pipeline/results/C2/CBR/classification/standard/hypothesis_driven/pyrad-noimp/rwd/seed_0/eval/00000-mb_attention_mil
+#       dlif_pipeline/results/C2/CBR/classification/standard/hypothesis_driven/pyrad-noimp/cb/seed_0/eval/00000-mb_attention_mil
 #
 # The script replaces the outcome in the path to iterate over all outcomes.
 
@@ -14,7 +14,7 @@ set -e
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <path_to_any_outcome_eval_dir>"
-    echo "Example: $0 dlif_pipeline/results/C2/CBR/classification/standard/hypothesis_driven/pyrad-noimp/rwd/seed_0/eval/00000-mb_attention_mil"
+    echo "Example: $0 dlif_pipeline/results/C2/CBR/classification/standard/hypothesis_driven/pyrad-noimp/cb/seed_0/eval/00000-mb_attention_mil"
     exit 1
 fi
 

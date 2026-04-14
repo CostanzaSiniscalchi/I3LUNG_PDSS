@@ -37,7 +37,7 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
     else:
         # Map each modality name to its column name in the dataframe
         mod_mapping = {
-            'rwd': 'mod1', 
+            'cb': 'mod1', 
             'dp': 'mod3',
             'genomics': 'mod4',
         }

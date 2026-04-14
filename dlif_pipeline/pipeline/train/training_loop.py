@@ -83,7 +83,7 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
 
             for masked_entry in config["masked_mods"]:
                 keep = [m for m in all_mods
-                        if m == 'rwd' or not masked_entry.get(m, False)]
+                        if m == 'cb' or not masked_entry.get(m, False)]
                 dirname = build_output_dirname(keep, all_mods)
                 subset_name = dirname.replace("bags_", "")
 

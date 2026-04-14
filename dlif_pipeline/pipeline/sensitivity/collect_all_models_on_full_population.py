@@ -133,11 +133,11 @@ def main():
     # Discover modality directories
     modalities = sorted([
         d for d in os.listdir(base_dir)
-        if os.path.isdir(os.path.join(base_dir, d)) and d.startswith("rwd")
+        if os.path.isdir(os.path.join(base_dir, d)) and d.startswith("cb")
     ])
 
     if not modalities:
-        print(f"ERROR: No modality directories (rwd*) found in {base_dir}")
+        print(f"ERROR: No modality directories (cb*) found in {base_dir}")
         sys.exit(1)
 
     print(f"Modalities found: {modalities}")

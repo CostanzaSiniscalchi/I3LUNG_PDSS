@@ -4,7 +4,7 @@ This directory contains scripts for three sensitivity analyses that evaluate the
 
 ## 1. CB Model Tested on Different Patient Subsets
 
-**Scripts:** `collect_subset_results.py`, `run_rwd_subset_analysis.sh`, `plot_rwd_subsets.py`
+**Scripts:** `collect_subset_results.py`, `run_cb_subset_analysis.sh`, `plot_cb_subsets.py`
 
 We tested the performance of the CB-only model on subsets of patients based on their data availability by modality. For each outcome, the dashed gray line indicates the "baseline" model performance on all patients. Different combinations of modality availability are then tested. For each modality combination:
 - The **blue dot** represents the performance of the model on the subset of patients that have all the modalities listed available.
@@ -14,15 +14,15 @@ We tested the performance of the CB-only model on subsets of patients based on t
 
 ```bash
 # Run subset analysis across all outcomes
-bash dlif_pipeline/pipeline/sensitivity/run_rwd_subset_analysis.sh \
-    dlif_pipeline/results/C2/CBR/classification/standard/hypothesis_driven/pyrad-noimp/rwd/seed_0
+bash dlif_pipeline/pipeline/sensitivity/run_cb_subset_analysis.sh \
+    dlif_pipeline/results/C2/CBR/classification/standard/hypothesis_driven/pyrad-noimp/cb/seed_0
 
 # Collect results into CSVs
 python dlif_pipeline/pipeline/sensitivity/collect_subset_results.py \
-    dlif_pipeline/results/C2/CBR/classification/standard/hypothesis_driven/pyrad-noimp/rwd/seed_0
+    dlif_pipeline/results/C2/CBR/classification/standard/hypothesis_driven/pyrad-noimp/cb/seed_0
 
 # Plot results
-python dlif_pipeline/pipeline/sensitivity/plot_rwd_subsets.py
+python dlif_pipeline/pipeline/sensitivity/plot_cb_subsets.py
 ```
 
 ---
@@ -95,69 +95,69 @@ annotation_file: ../data/annotations.csv
 # Keep mods matching the TRAINED model (for path resolution)
 # (find the model trained on all modalities)
 mods:
-  - rwd: true
+  - cb: true
     radpy: true
     dp: true
     genomics: true
-  - rwd: true
+  - cb: true
     radfm: true
     dp: true
     genomics: true
 
 eval_dataset_split: "test"
 
-masked_mods: # which modalities to mask (true = mask, rwd always kept)
-  # rwd_mask_dp_rad_genomics
+masked_mods: # which modalities to mask (true = mask, cb always kept)
+  # cb_mask_dp_rad_genomics
   - dp: true
     radpy: true
     radfm: true
     genomics: true
-  # rwd_radpy_mask_dp_genomics
-  - dp: true
-    radpy: false
-    radfm: true
-    genomics: true
-  # rwd_radfm_mask_dp_genomics
-  - dp: true
-    radpy: true
-    radfm: false
-    genomics: true
-  # rwd_dp_mask_rad_genomics
-  - dp: false
-    radpy: true
-    radfm: true
-    genomics: true
-  # rwd_radfm_dp_mask_genomics
-  - dp: false
-    radpy: true
-    radfm: false
-    genomics: true
-  # rwd_radpy_dp_mask_genomics
-  - dp: false
-    radpy: false
-    radfm: true
-    genomics: true
-  # rwd_genomics_mask_dp_rad
-  - dp: true
-    radpy: true
-    radfm: true
-    genomics: false
-  # rwd_radfm_genomics_mask_dp
-  - dp: true
-    radpy: true
-    radfm: false
-    genomics: false
-  # rwd_radfm_genomics_mask_dp
+  # cb_radpy_mask_dp_genomics
   - dp: true
     radpy: false
     radfm: true
+    genomics: true
+  # cb_radfm_mask_dp_genomics
+  - dp: true
+    radpy: true
+    radfm: false
+    genomics: true
+  # cb_dp_mask_rad_genomics
+  - dp: false
+    radpy: true
+    radfm: true
+    genomics: true
+  # cb_radfm_dp_mask_genomics
+  - dp: false
+    radpy: true
+    radfm: false
+    genomics: true
+  # cb_radpy_dp_mask_genomics
+  - dp: false
+    radpy: false
+    radfm: true
+    genomics: true
+  # cb_genomics_mask_dp_rad
+  - dp: true
+    radpy: true
+    radfm: true
     genomics: false
-  # rwd_dp_genomics_mask_radpy
+  # cb_radfm_genomics_mask_dp
+  - dp: true
+    radpy: true
+    radfm: false
+    genomics: false
+  # cb_radfm_genomics_mask_dp
+  - dp: true
+    radpy: false
+    radfm: true
+    genomics: false
+  # cb_dp_genomics_mask_radpy
   - dp: false
     radpy: true
     radfm: false
     genomics: false
-  # rwd_dp_genomics_mask_radfm
+  # cb_dp_genomics_mask_radfm
   - dp: false
     radpy: false
     radfm: true
@@ -203,6 +203,6 @@ python dlif_pipeline/pipeline/sensitivity/plot_mask_results.py
 
 | Analysis | Output Directory |
 |---|---|
-| RWD subset analysis | `dlif_pipeline/results/all_mods_subset_analysis/` |
+| CB subset analysis | `dlif_pipeline/results/all_mods_subset_analysis/` |
 | All models on full population | `dlif_pipeline/results/models_on_all_data/` |
 | Masked modalities | `dlif_pipeline/results/mask_analysis/` |

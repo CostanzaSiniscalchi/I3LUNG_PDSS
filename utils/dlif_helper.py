@@ -15,36 +15,36 @@ def outcome_to_dlif(outcome_str: str) -> str:
 
 def map_dlif_to_mlef_modality(dlif_name: str) -> str:
     """
-    Map DLIF modality names to MLEF-style names.
-    DLIF: rwd, rwd_dp, rwd_radfm, rwd_radpy, rwd_radfm_dp, rwd_radpy_dp
-    MLEF: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD
+    Map DLIF modality names to display/MLEF-style names.
+    DLIF: cb, cb_dp, cb_radfm, cb_radpy, cb_radfm_dp, cb_radpy_dp
+    Display: CB, CB_DP, CB_FMRAD, CB_PYRAD, CB_DP_FMRAD, CB_DP_PYRAD
     """
     mapping = {
-        'rwd': 'CB',
-        'rwd_dp': 'CB_DP',
-        'rwd_radfm': 'CB_FMRAD',
-        'rwd_radpy': 'CB_PYRAD',
-        'rwd_radfm_dp': 'CB_DP_FMRAD',
-        'rwd_radpy_dp': 'CB_DP_PYRAD',
-        'rwd_radfm_dp_genomics': 'CB_DP_FMRAD_G',
-        'rwd_radpy_dp_genomics': 'CB_DP_PYRAD_G',
+        'cb': 'CB',
+        'cb_dp': 'CB_DP',
+        'cb_radfm': 'CB_FMRAD',
+        'cb_radpy': 'CB_PYRAD',
+        'cb_radfm_dp': 'CB_DP_FMRAD',
+        'cb_radpy_dp': 'CB_DP_PYRAD',
+        'cb_radfm_dp_genomics': 'CB_DP_FMRAD_G',
+        'cb_radpy_dp_genomics': 'CB_DP_PYRAD_G',
     }
     return mapping.get(dlif_name.lower(), dlif_name.upper())
 
 
 def map_mlef_to_dlif_modality(mlef_name: str) -> str:
     """
-    Map MLEF modality names to DLIF-style names.
+    Map display/MLEF modality names to DLIF-style directory names.
     """
     mapping = {
-        'CB': 'rwd',
-        'CB_DP': 'rwd_dp',
-        'CB_FMRAD': 'rwd_radfm',
-        'CB_PYRAD': 'rwd_radpy',
-        'CB_DP_FMRAD': 'rwd_radfm_dp',
-        'CB_DP_PYRAD': 'rwd_radpy_dp',
-        'CB_DP_FMRAD_G': 'rwd_radfm_dp_genomics',
-        'CB_DP_PYRAD_G': 'rwd_radpy_dp_genomics',
+        'CB': 'cb',
+        'CB_DP': 'cb_dp',
+        'CB_FMRAD': 'cb_radfm',
+        'CB_PYRAD': 'cb_radpy',
+        'CB_DP_FMRAD': 'cb_radfm_dp',
+        'CB_DP_PYRAD': 'cb_radpy_dp',
+        'CB_DP_FMRAD_G': 'cb_radfm_dp_genomics',
+        'CB_DP_PYRAD_G': 'cb_radpy_dp_genomics',
     }
     return mapping.get(mlef_name.upper(), mlef_name.lower())
 
@@ -97,7 +97,7 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "model": None,
                 "train": None,
             },
-            "rwd_only": None
+            "cb_only": None
         }
 
     # Find eval predictions based on evaluation type
@@ -119,7 +119,7 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "model": None,  # DLIF stores models differently
                 "train": None,
             },
-            "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
+            "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
         }
     elif task == 'survival':
         paths = {
@@ -129,7 +129,7 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "model": None,
                 "train": None,
             },
-            "rwd_only": None  # DLIF doesn't have RWD_ONLY subdirectories
+            "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
         }
     else:
         paths = {
@@ -139,6 +139,6 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "model": None,
                 "train": None,
             },
-            "rwd_only": None
+            "cb_only": None
         }
     return paths

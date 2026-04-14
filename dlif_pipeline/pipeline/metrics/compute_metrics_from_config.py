@@ -468,7 +468,7 @@ def main():
     parser.add_argument("--config", required=True, help="Path to config YAML file")
     parser.add_argument("--base_dir", required=True, help="Base results directory")
     parser.add_argument("--mod_string", required=True, 
-        help="Modality string to plot (e.g., dp_rwd_radfm or just dp)")
+        help="Modality string to plot (e.g., dp_cb_radfm or just dp)")
     args = parser.parse_args()
     config = args.config
     base_dir = args.base_dir

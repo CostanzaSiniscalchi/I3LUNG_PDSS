@@ -2,15 +2,15 @@
 """
 Collect masked-bag evaluation results into consolidated CSVs.
 
-For each model (rwd_radpy_dp_genomics, rwd_radfm_dp_genomics),
+For each model (cb_radpy_dp_genomics, cb_radfm_dp_genomics),
 reads baseline and eval_mask results across all cohorts and outcomes.
 
 Usage:
     python dlif_pipeline/pipeline/sensitivity/collect_mask_results.py
 
 Output:
-    dlif_pipeline/results/mask_analysis/rwd_radpy_dp_genomics_mask_results.csv
-    dlif_pipeline/results/mask_analysis/rwd_radfm_dp_genomics_mask_results.csv
+    dlif_pipeline/results/mask_analysis/cb_radpy_dp_genomics_mask_results.csv
+    dlif_pipeline/results/mask_analysis/cb_radfm_dp_genomics_mask_results.csv
     dlif_pipeline/results/mask_analysis/mask_results_all.csv
 """
 
@@ -20,7 +20,7 @@ from pathlib import Path
 
 COHORTS = ["C2", "C23"]
 OUTCOMES = ["CBR", "ORR", "DCR", "os_months_6", "os_months_24"]
-MODELS = ["rwd_radpy_dp_genomics", "rwd_radfm_dp_genomics"]
+MODELS = ["cb_radpy_dp_genomics", "cb_radfm_dp_genomics"]
 
 BASE_RESULTS = Path("dlif_pipeline/results")
 OUTPUT_DIR = Path("dlif_pipeline/results/mask_analysis")
@@ -29,12 +29,12 @@ MASK_PATH_TEMPLATE = "{cohort}/{outcome}/classification/evaluation/hypothesis_dr
 STD_PATH_TEMPLATE = "{cohort}/{outcome}/classification/standard/hypothesis_driven/pyrad-noimp/{model}/seed_0"
 
 SUBSET_DIR_NAMES = {
-    "rwd_radpy_dp_genomics": "has_radpy_has_dp_has_genomics",
-    "rwd_radfm_dp_genomics": "has_fmrad_has_dp_has_genomics",
+    "cb_radpy_dp_genomics": "has_radpy_has_dp_has_genomics",
+    "cb_radfm_dp_genomics": "has_fmrad_has_dp_has_genomics",
 }
 
 DISPLAY_NAMES = {
-    "rwd": "CB",
+    "cb": "CB",
     "radpy": "RadPy",
     "radfm": "RadFM",
     "dp": "DP",
@@ -71,8 +71,8 @@ def read_metrics_from_dir(directory, prefix=""):
 def parse_mask_name(mask_name):
     """Parse a mask directory name into kept and masked modality lists.
 
-    E.g. 'rwd_dp_masked_radpy_genomics' -> kept=['rwd', 'dp'], masked=['radpy', 'genomics']
-         'rwd_masked_radpy_dp_genomics' -> kept=['rwd'], masked=['radpy', 'dp', 'genomics']
+    E.g. 'cb_dp_masked_radpy_genomics' -> kept=['cb', 'dp'], masked=['radpy', 'genomics']
+         'cb_masked_radpy_dp_genomics' -> kept=['cb'], masked=['radpy', 'dp', 'genomics']
 
     Returns (kept_list, masked_list).
     """
@@ -91,7 +91,7 @@ def format_masked_label(masked_list):
 
 
 def format_kept_label(kept_list):
-    """Convert ['rwd', 'dp'] -> 'CB + DP kept'."""
+    """Convert ['cb', 'dp'] -> 'CB + DP kept'."""
     names = [DISPLAY_NAMES.get(m, m) for m in kept_list]
     return " + ".join(names) + " kept"
 
