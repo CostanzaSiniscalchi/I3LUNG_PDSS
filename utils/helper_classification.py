@@ -2146,7 +2146,7 @@ def plot_fairness_by_group(
     if metric == 'FPR':
         for h in handles:
             h.set_hatch('')
-    plt.legend(handles, labels, title=group_col, loc='upper right', fontsize=15, title_fontsize=16, ncol=2)
+    plt.legend(handles, labels, title=group_col, loc='upper right', fontsize=12, title_fontsize=16, ncol=2)
     plt.tight_layout()
     plt.show()
 
