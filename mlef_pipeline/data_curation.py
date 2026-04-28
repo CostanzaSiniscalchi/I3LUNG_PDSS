@@ -16,7 +16,7 @@ from enums import *
 class DataLoader:
 
     data_path = {
-        Mode.RWD: 'data/rwd.csv',
+        Mode.CB: 'data/cb.csv',
         Mode.DP: 'data/digital_pathology.csv',
         Mode.FMRAD: 'data/fmrad.csv',
         Mode.PYRAD: 'data/pyradiomics.csv',
@@ -32,9 +32,9 @@ class DataLoader:
             if mode in self.data_path:
                 path = self.data_path[mode]
                 mode_data[mode] = pd.read_csv(path)
-                if mode == Mode.RWD:
+                if mode == Mode.CB:
                     with open ('mlef_pipeline/features.json', 'r') as f:
-                        selected_features = json.load(f)['RWD']
+                        selected_features = json.load(f)['CB']
                     mode_data[mode] = mode_data[mode][['Subject', 'CENTER', 'SET'] + selected_features]
                 elif mode == Mode.GEN:
                     with open ('mlef_pipeline/features.json', 'r') as f:
@@ -109,12 +109,12 @@ class DataLoader:
             how='inner'
         ).dropna(subset=[outcome])
 
-        if Mode.RWD in modes:
-            rwd = mode_data[Mode.RWD].copy()
+        if Mode.CB in modes:
+            cb = mode_data[Mode.CB].copy()
         else: 
-            rwd = pd.read_csv(self.data_path[Mode.RWD])
+            cb = pd.read_csv(self.data_path[Mode.CB])
         
-        subanalysis_features = pd.merge(rwd, outcomes, on='Subject', how='inner', suffixes=('', '_'))
+        subanalysis_features = pd.merge(cb, outcomes, on='Subject', how='inner', suffixes=('', '_'))
         
         dataset = self._get_subanalysis_data(dataset, subanalysis, subanalysis_features)
         

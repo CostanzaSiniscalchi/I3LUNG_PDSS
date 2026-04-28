@@ -15,11 +15,19 @@ def outcome_to_dlif(outcome_str: str) -> str:
 
 def map_dlif_to_mlef_modality(dlif_name: str) -> str:
     """
-    Map DLIF modality names to display/MLEF-style names.
+    Map DLIF modality names to MLEF-style names.
     DLIF: cb, cb_dp, cb_radfm, cb_radpy, cb_radfm_dp, cb_radpy_dp
-    Display: CB, CB_DP, CB_FMRAD, CB_PYRAD, CB_DP_FMRAD, CB_DP_PYRAD
+    MLEF: CB, CB_DP, CB_FMRAD, CB_PYRAD, CB_DP_FMRAD, CB_DP_PYRAD
     """
     mapping = {
+        'cb': 'CB',
+        'cb_dp': 'CB_DP',
+        'cb_radfm': 'CB_FMRAD',
+        'cb_radpy': 'CB_PYRAD',
+        'cb_radfm_dp': 'CB_DP_FMRAD',
+        'cb_radpy_dp': 'CB_DP_PYRAD',
+        'cb_radfm_dp_genomics': 'CB_DP_FMRAD_G',
+        'cb_radpy_dp_genomics': 'CB_DP_PYRAD_G',
         'cb': 'CB',
         'cb_dp': 'CB_DP',
         'cb_radfm': 'CB_FMRAD',
@@ -37,6 +45,14 @@ def map_mlef_to_dlif_modality(mlef_name: str) -> str:
     Map display/MLEF modality names to DLIF-style directory names.
     """
     mapping = {
+        'CB': 'cb',
+        'CB_DP': 'cb_dp',
+        'CB_FMRAD': 'cb_radfm',
+        'CB_PYRAD': 'cb_radpy',
+        'CB_DP_FMRAD': 'cb_radfm_dp',
+        'CB_DP_PYRAD': 'cb_radpy_dp',
+        'CB_DP_FMRAD_G': 'cb_radfm_dp_genomics',
+        'CB_DP_PYRAD_G': 'cb_radpy_dp_genomics',
         'CB': 'cb',
         'CB_DP': 'cb_dp',
         'CB_FMRAD': 'cb_radfm',
@@ -98,6 +114,7 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "train": None,
             },
             "cb_only": None
+            "cb_only": None
         }
 
     # Find eval predictions based on evaluation type
@@ -120,6 +137,7 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "train": None,
             },
             "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
+            "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
         }
     elif task == 'survival':
         paths = {
@@ -130,6 +148,7 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "train": None,
             },
             "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
+            "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
         }
     else:
         paths = {
@@ -139,6 +158,7 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "model": None,
                 "train": None,
             },
+            "cb_only": None
             "cb_only": None
         }
     return paths
