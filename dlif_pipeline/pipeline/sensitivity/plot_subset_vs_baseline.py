@@ -36,14 +36,14 @@ OUTCOME_LABELS = {
 }
 
 MODALITY_ORDER = [
-    "rwd",
-    "rwd_dp",
-    "rwd_radfm",
-    "rwd_radpy",
-    "rwd_radfm_dp",
-    "rwd_radpy_dp",
-    "rwd_radfm_dp_genomics",
-    "rwd_radpy_dp_genomics",
+    "cb",
+    "cb_dp",
+    "cb_radfm",
+    "cb_radpy",
+    "cb_radfm_dp",
+    "cb_radpy_dp",
+    "cb_radfm_dp_genomics",
+    "cb_radpy_dp_genomics",
 ]
 
 
@@ -115,7 +115,7 @@ def plot_outcome(cohort: str, outcome: str, odf: pd.DataFrame,
     xticks = []
     for m, n in zip(ordered_mods, n_patients):
         parts = m.split('_')
-        PART_MAP = {'rwd': 'CB', 'radpy': 'PYRAD', 'radfm': 'FMRAD', 'genomics': 'G'}
+        PART_MAP = {'cb': 'CB', 'radpy': 'PYRAD', 'radfm': 'FMRAD', 'genomics': 'G'}
         parts = [PART_MAP.get(p, p.upper()) for p in parts]
         formatted = '\n'.join(parts)
         xticks.append(f"{formatted}\n(n={int(n)})")
@@ -226,7 +226,7 @@ def plot_consolidated(cohort: str, data: pd.DataFrame,
     xticks = []
     for m, np_ in zip(ordered_mods, max_n):
         parts = m.split('_')
-        PART_MAP = {'rwd': 'CB', 'radpy': 'PYRAD', 'radfm': 'FMRAD', 'genomics': 'G'}
+        PART_MAP = {'cb': 'CB', 'radpy': 'PYRAD', 'radfm': 'FMRAD', 'genomics': 'G'}
         parts = [PART_MAP.get(p, p.upper()) for p in parts]
         formatted = '\n'.join(parts)
         xticks.append(f"{formatted}\n(n={int(np_)})")

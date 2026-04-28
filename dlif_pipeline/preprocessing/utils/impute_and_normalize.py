@@ -83,26 +83,26 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
     result = pd.concat([metadata, df_to_norm], axis=1)
     return result, scaler, to_standard_normalize, to_log_normalize
 
-# RWD
-print("Processing RWD...")
-rwd = pd.read_csv(DATA_DIR / 'rwd.csv', index_col='Subject')
-rwd_cols = ['SET', 'CENTER'] + [f for f in features_dict['RWD'] if f in rwd.columns]
-rwd = rwd[rwd_cols]
+# CB
+print("Processing CB...")
+cb = pd.read_csv(DATA_DIR / 'cb.csv', index_col='Subject')
+cb_cols = ['SET', 'CENTER'] + [f for f in features_dict['CB'] if f in cb.columns]
+cb = cb[cb_cols]
 
-train_mask = rwd['SET'] == 'TRAIN'
-rwd_train_imputed, rwd_imputer = impute_df(rwd[train_mask])
-rwd_train_proc, rwd_scaler, rwd_to_std, rwd_to_log = normalize(rwd_train_imputed)
+train_mask = cb['SET'] == 'TRAIN'
+cb_train_imputed, cb_imputer = impute_df(cb[train_mask])
+cb_train_proc, cb_scaler, cb_to_std, cb_to_log = normalize(cb_train_imputed)
 
-test_mask = rwd['SET'] == 'TEST'
-rwd_test_imputed, _ = impute_df(rwd[test_mask], imputer=rwd_imputer)
-rwd_test_proc, _, _, _ = normalize(rwd_test_imputed, scaler=rwd_scaler, to_standard_normalize=rwd_to_std, to_log_normalize=rwd_to_log)
+test_mask = cb['SET'] == 'TEST'
+cb_test_imputed, _ = impute_df(cb[test_mask], imputer=cb_imputer)
+cb_test_proc, _, _, _ = normalize(cb_test_imputed, scaler=cb_scaler, to_standard_normalize=cb_to_std, to_log_normalize=cb_to_log)
 
-ext_mask = rwd['SET'] == 'EXVAL'
-rwd_ext_imputed, _ = impute_df(rwd[ext_mask], imputer=rwd_imputer)
-rwd_ext_proc, _, _, _ = normalize(rwd_ext_imputed, scaler=rwd_scaler, to_standard_normalize=rwd_to_std, to_log_normalize=rwd_to_log)
+ext_mask = cb['SET'] == 'EXVAL'
+cb_ext_imputed, _ = impute_df(cb[ext_mask], imputer=cb_imputer)
+cb_ext_proc, _, _, _ = normalize(cb_ext_imputed, scaler=cb_scaler, to_standard_normalize=cb_to_std, to_log_normalize=cb_to_log)
 
-rwd_result = pd.concat([rwd_train_proc, rwd_test_proc, rwd_ext_proc])
-rwd_result.to_csv(DATA_DIR / 'rwd_processed.csv')
+cb_result = pd.concat([cb_train_proc, cb_test_proc, cb_ext_proc])
+cb_result.to_csv(DATA_DIR / 'cb_processed.csv')
 
 # Genomics
 print("Processing Genomics...")

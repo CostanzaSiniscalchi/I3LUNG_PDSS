@@ -12,7 +12,7 @@ Usage:
     python mask_modalities.py --source radpy radfm
 
     # Single combination only
-    python mask_modalities.py --source radpy --keep rwd radpy
+    python mask_modalities.py --source radpy --keep cb radpy
 
     # Dry run
     python mask_modalities.py --source radpy --dry-run
@@ -28,7 +28,7 @@ from tqdm import tqdm
 
 # Canonical modality order in all-modality bags (0-indexed position in mask)
 MODALITY_INDEX = {
-    'rwd': 0,       # feature1, mask[0]
+    'cb': 0,       # feature1, mask[0]
     'radpy': 1,     # feature2, mask[1]
     'radfm': 1,     # feature2, mask[1] -- mutually exclusive with radpy
     'dp': 2,        # feature3, mask[2]
@@ -37,14 +37,14 @@ MODALITY_INDEX = {
 
 # All modalities for each radiomics source (canonical order)
 ALL_MODALITIES = {
-    'radpy': ['rwd', 'radpy', 'dp', 'genomics'],
-    'radfm': ['rwd', 'radfm', 'dp', 'genomics'],
+    'radpy': ['cb', 'radpy', 'dp', 'genomics'],
+    'radfm': ['cb', 'radfm', 'dp', 'genomics'],
 }
 
 # Source bag directory names
 SOURCE_BAG_DIRS = {
-    'radpy': 'bags_rwd_radpy_dp_genomics',
-    'radfm': 'bags_rwd_radfm_dp_genomics',
+    'radpy': 'bags_cb_radpy_dp_genomics',
+    'radfm': 'bags_cb_radfm_dp_genomics',
 }
 
 # Expected feature dimensions per index (for verification)
@@ -55,17 +55,17 @@ EXPECTED_DIMS = {
 
 
 def get_all_subsets(source):
-    """Return all modality subsets to generate (rwd always kept, excluding full set).
+    """Return all modality subsets to generate (cb always kept, excluding full set).
 
     For 3 optional modalities, this yields 2^3 - 1 = 7 subsets.
     """
     all_mods = ALL_MODALITIES[source]
-    optional_mods = [m for m in all_mods if m != 'rwd']
+    optional_mods = [m for m in all_mods if m != 'cb']
 
     subsets = []
     for r in range(len(optional_mods)):  # 0..2 optional mods kept
         for combo in combinations(optional_mods, r):
-            subsets.append(['rwd'] + list(combo))
+            subsets.append(['cb'] + list(combo))
 
     # Also include subsets with all but one optional mod (size = len(optional) - 1 already covered)
     # r goes 0, 1, 2 for 3 optional mods => subsets of size 1, 2, 3
@@ -203,7 +203,7 @@ def parse_args():
         '--keep',
         nargs='+',
         default=None,
-        choices=['rwd', 'radpy', 'radfm', 'dp', 'genomics'],
+        choices=['cb', 'radpy', 'radfm', 'dp', 'genomics'],
         help='Modalities to keep (others masked). If omitted, generates ALL subsets.'
     )
     parser.add_argument(
@@ -236,8 +236,8 @@ def main():
         # Determine which subsets to generate
         if args.keep is not None:
             # Single run mode
-            if 'rwd' not in args.keep:
-                print("[ERROR] rwd must always be kept.")
+            if 'cb' not in args.keep:
+                print("[ERROR] cb must always be kept.")
                 sys.exit(1)
             if source == 'radpy' and 'radfm' in args.keep:
                 print("[ERROR] Cannot keep 'radfm' when source is 'radpy'.")

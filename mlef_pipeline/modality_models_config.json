@@ -2,53 +2,53 @@
     "C23": {
         "DCR": {
             "models": {
-                "RWD": "LR",
-                "RWD_DP": "LR",
-                "RWD_FMRAD": "LR",
-                "RWD_PYRAD": "LR",
-                "RWD_DP_FMRAD": "LR",
-                "RWD_DP_PYRAD": "LR"
+                "CB": "LR",
+                "CB_DP": "LR",
+                "CB_FMRAD": "LR",
+                "CB_PYRAD": "LR",
+                "CB_DP_FMRAD": "LR",
+                "CB_DP_PYRAD": "LR"
             },
-            "rwd_only_models": {
-                "RWD_DP": "LR",
-                "RWD_FMRAD": "LR",
-                "RWD_PYRAD": "LR",
-                "RWD_DP_FMRAD": "RF",
-                "RWD_DP_PYRAD": "RF"
+            "cb_only_models": {
+                "CB_DP": "LR",
+                "CB_FMRAD": "LR",
+                "CB_PYRAD": "LR",
+                "CB_DP_FMRAD": "RF",
+                "CB_DP_PYRAD": "RF"
             }
         },
         "OS_6": {
             "models": {
-                "RWD": "LR",
-                "RWD_DP": "LR",
-                "RWD_FMRAD": "LR",
-                "RWD_PYRAD": "LR",
-                "RWD_DP_FMRAD": "LR",
-                "RWD_DP_PYRAD": "LR"
+                "CB": "LR",
+                "CB_DP": "LR",
+                "CB_FMRAD": "LR",
+                "CB_PYRAD": "LR",
+                "CB_DP_FMRAD": "LR",
+                "CB_DP_PYRAD": "LR"
             },
-            "rwd_only_models": {
-                "RWD_DP": "LR",
-                "RWD_FMRAD": "LR",
-                "RWD_PYRAD": "LR",
-                "RWD_DP_FMRAD": "LR",
-                "RWD_DP_PYRAD": "LR"
+            "cb_only_models": {
+                "CB_DP": "LR",
+                "CB_FMRAD": "LR",
+                "CB_PYRAD": "LR",
+                "CB_DP_FMRAD": "LR",
+                "CB_DP_PYRAD": "LR"
             }
         },
         "OS_24": {
             "models": {
-                "RWD": "RF",
-                "RWD_DP": "LR",
-                "RWD_FMRAD": "LR",
-                "RWD_PYRAD": "LR",
-                "RWD_DP_FMRAD": "LR",
-                "RWD_DP_PYRAD": "LR"
+                "CB": "RF",
+                "CB_DP": "LR",
+                "CB_FMRAD": "LR",
+                "CB_PYRAD": "LR",
+                "CB_DP_FMRAD": "LR",
+                "CB_DP_PYRAD": "LR"
             },
-            "rwd_only_models": {
-                "RWD_DP": "LR",
-                "RWD_FMRAD": "LR",
-                "RWD_PYRAD": "LR",
-                "RWD_DP_FMRAD": "LR",
-                "RWD_DP_PYRAD": "LR"
+            "cb_only_models": {
+                "CB_DP": "LR",
+                "CB_FMRAD": "LR",
+                "CB_PYRAD": "LR",
+                "CB_DP_FMRAD": "LR",
+                "CB_DP_PYRAD": "LR"
             }
         }
     }

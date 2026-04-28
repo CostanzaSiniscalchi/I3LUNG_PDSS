@@ -17,18 +17,18 @@ A comprehensive framework for training and evaluating attention-based multiple i
 
 This pipeline provides an end-to-end solution for MIL on medical data, featuring:
 
-- **Multimodal Integration**: Combines radiomics (PyRadiomics/Foundation Models), clinical data (RWD), digital pathology (DP), and genomics
+- **Multimodal Integration**: Combines radiomics (PyRadiomics/Foundation Models), clinical data (CB), digital pathology (DP), and genomics
 - **Multiple Training Strategies**: Standard training, cross-validation, hyperparameter tuning, and external validation
 - **Task Support**: Binary/multi-class classification and survival analysis (Cox proportional hazards)
 - **Attention Mechanisms**: Multi-bag attention-based architecture for interpretable predictions
 
 ## Features
-**Note:** `RWD` refers to *Clinical Blood Data*, as described in the manuscript.
+**Note:** `CB` refers to *Clinical Blood Data*, as described in the manuscript.
 ### Data Modalities
 
 | Modality       | Description                                                           |
 |----------      |-------------                                                          |
-| **RWD**        | Real-world clinical data and patient demographics (required baseline) |
+| **CB**        | Real-world clinical data and patient demographics (required baseline) |
 | **RadPy**      | PyRadiomics-extracted radiomic features                               |
 | **RadFM**      | Foundation model-based radiomic features                              |
 | **DP**         | Deep learning features from digital pathology                         |
@@ -77,7 +77,7 @@ This takes around 10 mins to install.
 
 Place the following files in the `I3LUNG_PDSS/data` directory before running the pipelines:
 
-- `/data/rwd.csv`
+- `/data/cb.csv`
 - `/data/genomics.csv`
 - `/data/digital_pathology.csv`
 - `/data/pyradiomics.csv`
@@ -142,33 +142,33 @@ train_df: [ "../data/features_dataset_radpy_fixed.parquet", "../data/features_da
 annotation_file: ../data/annotations.csv
 
 mods:
-    # RWD
-  - rwd: true
+    # CB
+  - cb: true
     radpy: false
     dp: false
     genomics: false
-    # RWD_DP
-  - rwd: true
+    # CB_DP
+  - cb: true
     radpy: false
     dp: true
     genomics: false
-    # RWD_FMRAD
-  - rwd: true
+    # CB_FMRAD
+  - cb: true
     radfm: true
     dp: false
     genomics: false
-    # RWD_PYRAD
-  - rwd: true
+    # CB_PYRAD
+  - cb: true
     radpy: true
     dp: false
     genomics: false
-    # RWD_DP_FMRAD
-  - rwd: true
+    # CB_DP_FMRAD
+  - cb: true
     radfm: true
     dp: true
     genomics: false
-    # RWD_DP_PYRAD
-  - rwd: true
+    # CB_DP_PYRAD
+  - cb: true
     radpy: true
     dp: true
     genomics: false
@@ -234,20 +234,20 @@ prepare_dataset: true  # Set to true on first run or when data changes
 
 ```yaml
 mods:
-  - rwd: true      # Always required
+  - cb: true      # Always required
     radpy: true
     dp: false
     genomics: false
   
-  - rwd: true
+  - cb: true
     radpy: true
     dp: true
     genomics: false
 ```
 
-> **Note**: RWD must be `true` in all configurations as it serves as the baseline modality.
+> **Note**: CB must be `true` in all configurations as it serves as the baseline modality.
 
-You can add as many modalities combinations as you want (within the modalities supported: rwd, radpy, radfm, dp, genomics.), 
+You can add as many modalities combinations as you want (within the modalities supported: cb, radpy, radfm, dp, genomics.), 
 radpy and radfm are mutually exclusive.
 
 ### Hyperparameter Configuration
@@ -332,7 +332,7 @@ python dlif_pipeline/pipeline/train.py --config dlif_pipeline/configs/07-config-
 
 The tuning was done on:
 
-Modalities: rwd, radpy, dp
+Modalities: cb, radpy, dp
 Outcome: os_months_6
 
 We used the resulting hyperparameters for all other experiments.
@@ -359,7 +359,7 @@ results/
                 └── cross_validation/
                     └── hypothesis_driven/
                         └── pyrad-noimp/
-                            └── rwd_radpy/                                 
+                            └── cb_radpy/                                 
                                    └──seed_0/
                                       ├── attention/                          # Attention mechanism outputs
                                       │   ├── attention_weights.npz           # Raw attention weights
@@ -430,10 +430,10 @@ dlif_pipeline/
 │   │   ├── collect_subset_results.py
 │   │   ├── collect_all_models_on_full_population.py
 │   │   ├── collect_mask_results.py
-│   │   ├── plot_rwd_subsets.py
+│   │   ├── plot_cb_subsets.py
 │   │   ├── plot_subset_vs_baseline.py
 │   │   ├── plot_mask_results.py
-│   │   ├── run_rwd_subset_analysis.sh
+│   │   ├── run_cb_subset_analysis.sh
 │   │   └── run_all_models_on_full_population.sh
 │   │
 │   ├── plotting/             # Visualization scripts

@@ -2,7 +2,7 @@ def build_experiment_path(config, mods, outcome_override=None):
     import os
     """
     Builds a base experiment path like:
-    os_months_6/classification/standard/data_driven/foundation-noimp/rwd
+    os_months_6/classification/standard/data_driven/foundation-noimp/cb
     """
     task = config["task"]
     outcome = outcome_override or config["task_settings"]["outcome"]
@@ -26,7 +26,7 @@ def build_base_path(config, mods):
     """
     Builds a base path for the experiment based on the config and mods.
     Returns a string like:
-        os_months_6/classification/standard/data_driven/foundation-noimp/rwd
+        os_months_6/classification/standard/data_driven/foundation-noimp/cb
     """
     # Extract relevant parts from the config
     task = config["task"]

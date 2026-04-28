@@ -23,7 +23,7 @@ DATA_DIR = "dlif_pipeline/results/mask_analysis"
 SAVE_DIR = "dlif_pipeline/results/mask_analysis/plots"
 
 COHORTS = ["C2", "C23"]
-MODELS = ["rwd_radpy_dp_genomics", "rwd_radfm_dp_genomics"]
+MODELS = ["cb_radpy_dp_genomics", "cb_radfm_dp_genomics"]
 OUTCOMES_RESPONSE = ["DCR", "ORR", "CBR"]
 OUTCOMES_SURVIVAL = ["os_months_6", "os_months_24"]
 OUTCOME_LABELS = {
