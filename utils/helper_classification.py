@@ -131,6 +131,7 @@ def plot_auc_results(
          OS_24/ (or DCR/ OR OS_6/)
           C23/
             CB/
+            CB/
               model_XX.pkl
               train_set.xlsx/.csv
               test_set.xlsx/.csv
@@ -139,6 +140,12 @@ def plot_auc_results(
               prediction_EXVAL.csv
               prediction_TEST.csv
               results.xlsx/.csv      (metrics incl. CV AUC)
+            CB_DP/
+               CB_ONLY/         (MLEF only)
+            CB_PYRAD/
+            CB_FMRAD/
+            CB_DP_PYRAD/
+            CB_DP_FMRAD/
             CB_DP/
                CB_ONLY/         (MLEF only)
             CB_PYRAD/
@@ -155,11 +162,17 @@ def plot_auc_results(
              hypothesis_driven/ (or data_driven/)
               pyrad-noimp/ (or other extraction methods)
                cb/
+               cb/
                 seed_0/
                  predictions.parquet
                  predictions_train.parquet
                  eval_auc_ci.csv
                  eval_classification_metrics.csv
+               cb_dp/
+               cb_radfm/
+               cb_radpy/
+               cb_radfm_dp/
+               cb_radpy_dp/
                cb_dp/
                cb_radfm/
                cb_radpy/
@@ -172,9 +185,15 @@ def plot_auc_results(
           classification/
            standard/ (or cross_validation/)
             cb/
+            cb/
              predictions.parquet
              predictions_train.parquet
              eval_auc_ci.csv
+            cb_dp/
+            cb_radfm/
+            cb_radpy/
+            cb_radfm_dp/
+            cb_radpy_dp/
             cb_dp/
             cb_radfm/
             cb_radpy/
@@ -295,9 +314,9 @@ def plot_auc_results(
     def _ordered_modalities(mods: List[str]) -> List[str]:
         filtered = [m for m in mods if m not in exclude_modalities]
         if modality_order:
-            # Build a lookup that maps both "CB…" and "CB…" forms to the actual name in filtered
+            # Build a lookup that maps both "RWD" and "CB…" forms to the actual name in filtered
             def _normalise(name: str) -> str:
-                return name.upper().replace("CB", "CB")
+                return name.upper().replace("RWD", "CB")
             norm_to_actual = {_normalise(m): m for m in filtered}
             in_order = []
             for req in modality_order:
@@ -368,7 +387,7 @@ def plot_auc_results(
         if arch_name == "MLEF":
             ro_dir = find_subdir_any(
                 mod_dir,
-                ["CB_ONLY", "cb-only", "Rwd_only", "CB-ONLY"]
+                ["CB_ONLY", "cb-only", "rwd_only", "RWD-ONLY"]
             )
             if ro_dir:
                 paths["cb_only"] = {
@@ -511,7 +530,7 @@ def plot_auc_results(
         else:
             xticks = []
             for m, n in zip(modalities, n_train_mod):
-                parts = m.replace('CB', 'CB').split('_')
+                parts = m.replace('RWD', 'CB').split('_')
                 label_text = '\n'.join(parts)
                 if np.isfinite(n):
                     label_text += f"\n(n={int(n)})"

@@ -328,7 +328,7 @@ def plot_cindex_results(
         if arch_name == "MLEF":
             ro_dir = find_subdir_any(
                 mod_dir,
-                ["CB_ONLY", "cb-only", "Rwd_only", "CB-ONLY"]
+                ["CB_ONLY", "cb-only", "rwd_only", "RWD-ONLY"]
             )
             if ro_dir:
                 paths["cb_only"] = {

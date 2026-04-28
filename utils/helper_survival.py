@@ -137,30 +137,6 @@ def plot_cindex_results(
             pass
         return (np.nan, np.nan)
 
-    def _read_n_train_dlif(predictions_path) -> float:
-        """Read number of samples from DLIF prediction files.
-
-        Args:
-            predictions_path: Single Path (standard/evaluation) or list of Paths
-                (cross-validation folds). For CV, concatenates all fold predictions
-                to get total dataset size.
-        """
-        if predictions_path is None:
-            return np.nan
-        try:
-            if isinstance(predictions_path, list):
-                dfs = [pd.read_parquet(p) for p in predictions_path if p.exists()]
-                if not dfs:
-                    return np.nan
-                return int(len(pd.concat(dfs, ignore_index=True)))
-            else:
-                if not predictions_path.exists():
-                    return np.nan
-                df = pd.read_parquet(predictions_path)
-                return int(len(df))
-        except Exception:
-            return np.nan
-
     def _pair_paths_dlif(base_dir: Path, modality: str) -> dict:
         """Path resolver for DLIF architecture."""
         dlif_modality = map_mlef_to_dlif_modality(modality)
@@ -257,7 +233,7 @@ def plot_cindex_results(
         }
         
         if architecture == "MLEF":
-            if (ro_dir := _find_subdir(mod_dir, ["CB_ONLY", "cb-only", "Rwd_only", "CB-ONLY"])):
+            if (ro_dir := _find_subdir(mod_dir, ["CB_ONLY", "rwd-only", "RWD_only", "CB-ONLY"])):
                 paths["cb_only"] = {
                     "results": _find_first(ro_dir, ["results", "Results"]),
                     "pred": _find_first(ro_dir, ["prediction_CV", "prediction", "Prediction"]),
@@ -428,7 +404,7 @@ def plot_cindex_results(
                 paths = _pair_paths_dlif(analysis_dir, mod)
                 cindex_m, std_m = _read_cindex_dlif(paths["mod"]["results"])
                 model_m = "DLIF"
-                ntrain_m = _read_n_train_dlif(paths["mod"]["pred"])
+                ntrain_m = read_n_train_dlif(paths["mod"]["pred"])
             else:
                 paths = _pair_paths(analysis_dir, mod)
                 cindex_m, std_m = _read_cindex_cv(paths["mod"]["results"])
