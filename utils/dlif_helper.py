@@ -114,7 +114,6 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "train": None,
             },
             "cb_only": None
-            "cb_only": None
         }
 
     # Find eval predictions based on evaluation type
@@ -137,7 +136,6 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "train": None,
             },
             "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
-            "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
         }
     elif task == 'survival':
         paths = {
@@ -148,7 +146,6 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "train": None,
             },
             "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
-            "cb_only": None  # DLIF doesn't have CB_ONLY subdirectories
         }
     else:
         paths = {
@@ -158,7 +155,6 @@ def pair_paths_dlif(base_dir: Path, modality: str, dlif_eval_type: str, task: st
                 "model": None,
                 "train": None,
             },
-            "cb_only": None
             "cb_only": None
         }
     return paths

@@ -19,6 +19,8 @@ from sksurv.metrics import concordance_index_censored
 from itertools import combinations
 from scipy.stats import norm
 import seaborn as sns
+from sklearn.linear_model import LogisticRegression
+
 
 def plot_km_combined(datasets, stats: bool=True):
     """
@@ -1130,3 +1132,13 @@ def plot_fairness_results(per_group_df, title, figsize=(8, 5), palette=None, gro
     ax.set_ylim(0, 1)
     plt.tight_layout()
     return fig
+
+def shap_beeswarm(model, X_train: pd.DataFrame, X_test: pd.DataFrame, mapping = {}) -> None:
+    explainer = shap.Explainer(model.predict_partial_hazard, X_train)
+    
+    shap_values = explainer(X_test)
+
+    shap_values.feature_names = [mapping.get(name, name) for name in shap_values.feature_names]
+    shap.plots.beeswarm(shap_values, show=False, max_display=20)
+
+    plt.show()
