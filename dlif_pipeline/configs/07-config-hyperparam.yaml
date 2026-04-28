@@ -16,7 +16,7 @@ train_df: [ "../data/features_dataset_radpy_fixed.parquet", "../data/features_da
 annotation_file: ../data/annotations.csv
 
 mods:
-  - rwd: true # rwd: true
+  - cb: true # cb: true
     radfm: true
     dp: true
     genomics: false

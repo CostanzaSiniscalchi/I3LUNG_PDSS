@@ -130,7 +130,7 @@ def plot_auc_results(
         mlef_pipeline/results/
          OS_24/ (or DCR/ OR OS_6/)
           C23/
-            RWD/
+            CB/
               model_XX.pkl
               train_set.xlsx/.csv
               test_set.xlsx/.csv
@@ -139,12 +139,12 @@ def plot_auc_results(
               prediction_EXVAL.csv
               prediction_TEST.csv
               results.xlsx/.csv      (metrics incl. CV AUC)
-            RWD_DP/
-               RWD_ONLY/         (MLEF only)
-            RWD_PYRAD/
-            RWD_FMRAD/
-            RWD_DP_PYRAD/
-            RWD_DP_FMRAD/
+            CB_DP/
+               CB_ONLY/         (MLEF only)
+            CB_PYRAD/
+            CB_FMRAD/
+            CB_DP_PYRAD/
+            CB_DP_FMRAD/
 
     DLIF (when use_preds=False):
         dlif_pipeline/results/
@@ -154,32 +154,32 @@ def plot_auc_results(
             standard/ (or cross_validation/, evaluation/)
              hypothesis_driven/ (or data_driven/)
               pyrad-noimp/ (or other extraction methods)
-               rwd/
+               cb/
                 seed_0/
                  predictions.parquet
                  predictions_train.parquet
                  eval_auc_ci.csv
                  eval_classification_metrics.csv
-               rwd_dp/
-               rwd_radfm/
-               rwd_radpy/
-               rwd_radfm_dp/
-               rwd_radpy_dp/
+               cb_dp/
+               cb_radfm/
+               cb_radpy/
+               cb_radfm_dp/
+               cb_radpy_dp/
 
     DLIF (when use_preds=True):
         dlif_pipeline/preds/
          os_months_24/ (or DCR/)
           classification/
            standard/ (or cross_validation/)
-            rwd/
+            cb/
              predictions.parquet
              predictions_train.parquet
              eval_auc_ci.csv
-            rwd_dp/
-            rwd_radfm/
-            rwd_radpy/
-            rwd_radfm_dp/
-            rwd_radpy_dp/
+            cb_dp/
+            cb_radfm/
+            cb_radpy/
+            cb_radfm_dp/
+            cb_radpy_dp/
     """
 
     # ------------------------- utilities -------------------------
@@ -295,9 +295,9 @@ def plot_auc_results(
     def _ordered_modalities(mods: List[str]) -> List[str]:
         filtered = [m for m in mods if m not in exclude_modalities]
         if modality_order:
-            # Build a lookup that maps both "CB…" and "RWD…" forms to the actual name in filtered
+            # Build a lookup that maps both "CB…" and "CB…" forms to the actual name in filtered
             def _normalise(name: str) -> str:
-                return name.upper().replace("CB", "RWD")
+                return name.upper().replace("CB", "CB")
             norm_to_actual = {_normalise(m): m for m in filtered}
             in_order = []
             for req in modality_order:
@@ -310,12 +310,12 @@ def plot_auc_results(
 
     def _collect_modalities(analysis_dir: Path) -> List[str]:
         return _ordered_modalities([p.name for p in analysis_dir.iterdir()
-                                    if p.is_dir() and p.name.upper().startswith("RWD")])
+                                    if p.is_dir() and p.name.upper().startswith("CB")])
 
     def _pair_paths(analysis_dir: Path, modality: str):
         """
         Robust path resolver for MLEF:
-        - accepts RWD_ONLY or rwd-only (any case)
+        - accepts CB_ONLY or cb-only (any case)
         - accepts files named like results(.xlsx/.xls/.csv), prediction(_CV)(.xlsx/.csv), train_set(.xlsx/.csv), etc.
         - accepts files with different case
         """
@@ -362,16 +362,16 @@ def plot_auc_results(
                 "model":   find_first(mod_dir, ["model_", "model"]),   # picks model_LR / model_RF
                 "train":   find_first(mod_dir, ["train_set", "Train_set", "train"]),
             },
-            "rwd_only": None
+            "cb_only": None
         }
 
         if arch_name == "MLEF":
             ro_dir = find_subdir_any(
                 mod_dir,
-                ["RWD_ONLY", "rwd-only", "Rwd_only", "RWD-ONLY"]
+                ["CB_ONLY", "cb-only", "rwd_only", "RWD-ONLY"]
             )
             if ro_dir:
-                paths["rwd_only"] = {
+                paths["cb_only"] = {
                     "results": find_first(ro_dir, ["results", "Results"]),
                     "pred":    find_first(ro_dir, ["prediction_CV", "prediction", "Prediction"]),
                     "model":   find_first(ro_dir, ["model_", "model"]),
@@ -400,7 +400,7 @@ def plot_auc_results(
             else:
                 dm = pd.read_csv(pred_mod_path)
 
-            # Read RWD-only predictions
+            # Read CB-only predictions
             if pred_ro_path.suffix.lower() == '.parquet':
                 dr = pd.read_parquet(pred_ro_path)
             elif pred_ro_path.suffix.lower() in ['.xlsx', '.xls']:
@@ -503,7 +503,7 @@ def plot_auc_results(
             xticks = []
             for m, n in zip(modalities, n_train_mod):
                 parts = m.split('_')
-                parts = ['CB' if p == 'rwd' else p for p in parts]
+                parts = ['CB' if p == 'cb' else p for p in parts]
                 # Join with newlines
                 formatted_name = '\n'.join(parts)
                 xticks.append(f"{formatted_name}")
@@ -511,7 +511,7 @@ def plot_auc_results(
         else:
             xticks = []
             for m, n in zip(modalities, n_train_mod):
-                parts = m.replace('RWD', 'CB').split('_')
+                parts = m.replace('CB', 'CB').split('_')
                 label_text = '\n'.join(parts)
                 if np.isfinite(n):
                     label_text += f"\n(n={int(n)})"
@@ -616,7 +616,7 @@ def plot_auc_results(
             if not analysis_dir.exists():
                 continue
             dlif_modalities = [p.name for p in analysis_dir.iterdir()
-                             if p.is_dir() and p.name.lower().startswith("rwd")]
+                             if p.is_dir() and p.name.lower().startswith("cb")]
             modalities = [map_dlif_to_mlef_modality(m) for m in dlif_modalities]
             modalities = _ordered_modalities(modalities)
         else:
@@ -649,10 +649,10 @@ def plot_auc_results(
                 "model_mod": model_m,
             }
 
-            # paired RWD_ONLY (MLEF only) with RWD red==blue behavior
+            # paired CB_ONLY (MLEF only) with CB red==blue behavior
             if arch_name == "MLEF":
-                if mod == "RWD":
-                    # enforce coincidence for RWD: red == blue; no p-value
+                if mod == "CB":
+                    # enforce coincidence for CB: red == blue; no p-value
                     row.update({
                         "auc_ro_mean": row["auc_mod_mean"],
                         "auc_ro_std":  row["auc_mod_std"],
@@ -662,7 +662,7 @@ def plot_auc_results(
                         "stars":       ""
                     })
                 else:
-                    ro = paths["rwd_only"]
+                    ro = paths["cb_only"]
                     if ro is not None:
                         auc_r, std_r = _read_auc_cv(ro["results"])
                         pval = _compute_pvalue(paths["mod"]["pred"], ro["pred"])
@@ -988,7 +988,7 @@ def generate_dlif_metric_files(
         preds_base_path: Path to the preds directory containing prediction parquet files
         outcomes: List of outcomes to process (e.g., ['DCR', 'os_months_24']).
                  If None, processes all outcomes found.
-        modalities: List of modalities to process (e.g., ['rwd', 'rwd_dp']).
+        modalities: List of modalities to process (e.g., ['cb', 'cb_dp']).
                    If None, processes all modalities found.
         task: Task type ('classification' or 'survival').
         training_type: Training type ('standard', 'cross_validation', or 'evaluation')
@@ -1058,7 +1058,7 @@ def generate_dlif_metric_files(
 
         # Find all modality directories
         if modalities is None:
-            modality_dirs = [d for d in task_dir.iterdir() if d.is_dir() and d.name.startswith('rwd')]
+            modality_dirs = [d for d in task_dir.iterdir() if d.is_dir() and d.name.startswith('cb')]
         else:
             modality_dirs = [task_dir / mod for mod in modalities]
 
@@ -1166,7 +1166,7 @@ def _read_dlif_predictions(parquet_path):
     df['y_proba'] = y_proba
     df['y_pred'] = (y_proba >= 0.5).astype(int)
 
-    # Rename slide -> Subject and convert to int to match RWD format
+    # Rename slide -> Subject and convert to int to match CB format
     df = df.rename(columns={'slide': 'Subject'})
     df['Subject'] = df['Subject'].astype(int)
 
@@ -1178,7 +1178,7 @@ def load_predictions_and_data(outcome, base_path='mlef_pipeline/results',
                               dlif_base_path=None,
                               dlif_feature_type='hypothesis_driven',
                               dlif_extraction='pyrad-noimp',
-                              dlif_modality='rwd',
+                              dlif_modality='cb',
                               dlif_seed=0,
                               analysis='C23'):
     """
@@ -1199,7 +1199,7 @@ def load_predictions_and_data(outcome, base_path='mlef_pipeline/results',
     dlif_extraction : str
         DLIF extraction method (default: 'pyrad-noimp')
     dlif_modality : str
-        DLIF modality (default: 'rwd')
+        DLIF modality (default: 'cb')
     dlif_seed : int
         DLIF seed number (default: 0)
     analysis : str
@@ -1226,15 +1226,15 @@ def load_predictions_and_data(outcome, base_path='mlef_pipeline/results',
         predictions_df = _read_dlif_predictions(pred_path)
     else:
         # MLEF path
-        pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_TEST.csv')
+        pred_path = os.path.join(base_path, outcome, 'C23', 'CB', 'prediction_TEST.csv')
         predictions_df = pd.read_csv(pred_path)
 
-    # Load RWD data and join for CENTER/SEX
-    rwd_path = 'data/rwd.csv'
-    rwd_df = pd.read_csv(rwd_path)
+    # Load CB data and join for CENTER/SEX
+    cb_path = 'data/cb.csv'
+    cb_df = pd.read_csv(cb_path)
 
     test_df = predictions_df[['Subject']].merge(
-        rwd_df[['Subject', 'CENTER', 'SEX']],
+        cb_df[['Subject', 'CENTER', 'SEX']],
         on='Subject',
         how='left'
     )
@@ -1252,7 +1252,7 @@ def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results',
                                     dlif_base_path=None,
                                     dlif_feature_type='hypothesis_driven',
                                     dlif_extraction='pyrad-noimp',
-                                    dlif_modality='rwd',
+                                    dlif_modality='cb',
                                     dlif_seed=0,
                                     analysis='C23'):
     """
@@ -1273,7 +1273,7 @@ def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results',
     dlif_extraction : str
         DLIF extraction method (default: 'pyrad-noimp')
     dlif_modality : str
-        DLIF modality (default: 'rwd')
+        DLIF modality (default: 'cb')
     dlif_seed : int
         DLIF seed number (default: 0)
     analysis : str
@@ -1299,15 +1299,15 @@ def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results',
             pred_path = pred_dir / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet'
         predictions_df = _read_dlif_predictions(pred_path)
     else:
-        pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_EXVAL.csv')
+        pred_path = os.path.join(base_path, outcome, 'C23', 'CB', 'prediction_EXVAL.csv')
         predictions_df = pd.read_csv(pred_path)
 
-    # Load RWD data and join for SEX/RACE
-    rwd_path = 'data/rwd.csv'
-    rwd_df = pd.read_csv(rwd_path)
+    # Load CB data and join for SEX/RACE
+    cb_path = 'data/cb.csv'
+    cb_df = pd.read_csv(cb_path)
 
     exval_df = predictions_df[['Subject']].merge(
-        rwd_df[['Subject', 'SEX', 'RACE']],
+        cb_df[['Subject', 'SEX', 'RACE']],
         on='Subject',
         how='left'
     )
@@ -2160,7 +2160,7 @@ def analyze_outcome_fairness(
     dlif_base_path=None,
     dlif_feature_type='hypothesis_driven',
     dlif_extraction='pyrad-noimp',
-    dlif_modality='rwd',
+    dlif_modality='cb',
     dlif_seed=0,
     analysis='C23'
 ):
@@ -2188,7 +2188,7 @@ def analyze_outcome_fairness(
     dlif_extraction : str
         DLIF extraction method (default: 'pyrad-noimp')
     dlif_modality : str
-        DLIF modality (default: 'rwd')
+        DLIF modality (default: 'cb')
     dlif_seed : int
         DLIF seed number (default: 0)
     analysis : str
@@ -2551,7 +2551,7 @@ def analyze_exval_outcome_fairness_by_race(
     dlif_base_path=None,
     dlif_feature_type='hypothesis_driven',
     dlif_extraction='pyrad-noimp',
-    dlif_modality='rwd',
+    dlif_modality='cb',
     dlif_seed=0,
     analysis='C23'
 ):

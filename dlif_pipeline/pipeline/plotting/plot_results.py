@@ -60,7 +60,7 @@ def plot_results_from_config(config_arg, base_dir=None, use_preds=True, show=Fal
         config = config_arg
 
     # Parse path info using a sample modality string (just to get base path structure)
-    path_info = build_path_from_config(config, "rwd", base_dir)
+    path_info = build_path_from_config(config, "cb", base_dir)
     task = path_info['task']
     training_type = path_info['training_type']
     outcomes = path_info['outcomes']

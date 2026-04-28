@@ -18,53 +18,53 @@ train_df: [ "../data/features_dataset_radpy_fixed.parquet", "../data/features_da
 annotation_file: ../data/annotations.csv
 
 mods:
-    # RWD
-  - rwd: true
+    # CB
+  - cb: true
     radpy: false
     dp: false
     genomics: false
-    # RWD_DP
-  - rwd: true
+    # CB_DP
+  - cb: true
     radpy: false
     dp: true
     genomics: false
-    # RWD_FMRAD
-  - rwd: true
+    # CB_FMRAD
+  - cb: true
     radfm: true
     dp: false
     genomics: false
-    # RWD_PYRAD
-  - rwd: true
+    # CB_PYRAD
+  - cb: true
     radpy: true
     dp: false
     genomics: false
-    # RWD_DP_FMRAD
-  - rwd: true
+    # CB_DP_FMRAD
+  - cb: true
     radfm: true
     dp: true
     genomics: false
-    # RWD_DP_PYRAD
-  - rwd: true
+    # CB_DP_PYRAD
+  - cb: true
     radpy: true
     dp: true
     genomics: false
-    # RWD_RADFM_DP_GENOMICS
-  - rwd: true
+    # CB_RADFM_DP_GENOMICS
+  - cb: true
     radfm: true
     dp: true
     genomics: true
-    # RWD_RADPY_DP_GENOMICS
-  - rwd: true
+    # CB_RADPY_DP_GENOMICS
+  - cb: true
     radpy: true
     dp: true
     genomics: true
-    # RWD_RADFM_DP_GENOMICS
-  - rwd: true
+    # CB_RADFM_DP_GENOMICS
+  - cb: true
     radfm: true
     dp: true
     genomics: true
-    # RWD_RADPY_DP_GENOMICS
-  - rwd: true
+    # CB_RADPY_DP_GENOMICS
+  - cb: true
     radpy: true
     dp: true
     genomics: true

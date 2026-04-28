@@ -3,14 +3,14 @@
 Generate Kaplan-Meier plots from config file.
 
 Usage:
-    python plot_km.py --config path/to/config.yaml [--annotations_data path/to/annotations.csv] [--rwd_data path/to/rwd.csv]
+    python plot_km.py --config path/to/config.yaml [--annotations_data path/to/annotations.csv] [--cb_data path/to/cb.csv]
 
 This script:
 - Parses the config to determine outcomes and paths
 - Generates KM curves stratified by model predictions (tertiles)
 - Optionally generates KM curves stratified by LIPI scores for comparison
 - Saves plots and statistical comparison tables
-- Defaults to using data/annotations.csv for survival data and data/rwd.csv for LIPI scores
+- Defaults to using data/annotations.csv for survival data and data/cb.csv for LIPI scores
 """
 
 import os
@@ -103,7 +103,7 @@ def create_lipi_groups(merged_df):
     return datasets
 
 
-def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
+def plot_km_from_predictions(parquet_path, annotations_data, cb_data=None,
                              time_col='OS_MONTHS', event_col='DEATH_EVENT_OC',
                              output_dir=None, modality_name='model',
                              training_type='standard', plot_lipi=True,
@@ -114,14 +114,14 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
     Args:
         parquet_path: Path to predictions parquet file
         annotations_data: Path to CSV/Excel file with survival outcomes (uses 'slide' as ID column)
-        rwd_data: Path to CSV/Excel file with RWD data including LIPI scores (uses 'Subject' as ID, optional)
+        cb_data: Path to CSV/Excel file with CB data including LIPI scores (uses 'Subject' as ID, optional)
         time_col: Column name for survival time
         event_col: Column name for event indicator
         output_dir: Directory to save plots
         modality_name: Name of modality for plot titles
         training_type: Type of training (standard, cross_validation, etc.)
         plot_lipi: Whether to also generate LIPI comparison plot
-        save_prefix: Custom filename prefix (e.g. "km_plot-C23-standard-OS_MONTHS-rwd").
+        save_prefix: Custom filename prefix (e.g. "km_plot-C23-standard-OS_MONTHS-cb").
                      If None, uses default naming.
 
     Returns:
@@ -149,18 +149,18 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
         how='inner'
     )
 
-    # If RWD data is provided, merge LIPI scores
-    if rwd_data and os.path.exists(rwd_data):
-        if rwd_data.endswith('.csv'):
-            rwd_df = pd.read_csv(rwd_data)
+    # If CB data is provided, merge LIPI scores
+    if cb_data and os.path.exists(cb_data):
+        if cb_data.endswith('.csv'):
+            cb_df = pd.read_csv(cb_data)
         else:
-            rwd_df = pd.read_excel(rwd_data)
+            cb_df = pd.read_excel(cb_data)
         
-        rwd_df['Subject'] = rwd_df['Subject'].astype(str).str.strip()
-        # Match slide from merged to Subject in rwd_df
+        cb_df['Subject'] = cb_df['Subject'].astype(str).str.strip()
+        # Match slide from merged to Subject in cb_df
         merged['Subject'] = merged['slide']
         merged = merged.merge(
-            rwd_df[['Subject', 'LIPI']], 
+            cb_df[['Subject', 'LIPI']], 
             on='Subject', 
             how='left'
         )
@@ -253,7 +253,7 @@ def plot_km_from_predictions(parquet_path, annotations_data, rwd_data=None,
     return pw_df_pred, pw_df_pred_lipi_subset
 
 
-def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None, 
+def plot_km_from_config(config_arg, annotations_data=None, cb_data=None, 
                         base_dir=None, modalities=None, plot_lipi=True):
     """
     Generate KM plots for trained models based on config.
@@ -261,7 +261,7 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
     Args:
         config_arg: Either a path to a config YAML file (str) or a config dictionary (dict)
         annotations_data: Path to CSV/Excel file with survival outcomes (default: data/annotations.csv)
-        rwd_data: Path to CSV/Excel file with RWD data including LIPI (default: data/rwd.csv)
+        cb_data: Path to CSV/Excel file with CB data including LIPI (default: data/cb.csv)
         base_dir: Base results directory (optional)
         modalities: List of modality strings to plot (None = all available)
         plot_lipi: Whether to generate LIPI comparison plots
@@ -269,18 +269,18 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
     # Default data paths
     if annotations_data is None:
         annotations_data = 'data/annotations.csv'
-    if rwd_data is None:
-        rwd_data = 'data/rwd.csv'
+    if cb_data is None:
+        cb_data = 'data/cb.csv'
     
     # Verify annotations data file exists
     if not os.path.exists(annotations_data):
         print(f"❌ Error: Annotations data file not found: {annotations_data}")
         return
     
-    # Check if RWD data exists (optional for LIPI comparison)
-    rwd_available = os.path.exists(rwd_data)
-    if plot_lipi and not rwd_available:
-        print(f"⚠️  Warning: RWD data file not found: {rwd_data}")
+    # Check if CB data exists (optional for LIPI comparison)
+    cb_available = os.path.exists(cb_data)
+    if plot_lipi and not cb_available:
+        print(f"⚠️  Warning: CB data file not found: {cb_data}")
         print("   LIPI comparison plots will be skipped")
         plot_lipi = False
     
@@ -293,9 +293,9 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
     
     # Define available modalities
     all_modalities = [
-        "dp", "rwd", "radfm", "radpy", "radfm_dp", "radpy_dp",
-        "rwd_dp", "rwd_radfm", "rwd_radpy", "rwd_radfm_dp", "rwd_radpy_dp",
-        "rwd_radfm_dp_genomics", "rwd_radpy_dp_genomics"
+        "dp", "cb", "radfm", "radpy", "radfm_dp", "radpy_dp",
+        "cb_dp", "cb_radfm", "cb_radpy", "cb_radfm_dp", "cb_radpy_dp",
+        "cb_radfm_dp_genomics", "cb_radpy_dp_genomics"
     ]
     
     # Use specified modalities or all available
@@ -319,7 +319,7 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
     print(f"   Training type: {training_type}")
     print(f"   Outcomes: {', '.join(outcomes)}")
     print(f"   Annotations data: {annotations_data}")
-    print(f"   RWD data: {rwd_data if rwd_available else 'Not available'}")
+    print(f"   CB data: {cb_data if cb_available else 'Not available'}")
     print(f"   Modalities: {', '.join(modalities_to_plot)}")
 
     # Determine survival columns from outcome
@@ -382,7 +382,7 @@ def plot_km_from_config(config_arg, annotations_data=None, rwd_data=None,
                 pw_df_pred, pw_df_pred_lipi_subset = plot_km_from_predictions(
                     parquet_path=parquet_path,
                     annotations_data=annotations_data,
-                    rwd_data=rwd_data if rwd_available else None,
+                    cb_data=cb_data if cb_available else None,
                     time_col=time_col,
                     event_col=event_col,
                     output_dir=output_dir,
@@ -418,8 +418,8 @@ def main():
                        help="Path to config YAML file")
     parser.add_argument("--annotations_data", default=None,
                        help="Path to CSV/Excel file with survival outcomes (default: data/annotations.csv)")
-    parser.add_argument("--rwd_data", default=None,
-                       help="Path to CSV/Excel file with RWD data including LIPI (default: data/rwd.csv)")
+    parser.add_argument("--cb_data", default=None,
+                       help="Path to CSV/Excel file with CB data including LIPI (default: data/cb.csv)")
     parser.add_argument("--base_dir", default=None, 
                        help="Base results directory (optional)")
     parser.add_argument("--modalities", nargs='+', default=None,
@@ -432,7 +432,7 @@ def main():
     plot_km_from_config(
         config_arg=args.config,
         annotations_data=args.annotations_data,
-        rwd_data=args.rwd_data,
+        cb_data=args.cb_data,
         base_dir=args.base_dir,
         modalities=args.modalities,
         plot_lipi=not args.no_lipi

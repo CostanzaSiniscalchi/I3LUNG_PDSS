@@ -1,12 +1,12 @@
 """
-Dumbbell plot: RWD-only model performance on patient subsets
+Dumbbell plot: CB-only model performance on patient subsets
 defined by data modality availability (DP, Radiomics, Genomics).
 
 5 panels side-by-side (one per outcome), each with 3 rows
 (one per modality split). Blue = has modality, Red = missing modality.
 
 Usage:
-    python dlif_pipeline/scripts/plot_rwd_subsets.py
+    python dlif_pipeline/scripts/plot_cb_subsets.py
 """
 
 import os
@@ -19,8 +19,8 @@ import numpy as np
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-RESULTS_DIR = "dlif_pipeline/results/rwd_subset_analysis"
-SAVE_DIR = "dlif_pipeline/results/rwd_subset_analysis/plots"
+RESULTS_DIR = "dlif_pipeline/results/cb_subset_analysis"
+SAVE_DIR = "dlif_pipeline/results/cb_subset_analysis/plots"
 
 COHORTS = ["C2", "C23"]
 OUTCOMES_RESPONSE = ["DCR", "ORR", "CBR"]
@@ -193,7 +193,7 @@ def plot_dumbbell(cohort: str, outcomes, suffix: str, save: bool = True, show: b
 
     if save:
         os.makedirs(SAVE_DIR, exist_ok=True)
-        out_path = os.path.join(SAVE_DIR, f"rwd_subset_dumbbell_{cohort}_{suffix}.png")
+        out_path = os.path.join(SAVE_DIR, f"cb_subset_dumbbell_{cohort}_{suffix}.png")
         fig.savefig(out_path, dpi=600, bbox_inches="tight")
         print(f"Saved: {out_path}")
 

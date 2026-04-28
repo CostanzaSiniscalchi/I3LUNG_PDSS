@@ -60,15 +60,15 @@ def plot_cindex_results(
         MLEF/ (or DLIF/)
          OS_24/ (or DCR/ OR OS_6/)
           C23/
-            RWD/
+            CB/
               model_XX.pkl
               train_set.xlsx
               test_set.xlsx
               prediction_CV.xlsx   (columns: Subject, y_pred, EVENT, TIME)
               results.xlsx      (metrics incl. C-INDEX CV)
-            RWD_DP/
-               RWD_ONLY/         (MLEF only)
-            RWD_PYRAD/
+            CB_DP/
+               CB_ONLY/         (MLEF only)
+            CB_PYRAD/
             ...
     """
 
@@ -137,30 +137,6 @@ def plot_cindex_results(
             pass
         return (np.nan, np.nan)
 
-    def _read_n_train_dlif(predictions_path) -> float:
-        """Read number of samples from DLIF prediction files.
-
-        Args:
-            predictions_path: Single Path (standard/evaluation) or list of Paths
-                (cross-validation folds). For CV, concatenates all fold predictions
-                to get total dataset size.
-        """
-        if predictions_path is None:
-            return np.nan
-        try:
-            if isinstance(predictions_path, list):
-                dfs = [pd.read_parquet(p) for p in predictions_path if p.exists()]
-                if not dfs:
-                    return np.nan
-                return int(len(pd.concat(dfs, ignore_index=True)))
-            else:
-                if not predictions_path.exists():
-                    return np.nan
-                df = pd.read_parquet(predictions_path)
-                return int(len(df))
-        except Exception:
-            return np.nan
-
     def _pair_paths_dlif(base_dir: Path, modality: str) -> dict:
         """Path resolver for DLIF architecture."""
         dlif_modality = map_mlef_to_dlif_modality(modality)
@@ -173,7 +149,7 @@ def plot_cindex_results(
         if not mod_dir.exists():
             return {
                 "mod": {"results": None, "pred": None, "model": None, "train": None},
-                "rwd_only": None
+                "cb_only": None
             }
 
         # Find eval predictions based on evaluation type
@@ -192,7 +168,7 @@ def plot_cindex_results(
                 "model": None,
                 "train": None,
             },
-            "rwd_only": None
+            "cb_only": None
         }
 
         return paths
@@ -216,7 +192,7 @@ def plot_cindex_results(
 
     def _collect_modalities(analysis_dir: Path) -> List[str]:
         return _ordered_modalities([p.name for p in analysis_dir.iterdir()
-                                    if p.is_dir() and p.name.upper().startswith("RWD")])
+                                    if p.is_dir() and p.name.upper().startswith("CB")])
 
     def _find_first(dir_: Path, stems: List[str]) -> Optional[Path]:
         if not dir_.exists():
@@ -253,12 +229,12 @@ def plot_cindex_results(
                 "model": _find_first(mod_dir, ["model_", "model"]),
                 "train": _find_first(mod_dir, ["train_set", "Train_set", "train"]),
             },
-            "rwd_only": None
+            "cb_only": None
         }
         
         if architecture == "MLEF":
-            if (ro_dir := _find_subdir(mod_dir, ["RWD_ONLY", "rwd-only", "Rwd_only", "RWD-ONLY"])):
-                paths["rwd_only"] = {
+            if (ro_dir := _find_subdir(mod_dir, ["CB_ONLY", "rwd-only", "RWD_only", "CB-ONLY"])):
+                paths["cb_only"] = {
                     "results": _find_first(ro_dir, ["results", "Results"]),
                     "pred": _find_first(ro_dir, ["prediction_CV", "prediction", "Prediction"]),
                     "model": _find_first(ro_dir, ["model_", "model"]),
@@ -336,12 +312,12 @@ def plot_cindex_results(
             xticks = []
             for m, n in zip(modalities, n_train_mod):
                 parts = m.split('_')
-                parts = ['CB' if p == 'rwd' else p for p in parts]
+                parts = ['CB' if p == 'cb' else p for p in parts]
                 formatted_name = '\n'.join(parts)
                 xticks.append(f"{formatted_name}\n(n. {int(n) if np.isfinite(n) else 'NA'})")
             plt.xticks(X, xticks, rotation=0, fontsize=12)
         else:
-            xticks = [f"{m.replace('RWD', 'CB')}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
+            xticks = [f"{m.replace('CB', 'CB')}\n(n. {int(n) if np.isfinite(n) else 'NA'})"
                     for m, n in zip(modalities, n_train_mod)]
             plt.xticks(X, xticks, rotation=0, fontsize=12)
 
@@ -413,7 +389,7 @@ def plot_cindex_results(
         # Collect modalities
         if architecture == "DLIF":
             dlif_modalities = [p.name for p in analysis_dir.iterdir()
-                             if p.is_dir() and p.name.lower().startswith("rwd")]
+                             if p.is_dir() and p.name.lower().startswith("cb")]
             modalities = [map_dlif_to_mlef_modality(m) for m in dlif_modalities]
             modalities = _ordered_modalities(modalities)
         else:
@@ -428,7 +404,7 @@ def plot_cindex_results(
                 paths = _pair_paths_dlif(analysis_dir, mod)
                 cindex_m, std_m = _read_cindex_dlif(paths["mod"]["results"])
                 model_m = "DLIF"
-                ntrain_m = _read_n_train_dlif(paths["mod"]["pred"])
+                ntrain_m = read_n_train_dlif(paths["mod"]["pred"])
             else:
                 paths = _pair_paths(analysis_dir, mod)
                 cindex_m, std_m = _read_cindex_cv(paths["mod"]["results"])
@@ -444,7 +420,7 @@ def plot_cindex_results(
             }
             
             if architecture == "MLEF":
-                if mod == "RWD":
+                if mod == "CB":
                     row.update({
                         "cindex_ro_mean": row["cindex_mod_mean"],
                         "cindex_ro_std": row["cindex_mod_std"],
@@ -454,7 +430,7 @@ def plot_cindex_results(
                         "stars": ""
                     })
                 else:
-                    if (ro := paths["rwd_only"]):
+                    if (ro := paths["cb_only"]):
                         cindex_r, std_r = _read_cindex_cv(ro["results"])
                         pval = _compute_pvalue(paths["mod"]["pred"], ro["pred"])
                         row.update({

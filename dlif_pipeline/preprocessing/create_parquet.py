@@ -11,32 +11,32 @@ def create_feature_dataset_from_processed(
 ) -> pd.DataFrame:
     
     # Load processed data
-    rwd = pd.read_csv(DATA_DIR / 'rwd_processed.csv', index_col='Subject')
+    cb = pd.read_csv(DATA_DIR / 'cb_processed.csv', index_col='Subject')
     rad = pd.read_csv(DATA_DIR / f'{rad_type}_processed.csv', index_col='Subject')
     dp = pd.read_csv(DATA_DIR / 'digital_pathology_processed.csv', index_col='Subject')
     genomics = pd.read_csv(DATA_DIR / 'genomics_processed.csv', index_col='Subject')
     
-    # Get RWD subjects (master list)
-    rwd_subjects = set(rwd.index)
+    # Get CB subjects (master list)
+    cb_subjects = set(cb.index)
     
-    # Filter other modalities to keep only RWD subjects
-    rad = rad[rad.index.isin(rwd_subjects)]
-    dp = dp[dp.index.isin(rwd_subjects)]
-    genomics = genomics[genomics.index.isin(rwd_subjects)]
+    # Filter other modalities to keep only CB subjects
+    rad = rad[rad.index.isin(cb_subjects)]
+    dp = dp[dp.index.isin(cb_subjects)]
+    genomics = genomics[genomics.index.isin(cb_subjects)]
     
     # Drop SET and CENTER from features
     cols_to_drop = ['SET', 'CENTER']
-    rwd_features = rwd.drop(columns=[c for c in cols_to_drop if c in rwd.columns])
+    cb_features = cb.drop(columns=[c for c in cols_to_drop if c in cb.columns])
     rad_features = rad.drop(columns=[c for c in cols_to_drop if c in rad.columns])
     dp_features = dp.drop(columns=[c for c in cols_to_drop if c in dp.columns])
     gen_features = genomics.drop(columns=[c for c in cols_to_drop if c in genomics.columns])
     
     # Create base dataframe
-    df = pd.DataFrame(index=rwd.index)
+    df = pd.DataFrame(index=cb.index)
     df['Subject'] = df.index
     
-    # Add mod1 (RWD - always present)
-    df['mod1'] = rwd_features.apply(lambda r: r.tolist(), axis=1)
+    # Add mod1 (CB - always present)
+    df['mod1'] = cb_features.apply(lambda r: r.tolist(), axis=1)
     
     # Add mod2 (radiomics) - None if subject not in rad
     df['mod2'] = df['Subject'].apply(

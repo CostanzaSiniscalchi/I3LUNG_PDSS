@@ -8,14 +8,14 @@ Outputs go into subdirectories inside the eval folder.
 
 Usage (config mode):
     python compute_subset_metrics.py \
-        --subset_config configs/subset_eval/rwd_subset_eval.yaml \
+        --subset_config configs/subset_eval/cb_subset_eval.yaml \
         --config configs/main/01-config-classification-standard.yaml \
         --base_dir results/results_new \
-        --mod_string rwd
+        --mod_string cb
 
 Usage (direct path mode):
     python compute_subset_metrics.py \
-        --path results/.../rwd/seed_0 \
+        --path results/.../cb/seed_0 \
         --annotations ../data/annotations.csv \
         --subsets has_radpy:HAS_RADPY has_dp:HAS_DP "has_all:HAS_RADPY,HAS_DP,HAS_GENOMICS" \
         --task classification
@@ -481,13 +481,13 @@ def main():
 Examples:
   Config mode:
     python compute_subset_metrics.py \\
-        --subset_config configs/subset_eval/rwd_subset_eval.yaml \\
+        --subset_config configs/subset_eval/cb_subset_eval.yaml \\
         --config configs/main/01-config-classification-standard.yaml \\
-        --base_dir results/results_new --mod_string rwd
+        --base_dir results/results_new --mod_string cb
 
   Direct path mode:
     python compute_subset_metrics.py \\
-        --path results/.../rwd/seed_0 \\
+        --path results/.../cb/seed_0 \\
         --annotations ../data/annotations.csv \\
         --has_radpy --has_dp \\
         """,
@@ -498,7 +498,7 @@ Examples:
     config_group.add_argument("--subset_config", help="Path to subset evaluation config YAML")
     config_group.add_argument("--config", help="Path to training config YAML (for path resolution)")
     config_group.add_argument("--base_dir", help="Base results directory")
-    config_group.add_argument("--mod_string", help="Modality string (e.g., rwd)")
+    config_group.add_argument("--mod_string", help="Modality string (e.g., cb)")
 
     # Direct path mode arguments
     direct_group = parser.add_argument_group("Direct path mode")
