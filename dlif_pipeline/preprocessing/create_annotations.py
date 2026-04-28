@@ -31,7 +31,7 @@ def create_annotations(
     if outcomes_path is None:
         outcomes_path = DATA_DIR / 'outcomes.csv'
     if cb_path is None:
-        cb_path = DATA_DIR / 'rwd.csv'
+        cb_path = DATA_DIR / 'cb.csv'
     if features_path is None:
         features_path = DATA_DIR / 'features_dataset_radpy_fixed.parquet'
     if output_path is None:

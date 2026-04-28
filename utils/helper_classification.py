@@ -130,7 +130,7 @@ def plot_auc_results(
         mlef_pipeline/results/
          OS_24/ (or DCR/ OR OS_6/)
           C23/
-            RWD/
+            CB/
               model_XX.pkl
               train_set.xlsx/.csv
               test_set.xlsx/.csv
@@ -139,12 +139,12 @@ def plot_auc_results(
               prediction_EXVAL.csv
               prediction_TEST.csv
               results.xlsx/.csv      (metrics incl. CV AUC)
-            RWD_DP/
-               RWD_ONLY/         (MLEF only)
-            RWD_PYRAD/
-            RWD_FMRAD/
-            RWD_DP_PYRAD/
-            RWD_DP_FMRAD/
+            CB_DP/
+               CB_ONLY/         (MLEF only)
+            CB_PYRAD/
+            CB_FMRAD/
+            CB_DP_PYRAD/
+            CB_DP_FMRAD/
 
     DLIF (when use_preds=False):
         dlif_pipeline/results/
@@ -295,9 +295,9 @@ def plot_auc_results(
     def _ordered_modalities(mods: List[str]) -> List[str]:
         filtered = [m for m in mods if m not in exclude_modalities]
         if modality_order:
-            # Build a lookup that maps both "CB…" and "RWD…" forms to the actual name in filtered
+            # Build a lookup that maps both "CB…" and "CB…" forms to the actual name in filtered
             def _normalise(name: str) -> str:
-                return name.upper().replace("RWD", "CB")
+                return name.upper().replace("CB", "CB")
             norm_to_actual = {_normalise(m): m for m in filtered}
             in_order = []
             for req in modality_order:
@@ -310,12 +310,12 @@ def plot_auc_results(
 
     def _collect_modalities(analysis_dir: Path) -> List[str]:
         return _ordered_modalities([p.name for p in analysis_dir.iterdir()
-                                    if p.is_dir() and p.name.upper().startswith("RWD")])
+                                    if p.is_dir() and p.name.upper().startswith("CB")])
 
     def _pair_paths(analysis_dir: Path, modality: str):
         """
         Robust path resolver for MLEF:
-        - accepts RWD_ONLY or rwd-only (any case)
+        - accepts CB_ONLY or cb-only (any case)
         - accepts files named like results(.xlsx/.xls/.csv), prediction(_CV)(.xlsx/.csv), train_set(.xlsx/.csv), etc.
         - accepts files with different case
         """
@@ -368,7 +368,7 @@ def plot_auc_results(
         if arch_name == "MLEF":
             ro_dir = find_subdir_any(
                 mod_dir,
-                ["RWD_ONLY", "rwd-only", "Rwd_only", "RWD-ONLY"]
+                ["CB_ONLY", "cb-only", "rwd_only", "RWD-ONLY"]
             )
             if ro_dir:
                 paths["cb_only"] = {
@@ -511,7 +511,7 @@ def plot_auc_results(
         else:
             xticks = []
             for m, n in zip(modalities, n_train_mod):
-                parts = m.replace('RWD', 'CB').split('_')
+                parts = m.replace('CB', 'CB').split('_')
                 label_text = '\n'.join(parts)
                 if np.isfinite(n):
                     label_text += f"\n(n={int(n)})"
@@ -651,7 +651,7 @@ def plot_auc_results(
 
             # paired CB_ONLY (MLEF only) with CB red==blue behavior
             if arch_name == "MLEF":
-                if mod == "RWD":
+                if mod == "CB":
                     # enforce coincidence for CB: red == blue; no p-value
                     row.update({
                         "auc_ro_mean": row["auc_mod_mean"],
@@ -1226,7 +1226,7 @@ def load_predictions_and_data(outcome, base_path='mlef_pipeline/results',
         predictions_df = _read_dlif_predictions(pred_path)
     else:
         # MLEF path
-        pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_TEST.csv')
+        pred_path = os.path.join(base_path, outcome, 'C23', 'CB', 'prediction_TEST.csv')
         predictions_df = pd.read_csv(pred_path)
 
     # Load CB data and join for CENTER/SEX
@@ -1299,7 +1299,7 @@ def load_predictions_and_data_exval(outcome, base_path='mlef_pipeline/results',
             pred_path = pred_dir / 'eval' / '00000-mb_attention_mil' / 'predictions.parquet'
         predictions_df = _read_dlif_predictions(pred_path)
     else:
-        pred_path = os.path.join(base_path, outcome, 'C23', 'RWD', 'prediction_EXVAL.csv')
+        pred_path = os.path.join(base_path, outcome, 'C23', 'CB', 'prediction_EXVAL.csv')
         predictions_df = pd.read_csv(pred_path)
 
     # Load CB data and join for SEX/RACE

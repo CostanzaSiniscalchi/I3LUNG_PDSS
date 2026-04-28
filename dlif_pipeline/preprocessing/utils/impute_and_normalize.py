@@ -85,8 +85,8 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
 
 # CB
 print("Processing CB...")
-cb = pd.read_csv(DATA_DIR / 'rwd.csv', index_col='Subject')
-cb_cols = ['SET', 'CENTER'] + [f for f in features_dict['RWD'] if f in cb.columns]
+cb = pd.read_csv(DATA_DIR / 'cb.csv', index_col='Subject')
+cb_cols = ['SET', 'CENTER'] + [f for f in features_dict['CB'] if f in cb.columns]
 cb = cb[cb_cols]
 
 train_mask = cb['SET'] == 'TRAIN'

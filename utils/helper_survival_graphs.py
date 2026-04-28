@@ -149,7 +149,7 @@ def plot_cindex_results(
         mlef_pipeline/results/
          OS_24/ (or DCR/ OR OS_6/ or OS/)
           C23/
-            RWD/
+            CB/
               model_XX.pkl
               train_set.csv
               test_set.csv
@@ -157,12 +157,12 @@ def plot_cindex_results(
               prediction_TEST.csv
               prediction_EXVAL.csv
               results.xlsx      (metrics incl. AUC, C-INDEX)
-            RWD_DP/
-               RWD_ONLY/         (MLEF only)
-            RWD_PYRAD/
-            RWD_FMRAD/
-            RWD_DP_PYRAD/
-            RWD_DP_FMRAD/
+            CB_DP/
+               CB_ONLY/         (MLEF only)
+            CB_PYRAD/
+            CB_FMRAD/
+            CB_DP_PYRAD/
+            CB_DP_FMRAD/
 
     DLIF:
         dlif_pipeline/results/
@@ -270,12 +270,12 @@ def plot_cindex_results(
 
     def _collect_modalities(analysis_dir: Path) -> List[str]:
         return _ordered_modalities([p.name for p in analysis_dir.iterdir()
-                                    if p.is_dir() and p.name.upper().startswith("RWD")])
+                                    if p.is_dir() and p.name.upper().startswith("CB")])
 
     def _pair_paths(analysis_dir: Path, modality: str):
         """
         Robust path resolver for MLEF:
-        - accepts RWD_ONLY or rwd-only (any case)
+        - accepts CB_ONLY or cb-only (any case)
         - accepts files named like results(.xlsx/.xls), prediction(_CV).xlsx, train_set(.xlsx), etc.
         - accepts files with different case
         """
@@ -328,7 +328,7 @@ def plot_cindex_results(
         if arch_name == "MLEF":
             ro_dir = find_subdir_any(
                 mod_dir,
-                ["RWD_ONLY", "rwd-only", "Rwd_only", "RWD-ONLY"]
+                ["CB_ONLY", "cb-only", "rwd_only", "RWD-ONLY"]
             )
             if ro_dir:
                 paths["cb_only"] = {
@@ -452,7 +452,7 @@ def plot_cindex_results(
             ttl = title_prefix or f"CV {metric} - {arch_name}"
             xticks = []
             for m, n in zip(modalities, n_train_mod):
-                parts = m.replace('RWD', 'CB').split('_')
+                parts = m.replace('CB', 'CB').split('_')
                 label_text = '\n'.join(parts)
                 if np.isfinite(n):
                     label_text += f"\n(n={int(n)})"
@@ -581,7 +581,7 @@ def plot_cindex_results(
 
             # paired CB_ONLY (MLEF only) with CB red==blue behavior
             if arch_name == "MLEF":
-                if mod_key == "RWD":
+                if mod_key == "CB":
                     # enforce coincidence for CB: red == blue; no p-value
                     row.update({
                         f"{metric}_ro_mean": row[f"{metric}_mod_mean"],
