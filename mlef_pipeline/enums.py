@@ -1,7 +1,7 @@
 from enum import Enum
 
 class Mode(Enum):
-    RWD = 'RWD'
+    CB = 'CB'
     DP = 'DP'
     FMRAD = 'FMRAD'
     PYRAD = 'PYRAD'

@@ -348,7 +348,7 @@ def plot_cindex_results(
 
     def _compute_pvalue(pred_mod_path: Path, pred_ro_path: Path) -> Optional[float]:
         """
-        Compare two survival models using permutation test on C-index difference.
+        Compare two survival models using bootstrapping and two-tailed p-values test on C-index difference.
         """
         if not (pred_mod_path and pred_ro_path and pred_mod_path.exists() and pred_ro_path.exists()):
             return None

@@ -2,7 +2,7 @@
 
 This guide explains how to use the [`train_mlef.py`](#classification-analysis) and [`train_mlef_surv.py`](#survival-analysis) script to train MLEF (Machine Learning Early Fusion) classification and survival models.
 
-**Note:** `RWD` refers to *Clinical Blood Data*, as described in the manuscript.
+**Note:** `CB` refers to *Clinical Blood Data*, as described in the manuscript.
 
 ## Overview
 
@@ -36,41 +36,41 @@ For both analysis (classification and survival) the training process is the foll
 ### Step 1: Configure Models (Optional)
 
 By default, the script uses a configuration file (`modality_models_config.json`) to specify which model to use for each modality combination. This allows:
-- Different models for different modalities (e.g., LR for RWD, RF for RWD_DP)
-- Different models for RWD-only matched analyses
+- Different models for different modalities (e.g., LR for CB, RF for CB_DP)
+- Different models for CB-only matched analyses
 
 Set your preferred model for each modality:
 - `"LR"` = Logistic Regression 
 - `"RF"` = Random Forest 
 
-#### RWD-Matched Models (RWD-Only Analysis)
+#### CB-Matched Models (CB-Only Analysis)
 
-For each multimodal combination (e.g., RWD_DP), the script also trains an **RWD-matched model** saved in the `rwd-only/` subfolder. This baseline model:
-- Uses only RWD features
+For each multimodal combination (e.g., CB_DP), the script also trains an **CB-matched model** saved in the `cb-only/` subfolder. This baseline model:
+- Uses only CB features
 - Trains on the **same subjects** that have all modalities available
-- Enables fair comparison between multimodal and RWD-only performance on the same dataset
+- Enables fair comparison between multimodal and CB-only performance on the same dataset
 
-The RWD modality itself doesn't have a `rwd-only/` subfolder (it would be redundant).
+The CB modality itself doesn't have a `cb-only/` subfolder (it would be redundant).
 
-#### Configuring RWD-Only Models
+#### Configuring CB-Only Models
 
 
-#### Different Models for Main vs RWD-Only
+#### Different Models for Main vs CB-Only
 If you want different models:
 ```json
 {
-    "models": {"RWD_DP": "RF"},
-    "rwd_only_models": {"RWD_DP": "LR"}
+    "models": {"CB_DP": "RF"},
+    "cb_only_models": {"CB_DP": "LR"}
 }
 ```
 
 If you want the same model for both, just specify in `models`:
 ```json
 {
-    "models": {"RWD_DP": "RF"}
+    "models": {"CB_DP": "RF"}
 }
 ```
-The RWD-only will automatically use RF.
+The CB-only will automatically use RF.
 
 ### Step 2: Run Training
 
@@ -88,7 +88,7 @@ The script will automatically use the models specified in your configuration fil
 |----------|------|---------|-------------|
 | `--outcome` | str | `OS_6` | Target outcome: `OS_6` or `OS_24` or `DCR` |
 | `--subanalysis` | str | `C23` | Subgroup: `C23`, `C2`, `IO_ONLY`, `IO_CHT`, `LOW_PDL1`, `HIGH_PDL1`, `SQUAMOUS`, `ADENOCARCINOMA` |
-| `--modalities` | list | all | Modalities to train: `RWD`, `RWD_DP`, `RWD_FMRAD`, `RWD_PYRAD`, `RWD_DP_FMRAD`, `RWD_DP_PYRAD` |
+| `--modalities` | list | all | Modalities to train: `CB`, `CB_DP`, `CB_FMRAD`, `CB_PYRAD`, `CB_DP_FMRAD`, `CB_DP_PYRAD` |
 | `--model` | str | `LR` | Default model type (used if not specified in config): `LR` (Logistic Regression), `RF` (Random Forest) |
 | `--no-feature-selection` | flag | False | Disable automatic feature selection |
 | `--output-dir` | str | `.` | Base output directory |
@@ -99,12 +99,12 @@ The script will automatically use the models specified in your configuration fil
 
 When no `--modalities` argument is provided, the script trains these combinations in order:
 
-1. **RWD** - Real-world data only (clinical features)
-2. **RWD_DP** - RWD + Digital Pathology
-3. **RWD_FMRAD** - RWD + Foundation Model radiomic features
-4. **RWD_PYRAD** - RWD + PyRadiomics features
-5. **RWD_DP_FMRAD** - RWD + DP + Foundation Model radiomic features
-6. **RWD_DP_PYRAD** - RWD + DP + PyRadiomics features
+1. **CB** - Real-world data only (clinical features)
+2. **CB_DP** - CB + Digital Pathology
+3. **CB_FMRAD** - CB + Foundation Model radiomic features
+4. **CB_PYRAD** - CB + PyRadiomics features
+5. **CB_DP_FMRAD** - CB + DP + Foundation Model radiomic features
+6. **CB_DP_PYRAD** - CB + DP + PyRadiomics features
 
 ### Common Examples
 
@@ -121,8 +121,8 @@ python mlef_pipeline/train_mlef.py --outcome OS_24 --subanalysis C23
 
 3. **Train specific modalities only:**
 ```bash
-# Only trains RWD, RWD_DP, and RWD_PYRAD
-python mlef_pipeline/train_mlef.py --outcome OS_6 --subanalysis C23 --modalities RWD RWD_DP RWD_PYRAD
+# Only trains CB, CB_DP, and CB_PYRAD
+python mlef_pipeline/train_mlef.py --outcome OS_6 --subanalysis C23 --modalities CB CB_DP CB_PYRAD
 ```
 
 4. **Override default model (for unconfigured modalities):**
@@ -154,7 +154,7 @@ mlef_pipeline/
   results/
     OS_6/                       # Outcome (e.g., OS_6, OS_24, etc.)
       C23/                      # Subanalysis name
-        RWD/
+        CB/
           model_LR.pkl          # Trained model
           train_set.xlsx        # Training data (with FOLD column)
           test_set.xlsx         # Test data
@@ -162,14 +162,14 @@ mlef_pipeline/
           prediction_CV.xlsx    # CV predictions (Subject, y_pred, y_true)
           results.xlsx          # Performance metrics (CV, TEST, EXVAL AUCs)
         
-        RWD_DP/
+        CB_DP/
           model_LR.pkl
           train_set.xlsx
           test_set.xlsx
           exval_set.xlsx
           prediction_CV.xlsx
           results.xlsx
-          rwd-only/             # RWD-matched baseline model
+          cb-only/             # CB-matched baseline model
             model_LR.pkl
             train_set.xlsx
             test_set.xlsx
@@ -177,17 +177,17 @@ mlef_pipeline/
             prediction_CV.xlsx
             results.xlsx
         
-        RWD_FMRAD/
-          ... (same structure as RWD_DP)
+        CB_FMRAD/
+          ... (same structure as CB_DP)
         
-        RWD_PYRAD/
-          ... (same structure as RWD_DP)
+        CB_PYRAD/
+          ... (same structure as CB_DP)
         
-        RWD_DP_FMRAD/
-          ... (same structure as RWD_DP)
+        CB_DP_FMRAD/
+          ... (same structure as CB_DP)
         
-        RWD_DP_PYRAD/
-          ... (same structure as RWD_DP)
+        CB_DP_PYRAD/
+          ... (same structure as CB_DP)
         
         training_summary.xlsx   # Summary of all training runs
 ```
@@ -226,15 +226,15 @@ Feature selection: LASSO
 Output directory: /home/user/I3LUNG_PDSS/mlef_pipeline
 
 Modalities to train (6):
-  - RWD (Model: LR)
-  - RWD_DP (Model: RF, RWD-only: LR)
-  - RWD_FMRAD (Model: LR, RWD-only: LR)
-  - RWD_PYRAD (Model: LR, RWD-only: LR)
-  - RWD_DP_FMRAD (Model: RF, RWD-only: LR)
-  - RWD_DP_PYRAD (Model: RF, RWD-only: LR)
+  - CB (Model: LR)
+  - CB_DP (Model: RF, CB-only: LR)
+  - CB_FMRAD (Model: LR, CB-only: LR)
+  - CB_PYRAD (Model: LR, CB-only: LR)
+  - CB_DP_FMRAD (Model: RF, CB-only: LR)
+  - CB_DP_PYRAD (Model: RF, CB-only: LR)
 ================================================================================
 
-[1/6] Processing RWD...
+[1/6] Processing CB...
 Using model: LR
 1. Loading data...
 2. Splitting data...
@@ -245,14 +245,14 @@ Using model: LR
   Test AUC: 0.698 ± 0.062
   External AUC: 0.712 ± 0.089
 
-[2/6] Processing RWD_DP...
+[2/6] Processing CB_DP...
 Using model: RF
 ...
-Training RWD-only with model: LR
+Training CB-only with model: LR
 ...
 ```
 
-This shows which model is being used for each modality and its RWD-only analysis.
+This shows which model is being used for each modality and its CB-only analysis.
 
 ## Cross-Validation Strategy
 
@@ -298,19 +298,19 @@ Edit `mlef_pipeline/modality_models_config.json` to specify which model to use f
 ```json
 {
     "models": {
-        "RWD": "LR",
-        "RWD_DP": "RF",
-        "RWD_FMRAD": "LR",
-        "RWD_PYRAD": "LR",
-        "RWD_DP_FMRAD": "RF",
-        "RWD_DP_PYRAD": "RF"
+        "CB": "LR",
+        "CB_DP": "RF",
+        "CB_FMRAD": "LR",
+        "CB_PYRAD": "LR",
+        "CB_DP_FMRAD": "RF",
+        "CB_DP_PYRAD": "RF"
     },
-    "rwd_only_models": {
-        "RWD_DP": "LR",
-        "RWD_FMRAD": "LR",
-        "RWD_PYRAD": "LR",
-        "RWD_DP_FMRAD": "LR",
-        "RWD_DP_PYRAD": "LR"
+    "cb_only_models": {
+        "CB_DP": "LR",
+        "CB_FMRAD": "LR",
+        "CB_PYRAD": "LR",
+        "CB_DP_FMRAD": "LR",
+        "CB_DP_PYRAD": "LR"
     }
 }
 ```
@@ -331,7 +331,7 @@ Data files needed in `mlef_pipeline/`:
 - `submodel_features.json` - Features to exclude
 
 Data files needed in `../data/` (relative to mlef_pipeline):
-- `rwd.csv` - Real-world data
+- `cb.csv` - Real-world data
 - `digital_pathology.csv` - Digital pathology features extracted ..
 - `fmrad.csv` - Foundation model radiomic features
 - `pyradiomics.csv` - PyRadiomics perturbation..features
@@ -372,11 +372,11 @@ To train custom combinations, modify the `DEFAULT_MODALITIES` list in `train_mle
 
 ```python
 DEFAULT_MODALITIES = [
-    [Mode.RWD],
-    [Mode.RWD, Mode.DP],
-    [Mode.RWD, Mode.FMRAD],
+    [Mode.CB],
+    [Mode.CB, Mode.DP],
+    [Mode.CB, Mode.FMRAD],
     # Add your custom combinations
-    [Mode.RWD, Mode.DP, Mode.FMRAD, Mode.PYRAD],  # All modalities
+    [Mode.CB, Mode.DP, Mode.FMRAD, Mode.PYRAD],  # All modalities
 ]
 ```
 ### Integration with Visualization
@@ -390,7 +390,7 @@ plot_auc_results(
     architecture="MLEF",
     outcome='OS_24',
     analyses=["C23"],
-    modality_order=["RWD", "RWD_DP", "RWD_FMRAD", "RWD_PYRAD", "RWD_DP_FMRAD", "RWD_DP_PYRAD"],
+    modality_order=["CB", "CB_DP", "CB_FMRAD", "CB_PYRAD", "CB_DP_FMRAD", "CB_DP_PYRAD"],
     show=True
 )
 ```
@@ -440,7 +440,7 @@ python mlef_pipeline/train_mlef_surv.py --subanalysis C23
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `--subanalysis` | str | `C23` | Subgroup: `C23`, `C2`, `IO_ONLY`, `IO_CHT`, `LOW_PDL1`, `HIGH_PDL1`, `SQUAMOUS`, `ADENOCARCINOMA` |
-| `--modalities` | list | all | Modalities to train: `RWD`, `RWD_DP`, `RWD_FMRAD`, `RWD_PYRAD`, `RWD_DP_FMRAD`, `RWD_DP_PYRAD` |
+| `--modalities` | list | all | Modalities to train: `CB`, `CB_DP`, `CB_FMRAD`, `CB_PYRAD`, `CB_DP_FMRAD`, `CB_DP_PYRAD` |
 | `--no-feature-selection` | flag | False | Disable automatic feature selection (CoxNet) |
 | `--output-dir` | str | `mlef_pipeline` | Base output directory |
 
@@ -452,7 +452,7 @@ Results are saved in `mlef_pipeline/results/OS/`:
 mlef_pipeline/results/
   OS/
     C23/
-      RWD/
+      CB/
         model_COX.pkl             # Trained CoxPH model
         prediction_CV.csv         # CV predictions (risk scores)
         results.xlsx              # C-Index metrics

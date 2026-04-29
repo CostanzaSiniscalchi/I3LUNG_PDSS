@@ -41,22 +41,22 @@ warnings.filterwarnings('ignore', category=FutureWarning, module='lifelines')
 
 # Default modality combinations to train (in order)
 DEFAULT_MODALITIES = [
-    [Mode.RWD],
-    [Mode.RWD, Mode.DP],
-    [Mode.RWD, Mode.FMRAD],
-    [Mode.RWD, Mode.PYRAD],
-    [Mode.RWD, Mode.DP, Mode.FMRAD],
-    [Mode.RWD, Mode.DP, Mode.PYRAD],
+    [Mode.CB],
+    [Mode.CB, Mode.DP],
+    [Mode.CB, Mode.FMRAD],
+    [Mode.CB, Mode.PYRAD],
+    [Mode.CB, Mode.DP, Mode.FMRAD],
+    [Mode.CB, Mode.DP, Mode.PYRAD],
 ]
 
 # Mapping from modality list to folder name
 MODALITY_TO_FOLDER = {
-    frozenset([Mode.RWD]): 'RWD',
-    frozenset([Mode.RWD, Mode.DP]): 'RWD_DP',
-    frozenset([Mode.RWD, Mode.FMRAD]): 'RWD_FMRAD',
-    frozenset([Mode.RWD, Mode.PYRAD]): 'RWD_PYRAD',
-    frozenset([Mode.RWD, Mode.DP, Mode.FMRAD]): 'RWD_DP_FMRAD',
-    frozenset([Mode.RWD, Mode.DP, Mode.PYRAD]): 'RWD_DP_PYRAD',
+    frozenset([Mode.CB]): 'CB',
+    frozenset([Mode.CB, Mode.DP]): 'CB_DP',
+    frozenset([Mode.CB, Mode.FMRAD]): 'CB_FMRAD',
+    frozenset([Mode.CB, Mode.PYRAD]): 'CB_PYRAD',
+    frozenset([Mode.CB, Mode.DP, Mode.FMRAD]): 'CB_DP_FMRAD',
+    frozenset([Mode.CB, Mode.DP, Mode.PYRAD]): 'CB_DP_PYRAD',
 }
 
 
@@ -75,10 +75,10 @@ def create_output_dirs(base_path: Path, subanalysis: str, modality_folder: str) 
     output_dir = base_path / 'results' / 'OS' / subanalysis / modality_folder
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Create RWD-matched subdirectory (for non-RWD modalities)
-    if modality_folder != 'RWD':
-        rwd_only_dir = output_dir / 'rwd-only'
-        rwd_only_dir.mkdir(parents=True, exist_ok=True)
+    # Create CB-matched subdirectory (for non-CB modalities)
+    if modality_folder != 'CB':
+        cb_only_dir = output_dir / 'cb-only'
+        cb_only_dir.mkdir(parents=True, exist_ok=True)
     
     return output_dir
 
@@ -251,17 +251,17 @@ def train_and_evaluate_modality(
     # 5. Imputation
     print("5. Imputing missing values...")
     with open('mlef_pipeline/features.json', 'r') as f:
-        rwd_features = json.load(f)['RWD']
+        cb_features = json.load(f)['CB']
     
-    rwd_cols = [col for col in rwd_features if col in X_train.columns]
-    other_cols = [c for c in X_train.columns if c not in rwd_cols]
+    cb_cols = [col for col in cb_features if col in X_train.columns]
+    other_cols = [c for c in X_train.columns if c not in cb_cols]
 
-    X_train_rwd_imputed, imputer = dl.impute_df(X_train[rwd_cols])
-    X_train_imputed = pd.concat([X_train_rwd_imputed, X_train[other_cols]], axis=1)
-    X_test_rwd_imputed, _ = dl.impute_df(X_test[rwd_cols], imputer=imputer)
-    X_test_imputed = pd.concat([X_test_rwd_imputed, X_test[other_cols]], axis=1)
-    X_ext_rwd_imputed, _ = dl.impute_df(X_ext[rwd_cols], imputer=imputer) if not X_ext.empty else (X_ext[rwd_cols], None)
-    X_ext_imputed = pd.concat([X_ext_rwd_imputed, X_ext[other_cols]], axis=1) if not X_ext.empty else X_ext
+    X_train_cb_imputed, imputer = dl.impute_df(X_train[cb_cols])
+    X_train_imputed = pd.concat([X_train_cb_imputed, X_train[other_cols]], axis=1)
+    X_test_cb_imputed, _ = dl.impute_df(X_test[cb_cols], imputer=imputer)
+    X_test_imputed = pd.concat([X_test_cb_imputed, X_test[other_cols]], axis=1)
+    X_ext_cb_imputed, _ = dl.impute_df(X_ext[cb_cols], imputer=imputer) if not X_ext.empty else (X_ext[cb_cols], None)
+    X_ext_imputed = pd.concat([X_ext_cb_imputed, X_ext[other_cols]], axis=1) if not X_ext.empty else X_ext
     
     # 6. Normalization
     print("6. Normalizing features...")
@@ -473,24 +473,24 @@ def train_and_evaluate_modality(
     }
 
 
-def train_rwd_matched_model(
+def train_cb_matched_model(
     modes: List[Mode],
     subanalysis: Subanalysis,
     base_path: Path = Path('.'),
     select_features: bool = True
 ):
     """
-    Train RWD-matched CoxPH model (using only subjects that have all modalities).
-    This is saved in the rwd-only subfolder for non-RWD modalities.
+    Train CB-matched CoxPH model (using only subjects that have all modalities).
+    This is saved in the cb-only subfolder for non-CB modalities.
     """
     modality_folder = get_modality_folder_name(modes)
     
-    # Skip if this is already RWD-only
-    if modality_folder == 'RWD':
+    # Skip if this is already CB-only
+    if modality_folder == 'CB':
         return None
     
     print(f"\n{'='*80}")
-    print(f"Training RWD-matched model for {modality_folder}")
+    print(f"Training CB-matched model for {modality_folder}")
     print(f"{'='*80}")
     
     # Get subjects that have all modalities (intersection)
@@ -508,23 +508,23 @@ def train_rwd_matched_model(
     # Get subjects from full modality (these have all data)
     matched_subjects = set(full_dataset['Subject'].values)
     
-    # Now create RWD-only dataset but filter to matched subjects
-    rwd_dataset = dl.create_dataset(
-        modes=[Mode.RWD],
+    # Now create CB-only dataset but filter to matched subjects
+    cb_dataset = dl.create_dataset(
+        modes=[Mode.CB],
         outcome='OS MONTHS',
         subanalysis=subanalysis
     )
-    rwd_dataset = rwd_dataset[rwd_dataset['Subject'].isin(matched_subjects)]
+    cb_dataset = cb_dataset[cb_dataset['Subject'].isin(matched_subjects)]
     
     print(f"  Using {len(matched_subjects)} matched subjects")
     
     # Create output directory
-    output_dir = base_path / 'results' / 'OS' / subanalysis.value / modality_folder / 'rwd-only'
+    output_dir = base_path / 'results' / 'OS' / subanalysis.value / modality_folder / 'cb-only'
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    train_set = rwd_dataset[rwd_dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
-    test_set = rwd_dataset[rwd_dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
-    ext_set = rwd_dataset[rwd_dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+    train_set = cb_dataset[cb_dataset['SET'] == 'TRAIN'].set_index('Subject').drop(columns=['SET'])
+    test_set = cb_dataset[cb_dataset['SET'] == 'TEST'].set_index('Subject').drop(columns=['SET', 'CENTER'])
+    ext_set = cb_dataset[cb_dataset['SET'] == 'EXVAL'].set_index('Subject').drop(columns=['SET', 'CENTER'])
 
     if subanalysis != Subanalysis.INT:
         train_folds = train_set['CENTER']
@@ -708,14 +708,14 @@ def train_rwd_matched_model(
     })
     results.to_excel(output_dir / 'results.xlsx', index=False)
     
-    print(f"\n✓ RWD-matched model completed!")
+    print(f"\n✓ CB-matched model completed!")
     print(f"  CV C-Index: {cindex_cv['c_index']:.3f} ± {cv_auc_std:.3f}")
     print(f"  Test C-Index: {cindex_test['c_index']:.3f} ± {test_auc_std:.3f}")
     if not np.isnan(cindex_ext['c_index']):
         print(f"  External C-Index: {cindex_ext['c_index']:.3f} ± {ext_auc_std:.3f}")
     
     return {
-        'modality': f'{modality_folder}/rwd-only',
+        'modality': f'{modality_folder}/cb-only',
         'cv_cindex': cindex_cv['c_index'],
         'cv_cindex_std': cv_auc_std,
         'test_cindex': cindex_test['c_index'],
@@ -737,7 +737,7 @@ def main():
                         help='Subgroup analysis to perform (default: C23)')
     parser.add_argument('--modalities', type=str, nargs='+', default=None,
                         help='Modalities to train (default: all combinations). '
-                             'Options: RWD, RWD_DP, RWD_FMRAD, RWD_PYRAD, RWD_DP_FMRAD, RWD_DP_PYRAD')
+                             'Options: CB, CB_DP, CB_FMRAD, CB_PYRAD, CB_DP_FMRAD, CB_DP_PYRAD')
     parser.add_argument('--no-feature-selection', action='store_true',
                         help='Disable feature selection')
     parser.add_argument('--output-dir', type=str, default='mlef_pipeline',
@@ -757,8 +757,8 @@ def main():
         for mod_str in args.modalities:
             mode_list = []
             for m in mod_str.split('_'):
-                if m == 'RWD':
-                    mode_list.append(Mode.RWD)
+                if m == 'CB':
+                    mode_list.append(Mode.CB)
                 elif m == 'DP':
                     mode_list.append(Mode.DP)
                 elif m == 'FMRAD':
@@ -800,16 +800,16 @@ def main():
             )
             all_results.append(result)
             
-            # Train RWD-matched model if not RWD-only
-            if get_modality_folder_name(modes) != 'RWD':
-                rwd_result = train_rwd_matched_model(
+            # Train CB-matched model if not CB-only
+            if get_modality_folder_name(modes) != 'CB':
+                cb_result = train_cb_matched_model(
                     modes=modes,
                     subanalysis=subanalysis,
                     base_path=base_path,
                     select_features=select_features
                 )
-                if rwd_result:
-                    all_results.append(rwd_result)
+                if cb_result:
+                    all_results.append(cb_result)
             
         except Exception as e:
             print(f"\n❌ Error training {get_modality_folder_name(modes)}: {str(e)}")
