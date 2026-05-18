@@ -486,7 +486,7 @@ def plot_auc_results(
         sizes        = _scale_sizes(n_train_mod)
         model_names  = [r["model_mod"] for r in rows]
 
-        fig = plt.figure(figsize=(12, 6))
+        fig = plt.figure(figsize=(13, 6))
         # BLUE: modality
         if arch_name == "MLEF":
             label = "CV AUC"
@@ -536,28 +536,78 @@ def plot_auc_results(
                     label_text += f"\n(n={int(n)})"
                 xticks.append(label_text)
             plt.xticks(X, xticks, rotation=0, fontsize=12)
-        
+
+        # Add a bit more breathing room for multi-line x tick labels
+        plt.tick_params(axis='x', pad=10)
+        plt.gcf().subplots_adjust(bottom=0.20)
+
+        def _format_pvalue(p: Optional[float]) -> Optional[str]:
+            if p is None or (not np.isfinite(p)):
+                return None
+            # Report exact p-value only when significant
+            if p >= 0.05:
+                return None
+            if p < 0.001:
+                return "(p<0.001)"
+            # show exact value (trim trailing zeros) for p >= 0.001
+            p_str = f"{float(p):.3f}".rstrip('0').rstrip('.')
+            return f"(p={p_str})"
+
+        # vertical layout constants (data coordinates)
+        line_h = 0.04
+        gap_h = 0.008
 
         for i, (mval, mstd, mname) in enumerate(zip(auc_mod_mean, auc_mod_std, model_names)):
-            base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
-            if arch_name == "DLIF":
-                plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f}",
-                        fontsize=10, ha="center", color="#1a80bb")
+            # p-value (if present) must be shown BELOW the blue AUC text
+            p_txt = _format_pvalue(rows[i].get("pvalue"))
+            has_p = (p_txt is not None)
+
+            if arch_name == "MLEF":
+                blue_above_red = bool(multimodal_better is not None and multimodal_better[i])
+
+                if blue_above_red:
+                    y_red = 0.01
+                    y_blue_p = y_red + line_h + gap_h
+                else:
+                    y_blue_p = 0.01
+                    y_red = y_blue_p + (2 * line_h + gap_h if has_p else line_h + gap_h)
+
+                y_blue_auc = y_blue_p + (line_h if has_p else 0.0)
             else:
-                plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                        fontsize=10, ha="center", color="#1a80bb")
+                # DLIF (or any non-MLEF): keep a simple fixed position
+                y_blue_p = 0.01
+                y_blue_auc = 0.02
+                y_red = None
+
+            if arch_name == "DLIF":
+                plt.text(X[i], y_blue_auc, f"{mval:.2f} ± {mstd:.2f}",
+                        fontsize=12, ha="center", va="bottom", color="#1a80bb")
+            else:
+                plt.text(X[i], y_blue_auc, f"{mval:.2f} ± {mstd:.2f} ({mname})",
+                        fontsize=12, ha="center", va="bottom", color="#1a80bb")
+            if has_p:
+                plt.text(X[i], y_blue_p, p_txt,
+                        fontsize=12, ha="center", va="bottom", color="#1a80bb")
+
             star = rows[i].get("stars", "")
             if star:
-                plt.text(X[i] + 0.63, base_y + 0.006, star, fontsize=12, ha="left", va="center", color="black")
+                plt.text(X[i] + 0.64, y_blue_auc + 0.002, star, fontsize=12, ha="left", va="bottom", color="black")
 
         # --- RED annotations (keep values but REMOVE stars here) ---
         if arch_name == "MLEF":
             for i, rrow in enumerate(rows):
                 rv, rs, rname = rrow["auc_ro_mean"], rrow["auc_ro_std"], rrow["model_ro"]
-                base_y = 0.02 if multimodal_better[i] else 0.06
+                # must mirror the blue layout to avoid overlaps
+                p_txt = _format_pvalue(rrow.get("pvalue"))
+                has_p = (p_txt is not None)
+                blue_above_red = bool(multimodal_better is not None and multimodal_better[i])
+                if blue_above_red:
+                    base_y = 0.01
+                else:
+                    base_y = 0.01 + (2 * line_h + gap_h if has_p else line_h + gap_h)
                 if np.isfinite(rv) and np.isfinite(rs):
                     plt.text(X[i], base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=10, ha="center", color="#a00000")
+                            fontsize=12, ha="center", va="bottom", color="#a00000")
 
         if arch_name == "MLEF":
             _auc_prefix = "CV AUC"
@@ -600,7 +650,7 @@ def plot_auc_results(
         # Build the correct path based on architecture
         if architecture == "MLEF":
             # MLEF: mlef_pipeline/results/outcome/analysis/ 
-            base_path = Path("mlef_pipeline/results") / outcome / analysis
+            base_path = Path("mlef_pipeline/results") / outcome / analysis 
             # base_path = Path("new/results") / outcome / analysis
             analysis_dir = base_path
         else:  # DLIF
@@ -1485,7 +1535,7 @@ def permutation_test_two_groups(
         def _bootstrap_ci(g):
             gsub = sub[sub[group_col] == g]
             if gsub.empty or len(gsub) < 2:
-                return np.nan, np.nan
+                return np.nan, np.nan, np.array([])
             
             preds = gsub[pred_col].to_numpy()
             boot_rates = np.empty(n_boot)
@@ -1497,7 +1547,7 @@ def permutation_test_two_groups(
             alpha = 1 - ci_level
             lower = np.percentile(boot_rates, 100 * alpha / 2)
             upper = np.percentile(boot_rates, 100 * (1 - alpha / 2))
-            return lower, upper
+            return lower, upper, boot_rates
 
         rA, nA = _rate(a)
         rB, nB = _rate(b)
@@ -1505,8 +1555,8 @@ def permutation_test_two_groups(
             raise ValueError(f"One of the groups {groups} has no data under condition {cond_val}.")
         obs_diff = rA - rB
 
-        ci_A_lower, ci_A_upper = _bootstrap_ci(a)
-        ci_B_lower, ci_B_upper = _bootstrap_ci(b)
+        ci_A_lower, ci_A_upper, boot_A = _bootstrap_ci(a)
+        ci_B_lower, ci_B_upper, boot_B = _bootstrap_ci(b)
 
         # Permutation test
         diffs = np.empty(n_perms, dtype=float)
@@ -1526,8 +1576,10 @@ def permutation_test_two_groups(
         return {
             'rate_A': rA, 'n_A': nA,
             'ci_A': (ci_A_lower, ci_A_upper),
+            'boot_A': boot_A,
             'rate_B': rB, 'n_B': nB,
             'ci_B': (ci_B_lower, ci_B_upper),
+            'boot_B': boot_B,
             'obs_diff': obs_diff,
             'p_value': p_two_sided
         }
@@ -1600,7 +1652,7 @@ def omnibus_and_pairs(
         gsub = sub[sub[group_col] == group_name]
         
         if gsub.empty or len(gsub) < 2:
-            return np.nan, np.nan
+            return np.nan, np.nan, np.array([])
         
         preds = gsub[pred_col].to_numpy()
         boot_rates = np.empty(n_boot)
@@ -1612,17 +1664,20 @@ def omnibus_and_pairs(
         alpha = 1 - ci_level
         lower = np.percentile(boot_rates, 100 * alpha / 2)
         upper = np.percentile(boot_rates, 100 * (1 - alpha / 2))
-        return lower, upper
+        return lower, upper, boot_rates
 
     ci_lower = []
     ci_upper = []
+    boot_rates_by_group = []
     for g in obs_rates['group']:
-        lower, upper = _bootstrap_ci_group(g)
+        lower, upper, boot_rates = _bootstrap_ci_group(g)
         ci_lower.append(lower)
         ci_upper.append(upper)
+        boot_rates_by_group.append(boot_rates)
     
     obs_rates['ci_lower'] = ci_lower
     obs_rates['ci_upper'] = ci_upper
+    obs_rates['boot_rates'] = boot_rates_by_group
 
     groups = obs_rates['group'].tolist()
     pairs = list(combinations(groups, 2))
@@ -1791,7 +1846,13 @@ def plot_fairness_by_center(
     center_colors=None,
     patients_per_outcome=None,
     outcome_thresholds=None,
-    figsize=(14, 6)
+    figsize=(14, 6),
+    show_bootstrap_dots: bool = True,
+    dots_max_n: int = 150,
+    dots_jitter: float = 0.06,
+    dots_size: float = 16,
+    dots_alpha: float = 0.28,
+    dots_seed: int = 0
 ):
     """
     Plot TPR or FPR by center with statistical annotations.
@@ -1845,9 +1906,11 @@ def plot_fairness_by_center(
         for patch in ax.patches:
             patch.set_hatch('\\\\')
     
-    # Add error bars
+    # Add error bars (and optional bootstrap dots)
     outcomes = center_fairness['outcome'].unique()
     centers = center_order
+
+    rng = np.random.default_rng(dots_seed)
     
     x_positions = []
     y_values = []
@@ -1877,6 +1940,28 @@ def plot_fairness_by_center(
                 y_values.append(val)
                 yerr_lower.append(val - ci_low)
                 yerr_upper.append(ci_up - val)
+
+                # Bootstrap dot plot overlay
+                boot_col = f'{metric}_boot'
+                if show_bootstrap_dots and boot_col in sub.columns:
+                    boot = sub[boot_col].values[0]
+                    if isinstance(boot, (list, tuple, np.ndarray)):
+                        boot = np.asarray(boot, dtype=float)
+                        if boot.size > 0:
+                            if boot.size > dots_max_n:
+                                boot = rng.choice(boot, size=dots_max_n, replace=False)
+                            x_jit = x_pos + rng.uniform(-dots_jitter, dots_jitter, size=boot.size) 
+                            facecolor = np.array(patch.get_facecolor())
+                            darkened_color = facecolor * 0.6  # Darken by 40%
+                            ax.scatter(
+                                x_jit,
+                                boot,
+                                s=dots_size,
+                                alpha=dots_alpha,
+                                color=darkened_color,
+                                edgecolors='none',
+                                zorder=5
+                            )
     
     ax.errorbar(
         x_positions, y_values,
@@ -1972,7 +2057,13 @@ def plot_fairness_by_group(
     group_colors=None,
     patients_per_outcome=None,
     outcome_thresholds=None,
-    figsize=(6, 7)
+    figsize=(6, 7),
+    show_bootstrap_dots: bool = True,
+    dots_max_n: int = 150,
+    dots_jitter: float = 0.06,
+    dots_size: float = 18,
+    dots_alpha: float = 0.30,
+    dots_seed: int = 0
     
 ):
     """
@@ -2026,9 +2117,11 @@ def plot_fairness_by_group(
         for patch in ax.patches:
             patch.set_hatch('\\\\')
     
-    # Add error bars
+    # Add error bars (and optional bootstrap dots)
     outcomes = df_plot['outcome'].unique()
     groups = df_plot[group_col].unique()
+
+    rng = np.random.default_rng(dots_seed)
     
     x_positions = []
     y_values = []
@@ -2057,6 +2150,27 @@ def plot_fairness_by_group(
                 y_values.append(val)
                 yerr_lower.append(val - ci_low)
                 yerr_upper.append(ci_up - val)
+
+                if show_bootstrap_dots and 'Boot' in sub.columns:
+                    boot = sub['Boot'].values[0]
+                    if isinstance(boot, (list, tuple, np.ndarray)):
+                        boot = np.asarray(boot, dtype=float)
+                        if boot.size > 0:
+                            if boot.size > dots_max_n:
+                                boot = rng.choice(boot, size=dots_max_n, replace=False)
+                            x_jit = x_pos + rng.uniform(-dots_jitter, dots_jitter, size=boot.size)
+                            # Darken the color for bootstrap dots
+                            facecolor = np.array(patch.get_facecolor())
+                            darkened_color = facecolor * 0.6  # Darken by 40%
+                            ax.scatter(
+                                x_jit,
+                                boot,
+                                s=dots_size,
+                                alpha=dots_alpha,
+                                color=darkened_color,
+                                edgecolors='none',
+                                zorder=5
+                            )
     
     if x_positions:
         ax.errorbar(
@@ -2484,24 +2598,30 @@ def create_fairness_summary(results_dict):
     --------
     tuple : (sex_fairness_df, center_fairness_df, pairwise_tpr, pairwise_fpr)
     """
-    sex_fairness = pd.DataFrame(columns=['Metric', 'Sex', 'Value', 'CI', 'p-value', 'outcome'])
+    sex_fairness = pd.DataFrame(columns=['Metric', 'Sex', 'Value', 'CI', 'Boot', 'p-value', 'outcome'])
     center_fairness_list = []
     pairwise_tpr_list = []
     pairwise_fpr_list = []
     
     for outcome_name, results in results_dict.items():
         # Sex fairness
+        if results.get('sex_fairness') is None:
+            continue
         for metric, values in results['sex_fairness'].items():
             ciA = values.get('ci_A')
             ciB = values.get('ci_B')
             ciA_rounded = (round(float(ciA[0]), 2), round(float(ciA[1]), 2)) if isinstance(ciA, (tuple, list, np.ndarray)) and len(ciA) == 2 else ciA
             ciB_rounded = (round(float(ciB[0]), 2), round(float(ciB[1]), 2)) if isinstance(ciB, (tuple, list, np.ndarray)) and len(ciB) == 2 else ciB
+
+            bootA = values.get('boot_A', np.array([]))
+            bootB = values.get('boot_B', np.array([]))
             
             sex_fairness.loc[len(sex_fairness)] = {
                 'Metric': metric,
                 'Sex': 'Female',
                 'Value': values['rate_A'],
                 'CI': ciA_rounded,
+                'Boot': bootA,
                 'p-value': values['p_value'],
                 'outcome': outcome_name
             }
@@ -2510,16 +2630,17 @@ def create_fairness_summary(results_dict):
                 'Sex': 'Male',
                 'Value': values['rate_B'],
                 'CI': ciB_rounded,
+                'Boot': bootB,
                 'p-value': values['p_value'],
                 'outcome': outcome_name
             }
         
         # Center fairness
         tpr_rates = results['tpr_by_center']['observed_rates'].rename(
-            columns={'group': 'center', 'rate': 'TPR', 'denom': 'TPR_denom'}
+            columns={'group': 'center', 'rate': 'TPR', 'denom': 'TPR_denom', 'boot_rates': 'TPR_boot'}
         )
         fpr_rates = results['fpr_by_center']['observed_rates'].rename(
-            columns={'group': 'center', 'rate': 'FPR', 'denom': 'FPR_denom'}
+            columns={'group': 'center', 'rate': 'FPR', 'denom': 'FPR_denom', 'boot_rates': 'FPR_boot'}
         )
         
         tpr_rates['TPR_ci_lower'] = round(tpr_rates['ci_lower'], 2)
@@ -2528,8 +2649,8 @@ def create_fairness_summary(results_dict):
         fpr_rates['FPR_ci_upper'] = round(fpr_rates['ci_upper'], 2)
         
         center_df = pd.merge(
-            tpr_rates[['center', 'TPR', 'TPR_ci_lower', 'TPR_ci_upper']],
-            fpr_rates[['center', 'FPR', 'FPR_ci_lower', 'FPR_ci_upper']],
+            tpr_rates[['center', 'TPR', 'TPR_ci_lower', 'TPR_ci_upper', 'TPR_boot']],
+            fpr_rates[['center', 'FPR', 'FPR_ci_lower', 'FPR_ci_upper', 'FPR_boot']],
             on='center',
             how='outer'
         ).set_index('center').sort_index()
@@ -2721,8 +2842,8 @@ def create_race_fairness_summary(results_dict):
     --------
     tuple : (race_fairness_df, sex_fairness_df)
     """
-    race_fairness = pd.DataFrame(columns=['Metric', 'Race', 'Value', 'CI', 'p-value', 'outcome'])
-    sex_fairness = pd.DataFrame(columns=['Metric', 'Sex', 'Value', 'CI', 'p-value', 'outcome'])
+    race_fairness = pd.DataFrame(columns=['Metric', 'Race', 'Value', 'CI', 'Boot', 'p-value', 'outcome'])
+    sex_fairness = pd.DataFrame(columns=['Metric', 'Sex', 'Value', 'CI', 'Boot', 'p-value', 'outcome'])
     
     for outcome_name, results in results_dict.items():
         if results is None:
@@ -2735,12 +2856,16 @@ def create_race_fairness_summary(results_dict):
                 ciB = values.get('ci_B')
                 ciA_rounded = (round(float(ciA[0]), 2), round(float(ciA[1]), 2)) if isinstance(ciA, (tuple, list, np.ndarray)) and len(ciA) == 2 else ciA
                 ciB_rounded = (round(float(ciB[0]), 2), round(float(ciB[1]), 2)) if isinstance(ciB, (tuple, list, np.ndarray)) and len(ciB) == 2 else ciB
+
+                bootA = values.get('boot_A', np.array([]))
+                bootB = values.get('boot_B', np.array([]))
                 
                 race_fairness.loc[len(race_fairness)] = {
                     'Metric': metric,
                     'Race': 'WHITE',
                     'Value': values['rate_A'],
                     'CI': ciA_rounded,
+                    'Boot': bootA,
                     'p-value': values['p_value'],
                     'outcome': outcome_name
                 }
@@ -2749,6 +2874,7 @@ def create_race_fairness_summary(results_dict):
                     'Race': 'BLACK OR AFRICAN AMERICAN',
                     'Value': values['rate_B'],
                     'CI': ciB_rounded,
+                    'Boot': bootB,
                     'p-value': values['p_value'],
                     'outcome': outcome_name
                 }
@@ -2760,12 +2886,16 @@ def create_race_fairness_summary(results_dict):
                 ciB = values.get('ci_B')
                 ciA_rounded = (round(float(ciA[0]), 2), round(float(ciA[1]), 2)) if isinstance(ciA, (tuple, list, np.ndarray)) and len(ciA) == 2 else ciA
                 ciB_rounded = (round(float(ciB[0]), 2), round(float(ciB[1]), 2)) if isinstance(ciB, (tuple, list, np.ndarray)) and len(ciB) == 2 else ciB
+
+                bootA = values.get('boot_A', np.array([]))
+                bootB = values.get('boot_B', np.array([]))
                 
                 sex_fairness.loc[len(sex_fairness)] = {
                     'Metric': metric,
                     'Sex': 'Female',
                     'Value': values['rate_A'],
                     'CI': ciA_rounded,
+                    'Boot': bootA,
                     'p-value': values['p_value'],
                     'outcome': outcome_name
                 }
@@ -2774,6 +2904,7 @@ def create_race_fairness_summary(results_dict):
                     'Sex': 'Male',
                     'Value': values['rate_B'],
                     'CI': ciB_rounded,
+                    'Boot': bootB,
                     'p-value': values['p_value'],
                     'outcome': outcome_name
                 }
