@@ -466,39 +466,68 @@ def plot_cindex_results(
             plt.xticks(X, xticks, rotation=0, fontsize=12)
 
         
+        def _format_pvalue(p: Optional[float]) -> Optional[str]:
+            if p is None or (not np.isfinite(p)):
+                return None
+            if p >= 0.05:
+                return None
+            if p < 0.001:
+                return "(p<0.001)"
+            p_str = f"{float(p):.3f}".rstrip('0').rstrip('.')
+            return f"(p={p_str})"
+
+        line_h = 0.04
+        gap_h  = 0.008
+
+        # --- BLUE annotations ---
         for i, (mval, mstd, mname) in enumerate(zip(cindex_mod_mean, cindex_mod_std, model_names)):
-            base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
+            p_txt = _format_pvalue(rows[i].get("pvalue"))
+            has_p = (p_txt is not None)
+
+            if arch_name == "MLEF":
+                blue_above_red = bool(multimodal_better is not None and multimodal_better[i])
+                if blue_above_red:
+                    y_red    = 0.01
+                    y_blue_p = y_red + line_h + gap_h
+                else:
+                    y_blue_p = 0.01
+                    y_red    = y_blue_p + (2 * line_h + gap_h if has_p else line_h + gap_h)
+                y_blue_val = y_blue_p + (line_h if has_p else 0.0)
+            else:  # DLIF
+                y_blue_p   = 0.01
+                y_blue_val = 0.02
+                y_red      = None
+
             if arch_name == "DLIF":
-                plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f}",
-                        fontsize=11, ha="center", color="#1a80bb")
+                plt.text(X[i], y_blue_val, f"{mval:.2f} ± {mstd:.2f}",
+                        fontsize=11, ha="center", va="bottom", color="#1a80bb")
             else:
-                plt.text(X[i], base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                        fontsize=11, ha="center", color="#1a80bb")
+                plt.text(X[i], y_blue_val, f"{mval:.2f} ± {mstd:.2f} ({mname})",
+                        fontsize=11, ha="center", va="bottom", color="#1a80bb")
+
+            if has_p:
+                plt.text(X[i], y_blue_p, p_txt,
+                        fontsize=11, ha="center", va="bottom", color="#1a80bb")
+
             star = rows[i].get("stars", "")
             if star:
-                plt.text(X[i] + 0.66, base_y + 0.006, star, fontsize=11, ha="left", va="center", color="black")
+                plt.text(X[i] + 0.64, y_blue_val + 0.002, star,
+                        fontsize=11, ha="left", va="bottom", color="black")
 
-        '''
-        # --- BLUE annotations (now show stars here) ---
-        for i, (mval, mstd, mname) in enumerate(zip(cindex_mod_mean, cindex_mod_std, model_names)):
-            base_y = 0.06 if (multimodal_better is not None and multimodal_better[i]) else 0.02
-            plt.text(i, base_y, f"{mval:.2f} ± {mstd:.2f} ({mname})",
-                    fontsize=12, ha="center", color="#1a80bb")
-            # stars belong to the multimodal-vs-CB comparison
-            star = rows[i].get("stars", "")
-            if star:
-                # nudge a bit to the right of the blue text
-                plt.text(i + 0.36, base_y + 0.006, star, fontsize=12, ha="left", va="center", color="black")
-
-        '''
-        # --- RED annotations (keep values but REMOVE stars here) ---
+        # --- RED annotations ---
         if arch_name == "MLEF":
             for i, rrow in enumerate(rows):
                 rv, rs, rname = rrow[f"{metric}_ro_mean"], rrow[f"{metric}_ro_std"], rrow["model_ro"]
-                base_y = 0.02 if multimodal_better[i] else 0.06
+                p_txt  = _format_pvalue(rrow.get("pvalue"))
+                has_p  = (p_txt is not None)
+                blue_above_red = bool(multimodal_better is not None and multimodal_better[i])
+                if blue_above_red:
+                    base_y = 0.01
+                else:
+                    base_y = 0.01 + (2 * line_h + gap_h if has_p else line_h + gap_h)
                 if np.isfinite(rv) and np.isfinite(rs):
                     plt.text(X[i], base_y, f"{rv:.2f} ± {rs:.2f} ({rname})",
-                            fontsize=11, ha="center", color="#a00000")
+                            fontsize=11, ha="center", va="bottom", color="#a00000")
 
         plt.title(f"{ttl} - {outcome} {analysis}", pad=18)
         plt.ylabel(metric, fontsize=14)
