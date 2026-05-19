@@ -710,13 +710,18 @@ def analyze_fairness_by_site(predictions, sites, n_boot=1000, seed=42):
     print(f"\nOverall  (n={overall['n']:3d}): {format_cindex(overall)}")
     
     # Summary DataFrame
-    per_group = pd.DataFrame([{
-        "group": k,
-        "n": v["n"],
-        "c": v["c_index"],
-        "ci_lo": v["ci_lower"],
-        "ci_hi": v["ci_upper"]
-    } for k, v in group_results.items()]).sort_values("group").reset_index(drop=True)
+    per_group = pd.DataFrame([
+        {
+            "group": k,
+            "n": v["n"],
+            "c": v["c_index"],
+            "ci_lo": v["ci_lower"],
+            "ci_hi": v["ci_upper"],
+            # store bootstrap distribution for plotting (optional)
+            "boot": v.get("bootstrap_samples", None),
+        }
+        for k, v in group_results.items()
+    ]).sort_values("group").reset_index(drop=True)
     
     # Pairwise comparisons
     pairwise = pairwise_comparison(group_results)
@@ -788,13 +793,18 @@ def analyze_fairness_by_race(predictions, clinical_data, n_boot=1000, seed=42):
     print(f"\nOverall (n={overall['n']:3d}): {format_cindex(overall)}")
     
     # Summary DataFrame
-    per_group = pd.DataFrame([{
-        "group": k,
-        "n": v["n"],
-        "c": v["c_index"],
-        "ci_lo": v["ci_lower"],
-        "ci_hi": v["ci_upper"]
-    } for k, v in group_results.items()]).sort_values("group").reset_index(drop=True)
+    per_group = pd.DataFrame([
+        {
+            "group": k,
+            "n": v["n"],
+            "c": v["c_index"],
+            "ci_lo": v["ci_lower"],
+            "ci_hi": v["ci_upper"],
+            # store bootstrap distribution for plotting (optional)
+            "boot": v.get("bootstrap_samples", None),
+        }
+        for k, v in group_results.items()
+    ]).sort_values("group").reset_index(drop=True)
     
     # Pairwise comparisons
     pairwise = pairwise_comparison(group_results)
@@ -866,13 +876,18 @@ def analyze_fairness_by_sex(predictions, clinical_data, set_name='test', n_boot=
     print(f"\nOverall  (n={overall['n']:3d}): {format_cindex(overall)}")
     
     # Summary DataFrame
-    per_group = pd.DataFrame([{
-        "group": k,
-        "n": v["n"],
-        "c": v["c_index"],
-        "ci_lo": v["ci_lower"],
-        "ci_hi": v["ci_upper"]
-    } for k, v in group_results.items()]).sort_values("group").reset_index(drop=True)
+    per_group = pd.DataFrame([
+        {
+            "group": k,
+            "n": v["n"],
+            "c": v["c_index"],
+            "ci_lo": v["ci_lower"],
+            "ci_hi": v["ci_upper"],
+            # store bootstrap distribution for plotting (optional)
+            "boot": v.get("bootstrap_samples", None),
+        }
+        for k, v in group_results.items()
+    ]).sort_values("group").reset_index(drop=True)
     
     # Pairwise comparisons
     pairwise = pairwise_comparison(group_results)
@@ -888,7 +903,22 @@ def analyze_fairness_by_sex(predictions, clinical_data, set_name='test', n_boot=
     return per_group, pairwise, overall['c_index']
 
 
-def plot_fairness_results(per_group_df, title, figsize=(8, 5), palette=None, group_order=None, overall_cindex=None):
+def plot_fairness_results(
+    per_group_df,
+    title,
+    figsize=(8, 5),
+    palette=None,
+    group_order=None,
+    overall_cindex=None,
+    tick_labelsize: int = 14,
+    y_labelsize: int = 16,
+    show_bootstrap_dots: bool = True,
+    dots_max_n: int = 150,
+    dots_jitter: float = 0.08,
+    dots_size: float = 18,
+    dots_alpha: float = 0.28,
+    dots_seed: int = 0,
+):
     """
     Create bar plot of C-index by group with error bars.
     
@@ -923,12 +953,11 @@ def plot_fairness_results(per_group_df, title, figsize=(8, 5), palette=None, gro
     
     fig, ax = plt.subplots(figsize=figsize)
     
-    # Bar plot
+    # Bar plot (no hue -> no legend)
     barplot = sns.barplot(
         x="group", 
         y="c", 
         data=df,
-        hue="group",
         palette=palette,
         errorbar=None,
         ax=ax,
@@ -940,12 +969,40 @@ def plot_fairness_results(per_group_df, title, figsize=(8, 5), palette=None, gro
         p.set_edgecolor('none')
         p.set_linewidth(0)
     barplot.xaxis.grid(False)
+
+    # Optional: overlay bootstrap distribution as jittered dots (like classification plots)
+    if show_bootstrap_dots and 'boot' in df.columns:
+        rng = np.random.default_rng(dots_seed)
+        for patch, row in zip(barplot.patches, df.itertuples(index=False)):
+            boot = getattr(row, 'boot', None)
+            if boot is None:
+                continue
+            if isinstance(boot, (list, tuple, np.ndarray)):
+                boot = np.asarray(boot, dtype=float)
+                boot = boot[np.isfinite(boot)]
+                if boot.size == 0:
+                    continue
+                if boot.size > dots_max_n:
+                    boot = rng.choice(boot, size=dots_max_n, replace=False)
+
+                x_pos = patch.get_x() + patch.get_width() / 2
+                x_jit = x_pos + rng.uniform(-dots_jitter, dots_jitter, size=boot.size)
+
+                facecolor = np.array(patch.get_facecolor())
+                darkened_color = facecolor * 0.6
+                ax.scatter(
+                    x_jit,
+                    boot,
+                    s=dots_size,
+                    alpha=dots_alpha,
+                    color=darkened_color,
+                    edgecolors='none',
+                    zorder=5,
+                )
     
     # Add horizontal line for overall C-index
     if overall_cindex is not None:
-        ax.axhline(y=overall_cindex, color='gray', linestyle='--', linewidth=2, 
-                   label=f'Overall C-index: {overall_cindex:.2f}', alpha=0.7)
-        ax.legend(loc='lower right')
+        ax.axhline(y=overall_cindex, color='gray', linestyle='--', linewidth=2, alpha=0.7)
     
     # Add error bars manually
     for i, row in enumerate(df.itertuples(index=False)):
@@ -962,6 +1019,8 @@ def plot_fairness_results(per_group_df, title, figsize=(8, 5), palette=None, gro
         )
     
     ax.set(xlabel=None, ylabel='C-index', title=title)
+    ax.set_ylabel('C-index', fontsize=y_labelsize)
     ax.set_ylim(0, 1)
+    ax.tick_params(axis='both', which='major', labelsize=tick_labelsize)
     plt.tight_layout()
     return fig

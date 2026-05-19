@@ -953,51 +953,140 @@ def plot_radar_charts(
         
         ax.set_xticks(angles[:-1])
         ax.set_xticklabels(tick_labels, fontsize=fontsize)
-        ax.tick_params(axis='x', pad=46)
+        ax.tick_params(axis='x', pad=50)
         
         ax.set_ylim(0, 1)
         ax.set_title(f'{title_prefix} - {metric} Comparison', pad=120, fontsize=14)
         
         # --- Annotations ---
         colors = ['#811850', '#156ba9', "#477439"]
+
+        def _p_value_line(p_value: float) -> str:
+            """Return a second-line 'p=...' string only when p > 0.001."""
+            if p_value is None:
+                return ""
+            try:
+                p_value_float = float(p_value)
+            except (TypeError, ValueError):
+                return ""
+            if p_value_float <= 0.001:
+                return ""
+            formatted = f"{p_value_float:.4f}".rstrip('0').rstrip('.')
+            return f"\n(p={formatted})"
+        
+        def _p_value_inline(p_value: float) -> str:
+            """Return p-value as inline string (same line)."""
+            if p_value is None:
+                return ""
+            try:
+                p_value_float = float(p_value)
+            except (TypeError, ValueError):
+                return ""
+            if p_value_float <= 0.001:
+                return ""
+            formatted = f"{p_value_float:.4f}".rstrip('0').rstrip('.')
+            return f" (p={formatted})"
+
+
+        # ── constants ─────────────────────────────────────────────────────
+        LINE_H   = 0.11  # radial units per text line  (top / bottom axes)
+        ANG_LINE = 0.10   # angular radians per text line (left / right axes)
+        BASE_R   = 1.0    # inner edge of label area
+        SIDE_R_LAT  = 1.18   # più largo del 1.10 originale
+        SIDE_OFF_LAT = 0.12  # leggermente più staccato dall'asse
+        SIDE_DOWN    = 0.16
+        # ──────────────────────────────────────────────────────────────────
+
         for i, angle in enumerate(angles[:-1]):
+            angle_deg = np.rad2deg(angle)
+            is_topbottom = (85 < angle_deg < 95) or (265 < angle_deg < 275)
+
             if metric == 'AUC':
                 bio_val_text = f"Biomarker: {vals_bio[i]:.2f}"
-                model_val_text = f"ML CB-only: {vals_model[i]:.2f} {p_to_stars(p_values_ml[i])}"
-                if vals_dl is not None:
-                    dl_val_text = f"DLIF: {vals_dl[i]:.2f} {p_to_stars(p_values_dl[i])}"
+
+                if is_topbottom:
+                    # p-value inline (stesso rigo)
+                    ml_pstr = _p_value_inline(p_values_ml[i])
+                    model_val_text = f"ML CB-only: {vals_model[i]:.2f} {p_to_stars(p_values_ml[i])}{ml_pstr}"
+                    ml_lines = 1
+                    if vals_dl is not None:
+                        dl_pstr = _p_value_inline(p_values_dl[i])
+                        dl_val_text = f"DLIF: {vals_dl[i]:.2f} {p_to_stars(p_values_dl[i])}{dl_pstr}"
+                        dl_lines = 1
+                    else:
+                        dl_lines = 0
+                else:
+                    # p-value su riga separata (sotto)
+                    ml_pline = _p_value_line(p_values_ml[i])
+                    model_val_text = (
+                        f"ML CB-only: {vals_model[i]:.2f} {p_to_stars(p_values_ml[i])}"
+                        f"{ml_pline}"
+                    )
+                    ml_lines = 2 if ml_pline else 1
+                    if vals_dl is not None:
+                        dl_pline = _p_value_line(p_values_dl[i])
+                        dl_val_text = (
+                            f"DLIF: {vals_dl[i]:.2f} {p_to_stars(p_values_dl[i])}"
+                            f"{dl_pline}"
+                        )
+                        dl_lines = 2 if dl_pline else 1
+                    else:
+                        dl_lines = 0
             else:
-                bio_val_text = f"Biomarker: {vals_bio[i]:.2f}"
+                bio_val_text   = f"Biomarker: {vals_bio[i]:.2f}"
                 model_val_text = f"ML CB-only: {vals_model[i]:.2f}"
+                ml_lines       = 1
                 if vals_dl is not None:
                     dl_val_text = f"DLIF: {vals_dl[i]:.2f}"
+                    dl_lines    = 1
+                else:
+                    dl_lines = 0
+
             angle_deg = np.rad2deg(angle)
 
-            if 85 < angle_deg < 95: # Top
-                ha = 'center'
-                ax.text(angle, 1.16, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
-                ax.text(angle, 1, bio_val_text, color=colors[0], ha=ha, va='bottom', fontsize=fontsize)
-                if vals_dl is not None:
-                    ax.text(angle, 1.07, dl_val_text, color=colors[2], ha=ha, va='bottom', fontsize=fontsize)
-            elif 265 < angle_deg < 275: # Bottom
-                ha = 'center'
-                ax.text(angle, 1.01, model_val_text, color=colors[1], ha=ha, va='top', fontsize=fontsize)
-                ax.text(angle, 1.17, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
-                if vals_dl is not None:
-                    ax.text(angle, 1.09, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
-            elif angle_deg < 15 or angle_deg > 345: # Right
-                ha = 'left'
-                ax.text(angle - 0.17, 1.1, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
-                ax.text(angle - 0.26, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
-                if vals_dl is not None:
-                    ax.text(angle - 0.18, 1.11, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
-            else: # Left
-                ha = 'right'
-                ax.text(angle + 0.17, 1.1, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
-                ax.text(angle + 0.26, 1.1, bio_val_text, color=colors[0], ha=ha, va='top', fontsize=fontsize)
-                if vals_dl is not None:
-                    ax.text(angle + 0.18, 1.1, dl_val_text, color=colors[2], ha=ha, va='top', fontsize=fontsize)
+            if 85 < angle_deg < 95:          # ── Top (va='bottom' → grows outward) ──
+                ha      = 'center'
+                #   Stack outward: bio (innermost) → dl → model
+                bio_r   = BASE_R +0.02
+                dl_r    = bio_r   + LINE_H                                              # bio = 1 line
+                model_r = dl_r    + (dl_lines * LINE_H - 0.02 if vals_dl is not None else LINE_H + 0.01)
 
+                ax.text(angle, bio_r,   bio_val_text,   color=colors[0], ha=ha, va='bottom', fontsize=fontsize)
+                if vals_dl is not None:
+                    ax.text(angle, dl_r, dl_val_text,   color=colors[2], ha=ha, va='bottom', fontsize=fontsize)
+                ax.text(angle, model_r, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
+
+            elif 265 < angle_deg < 275:       # ── Bottom (va='top' → grows outward) ──
+                ha      = 'center'
+                #   Stack outward: model (innermost) → dl → bio
+                model_r = BASE_R + 0.01
+                dl_r    = model_r + ml_lines * LINE_H
+                bio_r   = dl_r    + (dl_lines * LINE_H - 0.03 if vals_dl is not None else LINE_H - 0.01)
+
+                ax.text(angle, model_r, model_val_text, color=colors[1], ha=ha, va='top', fontsize=fontsize)
+                if vals_dl is not None:
+                    ax.text(angle, dl_r, dl_val_text,   color=colors[2], ha=ha, va='top', fontsize=fontsize)
+                ax.text(angle, bio_r,   bio_val_text,   color=colors[0], ha=ha, va='top', fontsize=fontsize)
+
+            elif angle_deg < 15 or angle_deg > 345:   # ── Right ──
+                ha      = 'left'
+                ref_ang = angle - SIDE_OFF_LAT - SIDE_DOWN
+                bio_ang = ref_ang - (dl_lines if vals_dl is not None else 1) * ANG_LINE
+
+                ax.text(ref_ang, SIDE_R_LAT, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
+                if vals_dl is not None:
+                    ax.text(ref_ang, SIDE_R_LAT, dl_val_text, color=colors[2], ha=ha, va='top',   fontsize=fontsize)
+                ax.text(bio_ang, SIDE_R_LAT, bio_val_text,    color=colors[0], ha=ha, va='top',   fontsize=fontsize)
+
+            else:                                      # ── Left ──
+                ha      = 'right'
+                ref_ang = angle + SIDE_OFF_LAT + SIDE_DOWN
+                bio_ang = ref_ang + (dl_lines if vals_dl is not None else 1) * ANG_LINE
+
+                ax.text(ref_ang, SIDE_R_LAT, model_val_text, color=colors[1], ha=ha, va='bottom', fontsize=fontsize)
+                if vals_dl is not None:
+                    ax.text(ref_ang, SIDE_R_LAT, dl_val_text, color=colors[2], ha=ha, va='top',   fontsize=fontsize)
+                ax.text(bio_ang, SIDE_R_LAT, bio_val_text,    color=colors[0], ha=ha, va='top',   fontsize=fontsize)
 
          # --- ADD SIGNIFICANCE LEGEND ONLY FOR AUC PLOT ---
         if metric == 'AUC':
