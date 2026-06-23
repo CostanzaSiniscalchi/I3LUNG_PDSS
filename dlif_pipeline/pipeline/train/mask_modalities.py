@@ -50,7 +50,7 @@ SOURCE_BAG_DIRS = {
 # Expected feature dimensions per index (for verification)
 EXPECTED_DIMS = {
     'radpy': {0: 11, 1: 128, 2: 768, 3: 4},
-    'radfm': {0: 11, 1: 128, 2: 768, 3: 4},
+    'radfm': {0: 11, 1: 4096, 2: 768, 3: 4},
 }
 
 
