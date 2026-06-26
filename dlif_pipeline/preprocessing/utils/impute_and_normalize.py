@@ -40,6 +40,20 @@ CB_CATEGORICAL_BOUNDS: dict = {
     "BONE METS AT IO START":              (0, 1),
 }
 
+GEN_CATEGORICAL_FEATURES = [
+    "DRIVER",
+    "KRAS",
+    "P53",
+    "STK11",
+]
+
+GEN_CATEGORICAL_BOUNDS: dict = {
+    "DRIVER": (0, 1),
+    "KRAS":   (0, 1),
+    "P53":    (0, 1),
+    "STK11":  (0, 1),
+}
+
 
 def impute_df(df: pd.DataFrame, imputer=None, categorical_features: list = None, categorical_bounds: dict = None) -> Tuple[pd.DataFrame, IterativeImputer]:
     """Impute missing values in a feature DataFrame via MICE-style iterative imputation.
@@ -128,7 +142,7 @@ def impute_df(df: pd.DataFrame, imputer=None, categorical_features: list = None,
     imputed_df = pd.concat([metadata, imputed_df], axis=1)
     return imputed_df, imputer
 
-def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normalize: list=None, to_log_normalize: list=None, min_shifts: dict=None) -> Tuple[pd.DataFrame, StandardScaler, list, list, dict]:
+def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normalize: list=None, to_log_normalize: list=None, min_shifts: dict=None, categorical_features: list=None) -> Tuple[pd.DataFrame, StandardScaler, list, list, dict]:
     """Log-transform skewed features and standard-scale continuous features.
 
     `CENTER` and `SET` are held out as metadata. The remaining columns are
@@ -144,13 +158,13 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
 
     On the training split (with all three optional arguments left at `None`),
     the function auto-selects:
-    - log targets: columns with `|skew| > 0.9` that are not categorical;
-    - standard-scale targets: all non-categorical columns;
+    - log targets: columns with `|skew| > 0.9` that are not in `categorical_features`;
+    - standard-scale targets: all columns not in `categorical_features`;
     - min shifts: `-min(col)` for any auto-selected log column whose train
       minimum is negative.
-    A column is treated as categorical when it has at most 10 unique values
-    (heuristic — only used on the training call; auto-detected lists are then
-    threaded through to the test / external-validation calls).
+    The caller MUST pass `categorical_features` explicitly; there is no
+    automatic detection. The auto-selected lists are then threaded through
+    to the test / external-validation calls.
 
     For TEST / EXVAL the caller MUST pass back the `scaler`, both column
     lists, and `min_shifts` returned from the training call so the same
@@ -172,6 +186,10 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
     min_shifts : dict, optional
         `{col: shift}` map of per-column shifts to apply before `log(x + 1)`.
         Computed from `df` when None.
+    categorical_features : list, optional
+        Columns to exclude from log-transform and standard-scaling auto-selection.
+        Only used on the training call (when `to_log_normalize` / `to_standard_normalize`
+        are None). Pass the same list used for `impute_df`.
 
     Returns
     -------
@@ -198,13 +216,12 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
     if to_log_normalize is None:
         # Auto-select on the training split: skewed continuous columns get the
         # log transform; categoricals are skipped regardless of skew.
-        categorical_features = [col for col in df_to_norm.columns if df_to_norm[col].nunique() <= 10]
-        # FIXME: can we remove the <= 10 here? 
+        _cats = categorical_features if categorical_features is not None else []
+        print(f"Found categorical features: {_cats}")
         to_log_normalize = [
             column for column in df_to_norm.columns
-            if abs(df_to_norm[column].skew()) > 0.9
+            if abs(df_to_norm[column].skew()) > 0.9 and column not in _cats
         ]
-        to_log_normalize = [col for col in to_log_normalize if col not in categorical_features]
 
     # When called on train (min_shifts=None), compute shifts from train data.
     # When called on test/exval, use the train-derived shifts and clip any remaining negatives to 0.
@@ -220,9 +237,8 @@ def normalize(df: pd.DataFrame, scaler: StandardScaler=None, to_standard_normali
     df_to_norm[to_log_normalize] = df_to_norm[to_log_normalize].map(lambda x: math.log(x + 1))
 
     if to_standard_normalize is None:
-        # FIXME: see above
-        categorical_features = [col for col in df_to_norm.columns if df_to_norm[col].nunique() <= 10]
-        to_standard_normalize = [col for col in features_names if col not in categorical_features]
+        _cats = categorical_features if categorical_features is not None else []
+        to_standard_normalize = [col for col in features_names if col not in _cats]
 
     if scaler is None and len(to_standard_normalize) > 0:
         scaler = StandardScaler()
@@ -246,7 +262,7 @@ cb = cb[cb_cols]
 
 train_mask = cb['SET'] == 'TRAIN'
 cb_train_imputed, cb_imputer = impute_df(cb[train_mask], categorical_features=CB_CATEGORICAL_FEATURES, categorical_bounds=CB_CATEGORICAL_BOUNDS)
-cb_train_proc, cb_scaler, cb_to_std, cb_to_log, cb_min_shifts = normalize(cb_train_imputed)
+cb_train_proc, cb_scaler, cb_to_std, cb_to_log, cb_min_shifts = normalize(cb_train_imputed, categorical_features=CB_CATEGORICAL_FEATURES)
 
 joblib.dump(cb_imputer, DATA_DIR / 'cb_imputer.pkl')
 joblib.dump(cb_scaler,  DATA_DIR / 'cb_scaler.pkl')
@@ -266,17 +282,14 @@ cb_result = pd.concat([cb_train_proc, cb_test_proc, cb_ext_proc])
 cb_result.to_csv(DATA_DIR / 'cb_processed.csv')
 
 # Genomics
-# FIXME: CB now uses explicit CB_CATEGORICAL_FEATURES + CB_CATEGORICAL_BOUNDS
-# The GEN panel (DRIVER, KRAS, P53, STK11) is binary 0/1, but does it get the same treatment? 
-# add a GEN_CATEGORICAL_FEATURES list??
 print("Processing Genomics...")
 gen = pd.read_csv(DATA_DIR / 'genomics.csv', index_col='Subject')
 gen_cols = ['SET', 'CENTER'] + [f for f in features_dict['GEN'] if f in gen.columns]
 gen = gen[gen_cols]
 
 train_mask = gen['SET'] == 'TRAIN'
-gen_train_imputed, gen_imputer = impute_df(gen[train_mask])
-gen_train_proc, gen_scaler, gen_to_std, gen_to_log, gen_min_shifts = normalize(gen_train_imputed)
+gen_train_imputed, gen_imputer = impute_df(gen[train_mask], categorical_features=GEN_CATEGORICAL_FEATURES, categorical_bounds=GEN_CATEGORICAL_BOUNDS)
+gen_train_proc, gen_scaler, gen_to_std, gen_to_log, gen_min_shifts = normalize(gen_train_imputed, categorical_features=GEN_CATEGORICAL_FEATURES)
 
 joblib.dump(gen_imputer, DATA_DIR / 'gen_imputer.pkl')
 joblib.dump(gen_scaler,  DATA_DIR / 'gen_scaler.pkl')
@@ -284,11 +297,11 @@ with open(DATA_DIR / 'gen_norm_config.json', 'w') as f:
     json.dump({'to_standard_normalize': gen_to_std, 'to_log_normalize': gen_to_log, 'min_shifts': gen_min_shifts}, f)
 
 test_mask = gen['SET'] == 'TEST'
-gen_test_imputed, _ = impute_df(gen[test_mask], imputer=gen_imputer)
+gen_test_imputed, _ = impute_df(gen[test_mask], imputer=gen_imputer, categorical_features=GEN_CATEGORICAL_FEATURES, categorical_bounds=GEN_CATEGORICAL_BOUNDS)
 gen_test_proc, _, _, _, _ = normalize(gen_test_imputed, scaler=gen_scaler, to_standard_normalize=gen_to_std, to_log_normalize=gen_to_log, min_shifts=gen_min_shifts)
 
 ext_mask = gen['SET'] == 'EXVAL'
-gen_ext_imputed, _ = impute_df(gen[ext_mask], imputer=gen_imputer)
+gen_ext_imputed, _ = impute_df(gen[ext_mask], imputer=gen_imputer, categorical_features=GEN_CATEGORICAL_FEATURES, categorical_bounds=GEN_CATEGORICAL_BOUNDS)
 gen_ext_proc, _, _, _, _ = normalize(gen_ext_imputed, scaler=gen_scaler, to_standard_normalize=gen_to_std, to_log_normalize=gen_to_log, min_shifts=gen_min_shifts)
 
 gen_result = pd.concat([gen_train_proc, gen_test_proc, gen_ext_proc])
