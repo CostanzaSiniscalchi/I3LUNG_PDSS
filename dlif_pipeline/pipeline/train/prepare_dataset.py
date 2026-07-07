@@ -29,7 +29,13 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
         if isinstance(train_data, list):
             project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
             train_data_resolved = [os.path.normpath(os.path.join(project_root, td)) for td in train_data]
-            dfs = [pd.read_parquet(td) for td in train_data_resolved]
+            if 'radfm' in active_mods and 'radpy' not in active_mods:
+                selected = [p for p in train_data_resolved if 'fmrad' in os.path.basename(p)]
+            elif 'radpy' in active_mods and 'radfm' not in active_mods:
+                selected = [p for p in train_data_resolved if 'radpy' in os.path.basename(p)]
+            else:
+                selected = train_data_resolved
+            dfs = [pd.read_parquet(p) for p in (selected or train_data_resolved)]
             df = pd.concat(dfs, ignore_index=True)
             df.to_parquet('df.parquet', index=False)
         else:
@@ -51,7 +57,17 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
         if isinstance(train_data, list):
             train_data_resolved = [os.path.normpath(os.path.join(project_root, td)) for td in train_data]
-            dfs = [pd.read_parquet(td) for td in train_data_resolved]
+            # When both radpy and fmrad parquets are listed, each subject appears
+            # once per parquet with a different mod2 dimension (128 vs 4096).
+            # Select only the parquet matching the active radiomics modality so
+            # that iloc[0] in prepare_multimodal_mixed_bags gets the right features.
+            if 'radfm' in active_mods and 'radpy' not in active_mods:
+                selected = [p for p in train_data_resolved if 'fmrad' in os.path.basename(p)]
+            elif 'radpy' in active_mods and 'radfm' not in active_mods:
+                selected = [p for p in train_data_resolved if 'radpy' in os.path.basename(p)]
+            else:
+                selected = train_data_resolved  # CB-only or both active: use all
+            dfs = [pd.read_parquet(p) for p in (selected or train_data_resolved)]
             df = pd.concat(dfs, ignore_index=True)
         else:
             train_data_path = os.path.join(project_root, train_data.lstrip('../'))
