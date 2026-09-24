@@ -1,20 +1,24 @@
+import argparse
 import pandas as pd
 import json
 from pathlib import Path
 
 # Get the directory containing this script
 SCRIPT_DIR = Path(__file__).parent
-DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
+DEFAULT_DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
 
 def create_feature_dataset_from_processed(
-    rad_type: str = 'pyradiomics'
+    rad_type: str = 'pyradiomics',
+    dp_type: str = 'digital_pathology',
+    data_dir: Path = DEFAULT_DATA_DIR,
 ) -> pd.DataFrame:
-    
+    data_dir = Path(data_dir)
+
     # Load processed data
-    cb = pd.read_csv(DATA_DIR / 'cb_processed.csv', index_col='Subject')
-    rad = pd.read_csv(DATA_DIR / f'{rad_type}_processed.csv', index_col='Subject')
-    dp = pd.read_csv(DATA_DIR / 'digital_pathology_processed.csv', index_col='Subject')
-    genomics = pd.read_csv(DATA_DIR / 'genomics_processed.csv', index_col='Subject')
+    cb = pd.read_csv(data_dir / 'cb_processed.csv', index_col='Subject')
+    rad = pd.read_csv(data_dir / f'{rad_type}_processed.csv', index_col='Subject')
+    dp = pd.read_csv(data_dir / f'{dp_type}_processed.csv', index_col='Subject')
+    genomics = pd.read_csv(data_dir / 'genomics_processed.csv', index_col='Subject')
     
     # Get CB subjects (master list)
     cb_subjects = set(cb.index)
@@ -66,13 +70,40 @@ def create_feature_dataset_from_processed(
     
     return df
 
-# Create both versions
-print("Creating pyradiomics version...")
-df_pyrad = create_feature_dataset_from_processed(rad_type='pyradiomics')
-df_pyrad.to_parquet(DATA_DIR / 'features_dataset_radpy_fixed.parquet', index=False)
+# Filenames kept as-is for backward compatibility with existing configs/data.
+RAD_OUTPUT_STEMS = {
+    'pyradiomics': 'features_dataset_radpy_fixed',
+    'fmrad': 'features_dataset_fmrad',
+}
 
-print("\nCreating fmrad version...")
-df_fmrad = create_feature_dataset_from_processed(rad_type='fmrad')
-df_fmrad.to_parquet(DATA_DIR / 'features_dataset_fmrad.parquet', index=False)
+# Suffix appended to the output filename for each dp_type. '' for the
+# legacy/default gigapath source (predates this split, no token in the
+# name); everything else must contain a unique token — this must match
+# what prepare_dataset.py's SOURCE_VARIANT_GROUPS looks for.
+DP_OUTPUT_SUFFIXES = {
+    'digital_pathology': '',
+    'digital_pathology_titan': '_dp-titan',
+}
 
-print("\nDone!") 
+
+def _parse_args():
+    parser = argparse.ArgumentParser(description="Build the DLIF multimodal feature parquet files from processed modality CSVs.")
+    parser.add_argument('--data-dir', default=str(DEFAULT_DATA_DIR), help=f"Directory containing the *_processed.csv files and where the parquet outputs are written (default: {DEFAULT_DATA_DIR})")
+    parser.add_argument('--rad-types', nargs='+', default=['pyradiomics', 'fmrad'], help="Radiomics source(s) to build a parquet file for. Each produces '<data-dir>/features_dataset_<name>.parquet' (pyradiomics is saved as 'features_dataset_radpy_fixed.parquet' for backward compatibility).")
+    parser.add_argument('--dp-types', nargs='+', default=['digital_pathology'], choices=list(DP_OUTPUT_SUFFIXES), help="Digital pathology source(s) to build a parquet file for. 'digital_pathology' (gigapath, default) keeps the legacy filename; 'digital_pathology_titan' appends '_dp-titan' so it doesn't collide with the gigapath parquet.")
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    args = _parse_args()
+    data_dir = Path(args.data_dir)
+
+    for rad_type in args.rad_types:
+        rad_stem = RAD_OUTPUT_STEMS.get(rad_type, f'features_dataset_{rad_type}')
+        for dp_type in args.dp_types:
+            print(f"Creating {rad_type} / {dp_type} version...")
+            df = create_feature_dataset_from_processed(rad_type=rad_type, dp_type=dp_type, data_dir=data_dir)
+            output_name = f"{rad_stem}{DP_OUTPUT_SUFFIXES[dp_type]}.parquet"
+            df.to_parquet(data_dir / output_name, index=False)
+
+    print("\nDone!")

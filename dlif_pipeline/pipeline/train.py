@@ -35,13 +35,18 @@ if __name__ == "__main__":
     try:
         # Dataset preparation if requested
         if config.get("prepare_dataset", False):
+            bags_dir = config.get("bags_dir")
+            bags_root = os.path.abspath(bags_dir) if bags_dir else os.path.abspath(
+                os.path.join(os.path.dirname(__file__), '../bags/')
+            )
+
             for mods in config.get('mods', []):
 
                 train_data = config.get("train_df")
 
                 mod_string = "_".join([k for k, v in mods.items() if v])
                 bag_path = f"bags_{mod_string}"
-                bag_path_abs = os.path.abspath(os.path.join(os.path.dirname(__file__), '../bags/', bag_path))
+                bag_path_abs = os.path.join(bags_root, bag_path)
                 prepare_dataset(train_data, config.get("annotation_file"), mods, bag_path_abs)
 
             print("dataset prepared")

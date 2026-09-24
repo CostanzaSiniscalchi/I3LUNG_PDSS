@@ -1,3 +1,4 @@
+import argparse
 import pandas as pd
 import numpy as np
 import json
@@ -6,7 +7,7 @@ from pathlib import Path
 
 # Get the directory containing this script
 SCRIPT_DIR = Path(__file__).parent
-DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
+DEFAULT_DATA_DIR = SCRIPT_DIR.parent.parent / 'data'
 
 def _to_str_flag(series):
     """Convert a binary flag column (int/float/mixed) to clean '0'/'1'/'' strings."""
@@ -18,25 +19,39 @@ def _to_str_flag(series):
 
 
 def create_annotations(
+    data_dir=None,
     outcomes_path=None,
     cb_path=None,
     features_path=None,
     output_path=None,
+    modality_files=None,
+    int_cv_splits_path=None,
     n_sub=5,
     use_subfolds=False,
     val_split=0.10,
     seed=42
 ):
     # Set default paths if not provided
+    data_dir = Path(data_dir) if data_dir is not None else DEFAULT_DATA_DIR
     if outcomes_path is None:
-        outcomes_path = DATA_DIR / 'outcomes.csv'
+        outcomes_path = data_dir / 'outcomes.csv'
     if cb_path is None:
-        cb_path = DATA_DIR / 'cb.csv'
+        cb_path = data_dir / 'cb.csv'
     if features_path is None:
-        features_path = DATA_DIR / 'features_dataset_radpy_fixed.parquet'
+        features_path = data_dir / 'features_dataset_radpy_fixed.parquet'
     if output_path is None:
-        output_path = DATA_DIR / 'annotations.csv'
-    
+        output_path = data_dir / 'annotations.csv'
+    if modality_files is None:
+        modality_files = {
+            'HAS_CB': data_dir / 'cb.csv',
+            'HAS_RADPY': data_dir / 'pyradiomics.csv',
+            'HAS_FMRAD': data_dir / 'fmrad.csv',
+            'HAS_DP': data_dir / 'digital_pathology.csv',
+            'HAS_GENOMICS': data_dir / 'genomics.csv',
+        }
+    if int_cv_splits_path is None:
+        int_cv_splits_path = data_dir / 'int_cv_splits.json'
+
     # Load data
     outcomes = pd.read_csv(outcomes_path)
     cb = pd.read_csv(cb_path)
@@ -155,14 +170,8 @@ def create_annotations(
         ann['COHORT_2'] = '0'
 
     # HAS_{mod} flags based on which subjects appear in each raw data file
-    modality_files = {
-        'HAS_CB': DATA_DIR / 'cb.csv',
-        'HAS_RADPY': DATA_DIR / 'pyradiomics.csv',
-        'HAS_FMRAD': DATA_DIR / 'fmrad.csv',
-        'HAS_DP': DATA_DIR / 'digital_pathology.csv',
-        'HAS_GENOMICS': DATA_DIR / 'genomics.csv',
-    }
     for col_name, filepath in modality_files.items():
+        filepath = Path(filepath)
         if filepath.exists():
             subjects = set(pd.read_csv(filepath, usecols=['Subject'])['Subject'])
             ann[col_name] = ann['Subject'].isin(subjects).astype(int).astype(str)
@@ -196,7 +205,7 @@ def create_annotations(
         print(f"Added early stopping for {outcome}")
 
     # Add folds for INT-only
-    with open('data/int_cv_splits.json', 'r') as f:
+    with open(int_cv_splits_path, 'r') as f:
         int_only = json.load(f)
     for fold_idx, slide_list in int_only.items():
         ann.loc[ann['Subject'].isin(slide_list), 'INT_ONLY_FOLDS'] = fold_idx
@@ -227,5 +236,32 @@ def create_annotations(
     
     return ann
 
-# Run
-ann = create_annotations(use_subfolds=False)
+def _parse_args():
+    parser = argparse.ArgumentParser(description="Build the DLIF annotations.csv file from raw data.")
+    parser.add_argument('--data-dir', default=None, help=f"Directory containing raw data files (default: {DEFAULT_DATA_DIR})")
+    parser.add_argument('--outcomes-path', default=None, help="Path to outcomes.csv (default: <data-dir>/outcomes.csv)")
+    parser.add_argument('--cb-path', default=None, help="Path to cb.csv (default: <data-dir>/cb.csv)")
+    parser.add_argument('--features-path', default=None, help="Path to a features parquet file, used only to validate coverage (default: <data-dir>/features_dataset_radpy_fixed.parquet)")
+    parser.add_argument('--output-path', default=None, help="Path to write annotations.csv to (default: <data-dir>/annotations.csv)")
+    parser.add_argument('--int-cv-splits-path', default=None, help="Path to int_cv_splits.json (default: <data-dir>/int_cv_splits.json)")
+    parser.add_argument('--n-sub', type=int, default=5, help="Number of subfolds per center when --use-subfolds is set")
+    parser.add_argument('--use-subfolds', action='store_true', help="Split each center's fold into n-sub subfolds")
+    parser.add_argument('--val-split', type=float, default=0.10, help="Fraction of the train set to hold out for early stopping")
+    parser.add_argument('--seed', type=int, default=42, help="Random seed for subfolds/early-stopping sampling")
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    args = _parse_args()
+    ann = create_annotations(
+        data_dir=args.data_dir,
+        outcomes_path=args.outcomes_path,
+        cb_path=args.cb_path,
+        features_path=args.features_path,
+        output_path=args.output_path,
+        int_cv_splits_path=args.int_cv_splits_path,
+        n_sub=args.n_sub,
+        use_subfolds=args.use_subfolds,
+        val_split=args.val_split,
+        seed=args.seed,
+    )
