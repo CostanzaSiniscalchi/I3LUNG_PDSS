@@ -102,7 +102,7 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
             dfs = [pd.read_parquet(p) for p in (selected or train_data_resolved)]
             df = pd.concat(dfs, ignore_index=True)
         else:
-            train_data_path = os.path.join(project_root, train_data.lstrip('../'))
+            train_data_path = os.path.normpath(os.path.join(project_root, train_data))
             df = pd.read_parquet(train_data_path)
         
         # Drop columns of unused modalities. Compared by column, not just by

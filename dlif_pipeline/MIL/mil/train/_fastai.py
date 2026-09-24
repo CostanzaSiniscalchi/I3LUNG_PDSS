@@ -13,12 +13,25 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn import __version__ as sklearn_version
 from packaging import version
 from fastai.vision.all import (
-    DataLoaders, Learner, SaveModelCallback, CSVLogger
+    DataLoaders, Learner, SaveModelCallback, CSVLogger, Callback
 )
 
 from MIL.util import log
 from MIL.model import torch_utils
 from .._params import TrainerConfig
+
+# -----------------------------------------------------------------------------
+
+class SaveFirstEpochCallback(Callback):
+    """Save a checkpoint after the first training epoch, independent of
+    whether it is the best-performing epoch so far (which ``SaveModelCallback``
+    would otherwise overwrite as later epochs improve)."""
+
+    order = 60  # run after SaveModelCallback
+
+    def after_epoch(self):
+        if self.epoch == 0:
+            self.learn.save("epoch_1")
 
 # -----------------------------------------------------------------------------
 
@@ -34,6 +47,7 @@ def train(learner, config, callbacks=None):
     """
     cbs = [
         SaveModelCallback(fname=f"best_valid", monitor=config.save_monitor),
+        SaveFirstEpochCallback(),
         CSVLogger(),
     ]
     if callbacks:

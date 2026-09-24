@@ -95,7 +95,13 @@ def impute_df(df: pd.DataFrame, imputer=None, categorical_features: list = None,
         The fitted imputer (newly trained or the one passed in).
     """
     metadata_cols = [col for col in METADATA_COLUMNS if col in df.columns]
-    cols_to_impute = [col for col in df.columns if col not in metadata_cols]
+    if imputer is not None:
+        # Transform-only: restrict to exactly the columns (and order) the
+        # imputer was fit on, so extra columns in `df` (e.g. a new cohort's
+        # raw CSV) don't trip sklearn's fit/transform feature-name check.
+        cols_to_impute = list(imputer.feature_names_in_)
+    else:
+        cols_to_impute = [col for col in df.columns if col not in metadata_cols]
     metadata = df[metadata_cols].copy()
     df_to_impute = df[cols_to_impute].copy()
 
