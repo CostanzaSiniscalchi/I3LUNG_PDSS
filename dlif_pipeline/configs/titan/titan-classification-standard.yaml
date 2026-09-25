@@ -1,0 +1,75 @@
+task: classification # classification/survival
+task_settings:
+  outcomes: ["os_months_24", "os_months_6", "DCR"]
+  # outcomes: ["CBR"]
+  # events: DEATH_EVENT_OC # survival only variable
+  loss: mm_loss # mm_survival_loss  mm_loss
+  # save_monitor: c_index  # survival only variable
+
+training_type: standard # hyperparameter_tuning  # cross_validation_stratified
+data-type: hypothesis_driven  # hypothesis_driven/data_driven
+source: pyrad  # pyrad/foundation
+imp: noimp  # noimp/imp
+seed: [0]
+
+use_early_stopping: true
+prepare_dataset: false
+
+train_df: [ "../data/features_dataset_radpy_fixed_dp-titan.parquet", "../data/features_dataset_fmrad_dp-titan.parquet" ]
+annotation_file: ../data/annotations.csv
+# bags_dir: 
+
+mods:
+  # CB_DP
+  - cb: true
+    radpy: false
+    dp: false
+    dp-titan: true
+    genomics: false
+  # CB_DP_FMRAD
+  - cb: true
+    radfm: true
+    dp: false
+    dp-titan: true
+    genomics: false
+  # CB_DP_PYRAD
+  - cb: true
+    radpy: true
+    dp: false
+    dp-titan: true
+    genomics: false
+  # CB_DP_GENOMICS
+  - cb: true
+    radpy: false
+    dp: false
+    dp-titan: true
+    genomics: true
+  # CB_RADFM_DP_GENOMICS
+  - cb: true
+    radfm: true
+    dp: false
+    dp-titan: true
+    genomics: true
+  # CB_RADPY_DP_GENOMICS
+  - cb: true
+    radpy: true
+    dp: false
+    dp-titan: true
+    genomics: true
+
+
+folds:
+  cross_validation:
+    - GHD
+    - INT
+    - MH
+    - SZMC
+    - VHIO
+  standard:
+    - ALL
+
+# default hyperparameters
+hyperparameters_default:
+  batch_size: 16
+  reconstruction_weight: 0.1
+  n_layers: 2
