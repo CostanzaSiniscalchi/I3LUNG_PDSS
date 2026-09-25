@@ -17,6 +17,7 @@ from utils.preprocessing import (
     CB_CATEGORICAL_BOUNDS,
     GEN_CATEGORICAL_FEATURES,
     GEN_CATEGORICAL_BOUNDS,
+    NON_FEATURE_COLUMNS,
 )
 
 
@@ -97,6 +98,7 @@ def impute_and_normalize(
 
         print(f"Processing {modality}...")
         df = pd.read_csv(raw_path, index_col='Subject')
+        df = df.drop(columns=[c for c in NON_FEATURE_COLUMNS if c in df.columns])
 
         train_mask = df['SET'] == 'TRAIN'
         train_proc, scaler, to_std, to_log, mod_min_shifts = normalize(df[train_mask])

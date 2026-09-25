@@ -12,38 +12,48 @@ from MIL.util import prepare_multimodal_mixed_bags
 
 # Groups of mutually-exclusive `mods` flags that each select a different
 # source variant feeding the *same* dataframe column (e.g. radpy vs radfm
-# both feed mod2; dp vs dp-titan both feed mod3). `token=None` marks the
-# legacy/default variant, whose parquet filenames predate this split and so
-# carry no distinguishing token — it's selected by *excluding* every sibling
-# variant's token rather than by matching one of its own.
+# both feed mod2; dp vs dp-titan vs dp-titan-coral all feed mod3). `token=None`
+# marks the legacy/default variant, whose parquet filenames predate this
+# split and so carry no distinguishing token — it's selected by *excluding*
+# every sibling variant's token rather than by matching one of its own.
 #
-# Add a tuple here when a new source-variant is introduced for a modality
-# (e.g. a future dp-<other-model>): give it a unique filename token and it's
-# automatically excluded from the legacy/default variant's selection too.
+# Add a tuple to a group's 'variants' list when a new source-variant is
+# introduced for that modality (e.g. a future dp-<other-model>): give it a
+# unique filename token (matching create_parquet.py's dp_output_suffix) and
+# it's automatically excluded from the legacy/default variant's selection
+# too, and automatically wired into mod_mapping below.
 SOURCE_VARIANT_GROUPS = [
-    [('radpy', 'radpy'), ('radfm', 'fmrad')],
-    [('dp', None), ('dp-titan', 'dp-titan')],
+    {'column': 'mod2', 'variants': [('radpy', 'radpy'), ('radfm', 'fmrad')]},
+    {'column': 'mod3', 'variants': [('dp', None), ('dp-titan', 'dp-titan'), ('dp-titan-coral', 'dp-titan-coral')]},
 ]
 
 
 def _select_source_variant_parquets(paths: list, active_mods: list) -> list:
     """Filter a list of resolved parquet paths down to the ones matching the
-    active source-variant mods (radpy/radfm, dp/dp-titan, ...).
+    active source-variant mods (radpy/radfm, dp/dp-titan/dp-titan-coral, ...).
 
-    A group is left unfiltered if zero or more than one of its mods are
-    active (ambiguous), so callers relying on the historical "use everything"
-    fallback still get that behavior.
+    A group is left unfiltered if none of its mods are active, so callers
+    relying on the historical "use everything" fallback still get that
+    behavior. If more than one mod in a group is active, that's ambiguous
+    (two source variants can't both be selected for the same dataframe
+    column) and raises rather than silently skipping the filter.
     """
     selected = paths
     for group in SOURCE_VARIANT_GROUPS:
-        active_in_group = [token for key, token in group if key in active_mods]
-        if len(active_in_group) != 1:
+        variants = group['variants']
+        active_in_group = [(key, token) for key, token in variants if key in active_mods]
+        if not active_in_group:
             continue
-        token = active_in_group[0]
+        if len(active_in_group) > 1:
+            raise ValueError(
+                f"Mutually-exclusive mods {[key for key, _ in active_in_group]} are all "
+                f"active for column {group['column']!r}; enable exactly one."
+            )
+        token = active_in_group[0][1]
         if token is not None:
             selected = [p for p in selected if token in os.path.basename(p)]
         else:
-            sibling_tokens = [t for _, t in group if t is not None]
+            sibling_tokens = [t for _, t in variants if t is not None]
             selected = [p for p in selected if not any(t in os.path.basename(p) for t in sibling_tokens)]
     return selected
 
@@ -74,20 +84,18 @@ def prepare_dataset(train_data: str, annotation_file: str, mods: dict, bag_path:
         else:
             shutil.copyfile(train_data, 'df.parquet')
     else:
-        # Map each modality name to its column name in the dataframe
+        # Map each modality name to its column name in the dataframe.
+        # 'cb'/'genomics' are single-source; the source-variant modalities
+        # (radpy/radfm, dp/dp-titan/dp-titan-coral, ...) are wired in from
+        # SOURCE_VARIANT_GROUPS so a new variant only needs adding there.
         mod_mapping = {
             'cb': 'mod1',
-            'dp': 'mod3',
             'genomics': 'mod4',
         }
-
-        # Add the correct radiomics key
-        if 'radpy' in mods:
-            mod_mapping['radpy'] = 'mod2'
-        if 'radfm' in mods:
-            mod_mapping['radfm'] = 'mod2'  # same column name, different source
-        if 'dp-titan' in mods:
-            mod_mapping['dp-titan'] = 'mod3'  # same column name as dp, different source
+        for group in SOURCE_VARIANT_GROUPS:
+            for key, _token in group['variants']:
+                if key in mods:
+                    mod_mapping[key] = group['column']
 
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
         if isinstance(train_data, list):

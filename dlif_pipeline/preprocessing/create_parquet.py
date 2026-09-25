@@ -76,21 +76,29 @@ RAD_OUTPUT_STEMS = {
     'fmrad': 'features_dataset_fmrad',
 }
 
-# Suffix appended to the output filename for each dp_type. '' for the
-# legacy/default gigapath source (predates this split, no token in the
-# name); everything else must contain a unique token — this must match
-# what prepare_dataset.py's SOURCE_VARIANT_GROUPS looks for.
-DP_OUTPUT_SUFFIXES = {
-    'digital_pathology': '',
-    'digital_pathology_titan': '_dp-titan',
-}
+# Filename token derived from dp_type, appended to the output filename.
+# '' for the legacy/default gigapath source (predates this split, no
+# token in the name); every other dp_type must be named
+# 'digital_pathology_<token>' (e.g. 'digital_pathology_titan',
+# 'digital_pathology_titan_coral') and gets suffix '_dp-<token>' with
+# underscores turned into dashes — this must match what
+# prepare_dataset.py's SOURCE_VARIANT_GROUPS looks for.
+def dp_output_suffix(dp_type: str) -> str:
+    if dp_type == 'digital_pathology':
+        return ''
+    if not dp_type.startswith('digital_pathology_'):
+        raise ValueError(
+            f"dp_type must be 'digital_pathology' or start with 'digital_pathology_', got {dp_type!r}"
+        )
+    token = dp_type[len('digital_pathology_'):].replace('_', '-')
+    return f'_dp-{token}'
 
 
 def _parse_args():
     parser = argparse.ArgumentParser(description="Build the DLIF multimodal feature parquet files from processed modality CSVs.")
     parser.add_argument('--data-dir', default=str(DEFAULT_DATA_DIR), help=f"Directory containing the *_processed.csv files and where the parquet outputs are written (default: {DEFAULT_DATA_DIR})")
     parser.add_argument('--rad-types', nargs='+', default=['pyradiomics', 'fmrad'], help="Radiomics source(s) to build a parquet file for. Each produces '<data-dir>/features_dataset_<name>.parquet' (pyradiomics is saved as 'features_dataset_radpy_fixed.parquet' for backward compatibility).")
-    parser.add_argument('--dp-types', nargs='+', default=['digital_pathology'], choices=list(DP_OUTPUT_SUFFIXES), help="Digital pathology source(s) to build a parquet file for. 'digital_pathology' (gigapath, default) keeps the legacy filename; 'digital_pathology_titan' appends '_dp-titan' so it doesn't collide with the gigapath parquet.")
+    parser.add_argument('--dp-types', nargs='+', default=['digital_pathology'], help="Digital pathology source(s) to build a parquet file for. 'digital_pathology' (gigapath, default) keeps the legacy filename; any 'digital_pathology_<token>' (e.g. 'digital_pathology_titan', 'digital_pathology_titan_coral') appends '_dp-<token>' so it doesn't collide with other dp parquets.")
     return parser.parse_args()
 
 
@@ -103,7 +111,7 @@ if __name__ == '__main__':
         for dp_type in args.dp_types:
             print(f"Creating {rad_type} / {dp_type} version...")
             df = create_feature_dataset_from_processed(rad_type=rad_type, dp_type=dp_type, data_dir=data_dir)
-            output_name = f"{rad_stem}{DP_OUTPUT_SUFFIXES[dp_type]}.parquet"
+            output_name = f"{rad_stem}{dp_output_suffix(dp_type)}.parquet"
             df.to_parquet(data_dir / output_name, index=False)
 
     print("\nDone!")

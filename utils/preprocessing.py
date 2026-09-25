@@ -13,6 +13,12 @@ from sklearn.preprocessing import StandardScaler
 # frames) are unaffected since the columns simply aren't found.
 METADATA_COLUMNS = ['CENTER', 'SET']
 
+# Columns that are pure identifiers, not features or metadata worth keeping —
+# dropped entirely (not passed to imputation/normalization, not re-attached to
+# the result) whenever present. E.g. some digital pathology exports include a
+# 'slide_name' column alongside the embedding features.
+NON_FEATURE_COLUMNS = ['slide_name']
+
 CB_CATEGORICAL_FEATURES = [
     "ECOG PS",
     "SEX",

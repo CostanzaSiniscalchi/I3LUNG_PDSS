@@ -27,13 +27,17 @@ from utils.preprocessing import (  # noqa: E402
     CB_CATEGORICAL_BOUNDS,
     GEN_CATEGORICAL_FEATURES,
     GEN_CATEGORICAL_BOUNDS,
+    NON_FEATURE_COLUMNS,
 )
 
-# Default raw-file name per modality, used when no override path is given.
+# Base (non-dp) modalities this script knows about by name, used to build
+# the preprocess_new_cohort.py CLI's fixed --<modality>-path override flags.
+# Digital pathology is handled separately via `dp_types` below since it's an
+# open-ended set of source variants (digital_pathology, digital_pathology_titan,
+# digital_pathology_titan_coral, ...), not a fixed list.
 DEFAULT_FILENAMES = {
     "cb": "cb.csv",
     "genomics": "genomics.csv",
-    "digital_pathology": "digital_pathology.csv",
     "pyradiomics": "pyradiomics.csv",
     "fmrad": "fmrad.csv",
 }
@@ -46,13 +50,17 @@ _CATEGORICAL = {
 
 def resolve_input_path(modality: str, raw_data_dir: Path, input_paths: Dict[str, str]) -> Optional[Path]:
     """Return the path to use for `modality`'s raw CSV: the override in
-    `input_paths` if given, otherwise `<raw_data_dir>/<default filename>` if
+    `input_paths` if given, otherwise `<raw_data_dir>/<modality>.csv` if
     that file exists, otherwise None (modality is skipped).
+
+    Every modality's default filename is just '<modality>.csv' — this also
+    covers any digital_pathology_<token> variant without needing an entry in
+    DEFAULT_FILENAMES.
     """
     override = input_paths.get(modality)
     if override:
         return Path(override)
-    default_path = Path(raw_data_dir) / DEFAULT_FILENAMES[modality]
+    default_path = Path(raw_data_dir) / f"{modality}.csv"
     return default_path if default_path.exists() else None
 
 
@@ -91,7 +99,8 @@ def preprocess_new_cohort(
     raw_data_dir: Path,
     artifacts_dir: Path,
     output_dir: Path,
-    modalities=("cb", "genomics", "digital_pathology", "pyradiomics", "fmrad"),
+    modalities=("cb", "genomics", "pyradiomics", "fmrad"),
+    dp_types=("digital_pathology",),
     input_paths: Optional[Dict[str, str]] = None,
 ) -> Dict[str, pd.DataFrame]:
     """Transform each modality present for the new cohort and write
@@ -99,9 +108,19 @@ def preprocess_new_cohort(
     impute_and_normalize.py produces for the retrospective cohort, so
     create_parquet.py --data-dir <output_dir> can consume it unchanged.
 
+    `dp_types` is the open-ended set of digital pathology source variants to
+    process (e.g. 'digital_pathology', 'digital_pathology_titan',
+    'digital_pathology_titan_coral', ...), matching create_parquet.py's and
+    create_annotations.py's --dp-types. Each is treated exactly like any
+    other modality: read from '<raw_data_dir>/<dp_type>.csv' (or an override
+    path), transformed with the artifacts saved under that same name by
+    impute_and_normalize.py, and written to '<output_dir>/<dp_type>_processed.csv'.
+
     A modality is skipped (with a printed warning) if neither an override
     path nor the default file exists in raw_data_dir — mirrors the HAS_{mod}
-    pattern in create_annotations.py.
+    pattern in create_annotations.py. This means radpy/radfm/any dp variant
+    you don't have data for yet can simply be left out of `raw_data_dir` and
+    will be skipped rather than erroring.
     """
     raw_data_dir = Path(raw_data_dir)
     artifacts_dir = Path(artifacts_dir)
@@ -110,14 +129,15 @@ def preprocess_new_cohort(
     input_paths = input_paths or {}
 
     results = {}
-    for modality in modalities:
+    for modality in list(modalities) + list(dp_types):
         input_path = resolve_input_path(modality, raw_data_dir, input_paths)
         if input_path is None:
-            print(f"[SKIP] {modality}: no input file found (looked for override, then {raw_data_dir / DEFAULT_FILENAMES[modality]})")
+            print(f"[SKIP] {modality}: no input file found (looked for override, then {raw_data_dir / f'{modality}.csv'})")
             continue
 
         print(f"Processing {modality} from {input_path}...")
         df = pd.read_csv(input_path, index_col="Subject")
+        df = df.drop(columns=[c for c in NON_FEATURE_COLUMNS if c in df.columns])
         artifacts = load_modality_artifacts(modality, artifacts_dir)
         result = transform_modality(df, modality, artifacts)
 

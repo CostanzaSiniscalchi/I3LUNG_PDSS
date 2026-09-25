@@ -18,6 +18,22 @@ def _to_str_flag(series):
     return series.apply(_convert)
 
 
+def dp_flag_name(dp_type: str) -> str:
+    """HAS_<X> annotation column name for a given dp_type. 'digital_pathology'
+    (legacy/gigapath) keeps the existing 'HAS_DP' name; any
+    'digital_pathology_<token>' (e.g. 'digital_pathology_titan_coral', matching
+    create_parquet.py's dp_output_suffix convention) becomes 'HAS_DP_<TOKEN>'.
+    """
+    if dp_type == 'digital_pathology':
+        return 'HAS_DP'
+    if not dp_type.startswith('digital_pathology_'):
+        raise ValueError(
+            f"dp_type must be 'digital_pathology' or start with 'digital_pathology_', got {dp_type!r}"
+        )
+    token = dp_type[len('digital_pathology_'):].upper()
+    return f'HAS_DP_{token}'
+
+
 def create_annotations(
     data_dir=None,
     outcomes_path=None,
@@ -25,11 +41,13 @@ def create_annotations(
     features_path=None,
     output_path=None,
     modality_files=None,
+    dp_types=None,
     int_cv_splits_path=None,
     n_sub=5,
     use_subfolds=False,
     val_split=0.10,
-    seed=42
+    seed=42,
+    default_dataset=None
 ):
     # Set default paths if not provided
     data_dir = Path(data_dir) if data_dir is not None else DEFAULT_DATA_DIR
@@ -42,13 +60,16 @@ def create_annotations(
     if output_path is None:
         output_path = data_dir / 'annotations.csv'
     if modality_files is None:
+        if dp_types is None:
+            dp_types = ['digital_pathology']
         modality_files = {
             'HAS_CB': data_dir / 'cb.csv',
             'HAS_RADPY': data_dir / 'pyradiomics.csv',
             'HAS_FMRAD': data_dir / 'fmrad.csv',
-            'HAS_DP': data_dir / 'digital_pathology.csv',
-            'HAS_GENOMICS': data_dir / 'genomics.csv',
         }
+        for dp_type in dp_types:
+            modality_files[dp_flag_name(dp_type)] = data_dir / f'{dp_type}.csv'
+        modality_files['HAS_GENOMICS'] = data_dir / 'genomics.csv'
     if int_cv_splits_path is None:
         int_cv_splits_path = data_dir / 'int_cv_splits.json'
 
@@ -75,17 +96,31 @@ def create_annotations(
     ann = outcomes[outcomes['Subject'].isin(cb_subjects)].copy()
     
     
-    # Get FOLD and dataset from CB
-    cb_info = cb[['Subject', 'CENTER', 'SET']].copy()
-    ann = ann.merge(cb_info, on='Subject', how='left')  # merge su Subject direttamente
-    ann = ann.rename(columns={'CENTER': 'FOLD', 'SET': 'dataset'})
-    
-    # Map dataset values
-    ann['dataset'] = ann['dataset'].map({
-        'TRAIN': 'train',
-        'TEST': 'test',
-        'EXVAL': 'ext_val'
-    })
+    # Get FOLD and dataset from CB. A cohort with no TRAIN/TEST/EXVAL 'SET'
+    # column (e.g. a new external cohort with no split of its own) instead
+    # tags every subject with `default_dataset` (e.g. "ext_val" for eval-only
+    # use), skipping the TRAIN/TEST/EXVAL mapping entirely.
+    if 'SET' in cb.columns:
+        cb_info = cb[['Subject', 'CENTER', 'SET']].copy()
+        ann = ann.merge(cb_info, on='Subject', how='left')  # merge su Subject direttamente
+        ann = ann.rename(columns={'CENTER': 'FOLD', 'SET': 'dataset'})
+
+        # Map dataset values
+        ann['dataset'] = ann['dataset'].map({
+            'TRAIN': 'train',
+            'TEST': 'test',
+            'EXVAL': 'ext_val'
+        })
+    else:
+        if not default_dataset:
+            raise ValueError(
+                "cb data has no 'SET' column (no TRAIN/TEST/EXVAL split); "
+                "pass default_dataset (e.g. 'ext_val') to tag every subject."
+            )
+        cb_info = cb[['Subject', 'CENTER']].copy()
+        ann = ann.merge(cb_info, on='Subject', how='left')
+        ann = ann.rename(columns={'CENTER': 'FOLD'})
+        ann['dataset'] = default_dataset
     
     # Get outcome columns
     outcome_cols = [c for c in ann.columns if c not in ['Subject', 'FOLD', 'dataset']]
@@ -137,6 +172,10 @@ def create_annotations(
     
     # Map PDL1 to low/high if column exists
     if 'PDL1_CATEGORY' in ann.columns:
+        # Coerce first: some cohorts store this as raw text categories
+        # (e.g. "1-49 %") alongside numeric codes, which would otherwise
+        # crash a direct astype('Int64').
+        ann['PDL1_CATEGORY'] = pd.to_numeric(ann['PDL1_CATEGORY'], errors='coerce')
         ann['PDL1_GROUP'] = ann['PDL1_CATEGORY'].map({
             0: 'low',
             1: 'low',
@@ -204,11 +243,14 @@ def create_annotations(
         
         print(f"Added early stopping for {outcome}")
 
-    # Add folds for INT-only
-    with open(int_cv_splits_path, 'r') as f:
-        int_only = json.load(f)
-    for fold_idx, slide_list in int_only.items():
-        ann.loc[ann['Subject'].isin(slide_list), 'INT_ONLY_FOLDS'] = fold_idx
+    # Add folds for INT-only (only applies to the retrospective INT center's
+    # own CV splits; a cohort with no such file simply has no INT_ONLY_FOLDS)
+    ann['INT_ONLY_FOLDS'] = None
+    if Path(int_cv_splits_path).exists():
+        with open(int_cv_splits_path, 'r') as f:
+            int_only = json.load(f)
+        for fold_idx, slide_list in int_only.items():
+            ann.loc[ann['Subject'].isin(slide_list), 'INT_ONLY_FOLDS'] = fold_idx
 
     # Rinomina Subject in slide
     ann = ann.rename(columns={'Subject': 'patient'})
@@ -221,7 +263,11 @@ def create_annotations(
     for outcome in outcome_cols:
         split_cols.extend([f'dataset_{outcome}', f'fold_{outcome}'])
     
-    flag_cols = ['PDL1_GROUP', 'PDL1_CATEGORY', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2', 'HAS_CB', 'HAS_RADPY', 'HAS_FMRAD', 'HAS_DP', 'HAS_GENOMICS', 'INT_ONLY_FOLDS']
+    flag_cols = (
+        ['PDL1_GROUP', 'PDL1_CATEGORY', 'NSCLC_HISTOLOGY_ADENOCARCINOMA', 'NSCLC_HISTOLOGY_SQUAMOUS', 'IO_CHT', 'COHORT_2']
+        + list(modality_files.keys())
+        + ['INT_ONLY_FOLDS']
+    )
     
     early_cols = [f'early_stopping_{o}' for o in outcome_cols]
     
@@ -243,11 +289,13 @@ def _parse_args():
     parser.add_argument('--cb-path', default=None, help="Path to cb.csv (default: <data-dir>/cb.csv)")
     parser.add_argument('--features-path', default=None, help="Path to a features parquet file, used only to validate coverage (default: <data-dir>/features_dataset_radpy_fixed.parquet)")
     parser.add_argument('--output-path', default=None, help="Path to write annotations.csv to (default: <data-dir>/annotations.csv)")
+    parser.add_argument('--dp-types', nargs='+', default=None, help="Digital pathology source(s) to add HAS_<X> coverage flags for, matching create_parquet.py's --dp-types (default: ['digital_pathology']). 'digital_pathology' checks <data-dir>/digital_pathology.csv and sets 'HAS_DP'; any 'digital_pathology_<token>' (e.g. 'digital_pathology_titan_coral') checks <data-dir>/digital_pathology_<token>.csv and sets 'HAS_DP_<TOKEN>'.")
     parser.add_argument('--int-cv-splits-path', default=None, help="Path to int_cv_splits.json (default: <data-dir>/int_cv_splits.json)")
     parser.add_argument('--n-sub', type=int, default=5, help="Number of subfolds per center when --use-subfolds is set")
     parser.add_argument('--use-subfolds', action='store_true', help="Split each center's fold into n-sub subfolds")
     parser.add_argument('--val-split', type=float, default=0.10, help="Fraction of the train set to hold out for early stopping")
     parser.add_argument('--seed', type=int, default=42, help="Random seed for subfolds/early-stopping sampling")
+    parser.add_argument('--default-dataset', default=None, help="Dataset split tag (e.g. 'ext_val') to assign every subject when cb.csv has no 'SET' column (a cohort with no TRAIN/TEST/EXVAL split of its own)")
     return parser.parse_args()
 
 
@@ -259,9 +307,11 @@ if __name__ == '__main__':
         cb_path=args.cb_path,
         features_path=args.features_path,
         output_path=args.output_path,
+        dp_types=args.dp_types,
         int_cv_splits_path=args.int_cv_splits_path,
         n_sub=args.n_sub,
         use_subfolds=args.use_subfolds,
         val_split=args.val_split,
         seed=args.seed,
+        default_dataset=args.default_dataset,
     )

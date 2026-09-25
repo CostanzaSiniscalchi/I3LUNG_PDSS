@@ -13,19 +13,23 @@ from sklearn.impute import IterativeImputer
 from sklearn.preprocessing import StandardScaler
 
 # Modalities that go through imputation before normalization. All other
-# modalities (digital_pathology, pyradiomics, fmrad) are assumed complete and
-# only get normalized — mirrors the branches in impute_and_normalize.py.
+# modalities (digital_pathology, any digital_pathology_<token> variant,
+# pyradiomics, fmrad) are assumed complete and only get normalized — mirrors
+# the branches in impute_and_normalize.py.
 MODALITIES_WITH_IMPUTER = {"cb", "genomics"}
 
 # impute_and_normalize.py saves genomics artifacts under the "gen" prefix,
-# not "genomics" — kept as-is here for consistency with existing files on disk.
-ARTIFACT_PREFIX = {
-    "cb": "cb",
+# not "genomics" — kept as-is here for consistency with existing files on
+# disk. Every other modality (including any digital_pathology_<token>
+# variant, e.g. 'digital_pathology_titan_coral') is saved under its own name
+# as-is, so no entry is needed here for those.
+ARTIFACT_PREFIX_OVERRIDES = {
     "genomics": "gen",
-    "digital_pathology": "digital_pathology",
-    "pyradiomics": "pyradiomics",
-    "fmrad": "fmrad",
 }
+
+
+def artifact_prefix(modality: str) -> str:
+    return ARTIFACT_PREFIX_OVERRIDES.get(modality, modality)
 
 
 @dataclass
@@ -44,11 +48,8 @@ def load_modality_artifacts(modality: str, artifacts_dir: Path) -> ModalityArtif
     Raises FileNotFoundError naming the exact missing path if an artifact isn't
     there — never falls back to fitting a new one.
     """
-    if modality not in ARTIFACT_PREFIX:
-        raise ValueError(f"Unknown modality: {modality!r}. Expected one of {sorted(ARTIFACT_PREFIX)}")
-
     artifacts_dir = Path(artifacts_dir)
-    prefix = ARTIFACT_PREFIX[modality]
+    prefix = artifact_prefix(modality)
 
     scaler_path = artifacts_dir / f"{prefix}_scaler.pkl"
     config_path = artifacts_dir / f"{prefix}_norm_config.json"
