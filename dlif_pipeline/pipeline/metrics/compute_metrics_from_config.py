@@ -134,10 +134,10 @@ def find_result_directories(path_info):
 
         print(f" Searching in: {base_path}")
 
-        # Find all seed_0 directories
+        # Find all seed_N directories
         for root, dirs, files in os.walk(base_path):
-            for dir_name in dirs:
-                if dir_name == 'seed_0':
+            for dir_name in sorted(dirs):
+                if dir_name.startswith('seed_') and dir_name[5:].isdigit():
                     seed_dir = os.path.join(root, dir_name)
                     result_dirs.append((outcome, seed_dir))
                     print(f"   Found: {seed_dir}")

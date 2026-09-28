@@ -11,7 +11,7 @@ from os.path import join, exists, dirname
 from typing import Union, List, Optional, Callable, Tuple, Any, TYPE_CHECKING
 from MIL.util import load_json, write_json, get_new_model_dir, log, path_to_name
 from MIL.dataset import Dataset
-from ._params import TrainerConfig
+from ._params import TrainerConfig, BaseMultimodalLoss
 from . import utils
 
 if TYPE_CHECKING:
@@ -259,7 +259,7 @@ def predict_from_mixed_bags(
         - List of attention arrays (if attention=True)
     """
     import torch
-    
+
     device = utils._detect_device(model, device, verbose=False)
     y_pred = []
     y_att = []
@@ -267,7 +267,7 @@ def predict_from_mixed_bags(
     for bag in bags:
         # Load the multimodal bag dictionary
         bag_dict = torch.load(bag, weights_only=True)  # weights_only=True for torch 2.0+
-        
+
         # Get features and mask
         mask = bag_dict['mask'].to(device)
         features = []
@@ -289,11 +289,66 @@ def predict_from_mixed_bags(
 
             if apply_softmax:
                 _pred = torch.nn.functional.softmax(_pred, dim=1)
-            
+
             y_pred.append(_pred.cpu().numpy())
 
     yp = np.concatenate(y_pred, axis=0)
     return yp, y_att if attention else None
+
+# -----------------------------------------------------------------------------
+
+def _compute_and_save_eval_losses(model, bags, loss_func, outdir, labels, events=None):
+    """Compute and save classification/reconstruction sub-losses over an eval bag set.
+
+    Only runs when loss_func is a BaseMultimodalLoss. Writes subloss_history.csv
+    (single row, epoch=eval) to outdir. Reconstruction loss is unweighted.
+    """
+    import torch
+    if not isinstance(loss_func, BaseMultimodalLoss):
+        return
+
+    device = next(model.parameters()).device
+    is_survival = hasattr(loss_func, 'cph')
+
+    cls_losses, rec_losses = [], []
+    model.eval()
+    with torch.no_grad():
+        for bag in bags:
+            slide = path_to_name(bag)
+            if slide not in labels:
+                continue
+            label = labels[slide]
+
+            bag_dict = torch.load(bag, weights_only=True)
+            mask = bag_dict['mask'].to(device)
+            features = [bag_dict[f'feature{i}'].unsqueeze(0).to(device) for i in range(1, len(mask) + 1)]
+            mask = mask.unsqueeze(0)
+
+            logits = model(*features, mask, decode=True)
+            if not isinstance(logits, tuple):
+                continue
+
+            if is_survival:
+                # label is (time, event) tuple
+                target_tensor = torch.tensor([[label[0], label[1]]], dtype=torch.float32, device=device)
+            else:
+                target_tensor = torch.tensor([label], dtype=torch.long, device=device)
+
+            loss_func(logits, target_tensor)
+            cls_losses.append(getattr(loss_func, 'last_classification_loss', float('nan')))
+            rec_losses.append(getattr(loss_func, 'last_reconstruction_loss', float('nan')))
+
+    if not cls_losses:
+        return
+
+    cls_col = 'survival_loss' if is_survival else 'classification_loss'
+    csv_path = join(outdir, 'subloss_history.csv')
+    with open(csv_path, 'w') as f:
+        f.write(f'epoch,{cls_col},reconstruction_loss\n')
+        f.write(f'eval,{np.mean(cls_losses):.6f},{np.mean(rec_losses):.6f}\n')
+    log.info(f"Eval sub-losses saved to [green]{csv_path}[/]")
+
+# -----------------------------------------------------------------------------
 
 def run_eval(
     model: "torch.nn.Module",
@@ -379,6 +434,22 @@ def run_eval(
     # Print classification metrics, including per-category accuracy)
     metrics_df = utils.rename_df_cols(df, outcomes, model_type=config.model_type)
     config.run_metrics(metrics_df, level='slide', outdir=model_dir, save_plots=save_plots)
+
+    # Compute and save sub-losses for multimodal models (mixed-bags architecture).
+    if model_dir and (config.is_multimodal or config.is_mixed_bags):
+        try:
+            loss_kw = {}
+            if config.reconstruction_weight is not None:
+                loss_kw['reconstruction_weight'] = config.reconstruction_weight
+            loss_func = config.loss_fn(**loss_kw)
+            eval_labels, _ = utils.get_labels(
+                dataset, outcomes, config.model_type,
+                format='id', events=events
+            )
+            eval_bags = dataset.get_bags(bags) if isinstance(bags, str) else np.array(bags)
+            _compute_and_save_eval_losses(model, eval_bags, loss_func, model_dir, eval_labels)
+        except Exception as e:
+            log.warning(f"Could not compute eval sub-losses: {e}")
 
     # Export attention
     if outdir and y_att and save_attention:

@@ -228,6 +228,11 @@ class TrainerConfig:
         return self.model_config.is_multimodal
 
     @property
+    def is_mixed_bags(self):
+        """Whether the model uses mixed multimodal bags."""
+        return self.model_config.is_mixed_bags
+
+    @property
     def model_type(self):
         """Type of model (classification or regression)."""
         return self.model_config.model_type
