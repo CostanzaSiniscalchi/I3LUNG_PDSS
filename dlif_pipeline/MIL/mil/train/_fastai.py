@@ -15,10 +15,65 @@ from packaging import version
 from fastai.vision.all import (
     DataLoaders, Learner, SaveModelCallback, CSVLogger, Callback
 )
+from .._params import BaseMultimodalLoss, TrainerConfig
 
 from MIL.util import log
 from MIL.model import torch_utils
-from .._params import TrainerConfig
+
+# -----------------------------------------------------------------------------
+
+class MultimodalLossLogger(Callback):
+    """Write per-epoch classification and reconstruction sub-losses to subloss_history.csv.
+
+    Reconstruction loss is saved unweighted (before multiplication by reconstruction_weight)
+    so the raw component losses are interpretable independently of the hyperparameter.
+    """
+
+    order = CSVLogger.order + 1  # run after CSVLogger so epoch number is already written
+
+    def before_fit(self):
+        self._is_multimodal = isinstance(self.learn.loss_func, BaseMultimodalLoss)
+        if self._is_multimodal:
+            self._reset_buffers()
+            outdir = str(self.learn.path)
+            self._csv_path = os.path.join(outdir, 'subloss_history.csv')
+            if not os.path.exists(self._csv_path):
+                with open(self._csv_path, 'w') as f:
+                    f.write('epoch,train_classification_loss,train_reconstruction_loss,'
+                            'valid_classification_loss,valid_reconstruction_loss\n')
+
+    def _reset_buffers(self):
+        self._train_cls, self._train_rec = [], []
+        self._val_cls, self._val_rec = [], []
+
+    def after_batch(self):
+        if not self._is_multimodal:
+            return
+        lf = self.learn.loss_func
+        cls = getattr(lf, 'last_classification_loss', None)
+        rec = getattr(lf, 'last_reconstruction_loss', None)
+        if cls is None or rec is None:
+            return
+        if self.training:
+            self._train_cls.append(cls)
+            self._train_rec.append(rec)
+        else:
+            self._val_cls.append(cls)
+            self._val_rec.append(rec)
+
+    def after_epoch(self):
+        if not self._is_multimodal or not self._train_cls:
+            return
+        row = (
+            f"{self.epoch},"
+            f"{np.mean(self._train_cls):.6f},"
+            f"{np.mean(self._train_rec):.6f},"
+            f"{np.mean(self._val_cls) if self._val_cls else float('nan'):.6f},"
+            f"{np.mean(self._val_rec) if self._val_rec else float('nan'):.6f}\n"
+        )
+        with open(self._csv_path, 'a') as f:
+            f.write(row)
+        self._reset_buffers()
 
 # -----------------------------------------------------------------------------
 
@@ -49,6 +104,7 @@ def train(learner, config, callbacks=None):
         SaveModelCallback(fname=f"best_valid", monitor=config.save_monitor),
         SaveFirstEpochCallback(),
         CSVLogger(),
+        MultimodalLossLogger(),
     ]
     if callbacks:
         cbs += callbacks
@@ -120,7 +176,7 @@ def build_learner(
         encoder = OneHotEncoder(**oh_kw).fit(unique_categories.reshape(-1, 1))
     else:
         encoder = None
-    
+
     # Build the dataloaders.
     train_dl = config.build_train_dataloader(
         bags[train_idx],
@@ -157,7 +213,7 @@ def build_learner(
         model.relocate()
 
     # Loss should weigh inversely to class occurences.
-    
+
 
     if config.model_type in ['classification', 'multimodal'] and config.weighted_loss:
         #counts = pd.value_counts(targets[train_idx])

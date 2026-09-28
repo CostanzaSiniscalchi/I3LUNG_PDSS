@@ -746,7 +746,10 @@ class MultimodalLoss(BaseMultimodalLoss):
         reconstruction_loss = self._calculate_reconstruction_loss(
             reconstructions, reconstruction_targets, modality_mask
         )
-        
+
+        self.last_classification_loss = classification_loss.item()
+        self.last_reconstruction_loss = reconstruction_loss if isinstance(reconstruction_loss, float) else reconstruction_loss.item()
+
         # Combine losses
         total_loss = classification_loss + (self.reconstruction_weight * reconstruction_loss)
 
@@ -783,7 +786,10 @@ class MultimodalSurvivalLoss(BaseMultimodalLoss):
         reconstruction_loss = self._calculate_reconstruction_loss(
             reconstructions, reconstruction_targets, modality_mask
         )
-        
+
+        self.last_classification_loss = survival_loss.item()
+        self.last_reconstruction_loss = reconstruction_loss if isinstance(reconstruction_loss, float) else reconstruction_loss.item()
+
         # Combine losses
         total_loss = survival_loss + (self.reconstruction_weight * reconstruction_loss)
 
