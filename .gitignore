@@ -22,7 +22,7 @@
 # dlif_pipeline/ - whitelist tree, then exclude heavy dirs
 !dlif_pipeline/
 !dlif_pipeline/**
-dlif_pipeline/bags/
+dlif_pipeline/bags*/
 dlif_pipeline/configs/
 dlif_pipeline/results/
 dlif_pipeline/preds/

@@ -72,7 +72,9 @@ def run_training(config, mods):
 
     mod_string = "_".join([k for k, v in mods.items() if v])
     bag_path_mods = f"bags_{mod_string}"
-    bag_path = os.path.join(ROOT, "bags", bag_path_mods)
+    bags_dir = config.get("bags_dir")
+    bags_root = os.path.abspath(bags_dir) if bags_dir else os.path.join(ROOT, "bags")
+    bag_path = os.path.join(bags_root, bag_path_mods)
 
     annotations = config.get('annotation_file')
     P = Project(ROOT, annotations = annotations)

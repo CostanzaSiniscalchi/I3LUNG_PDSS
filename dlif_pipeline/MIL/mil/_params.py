@@ -228,6 +228,11 @@ class TrainerConfig:
         return self.model_config.is_multimodal
 
     @property
+    def is_mixed_bags(self):
+        """Whether the model uses mixed multimodal bags."""
+        return self.model_config.is_mixed_bags
+
+    @property
     def model_type(self):
         """Type of model (classification or regression)."""
         return self.model_config.model_type
@@ -746,7 +751,10 @@ class MultimodalLoss(BaseMultimodalLoss):
         reconstruction_loss = self._calculate_reconstruction_loss(
             reconstructions, reconstruction_targets, modality_mask
         )
-        
+
+        self.last_classification_loss = classification_loss.item()
+        self.last_reconstruction_loss = reconstruction_loss if isinstance(reconstruction_loss, float) else reconstruction_loss.item()
+
         # Combine losses
         total_loss = classification_loss + (self.reconstruction_weight * reconstruction_loss)
 
@@ -783,7 +791,10 @@ class MultimodalSurvivalLoss(BaseMultimodalLoss):
         reconstruction_loss = self._calculate_reconstruction_loss(
             reconstructions, reconstruction_targets, modality_mask
         )
-        
+
+        self.last_classification_loss = survival_loss.item()
+        self.last_reconstruction_loss = reconstruction_loss if isinstance(reconstruction_loss, float) else reconstruction_loss.item()
+
         # Combine losses
         total_loss = survival_loss + (self.reconstruction_weight * reconstruction_loss)
 

@@ -46,6 +46,11 @@ def build_path_from_config(config, mod_string, base_dir):
     root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
     task = config.get('task')  # 'classification' or 'survival'
     training_type = config.get('training_type')  # 'cross_validation', 'standard', 'evaluation'
+    # Mirrors training_loop.py's eval_cohort_tag redirect: an eval run tagged
+    # with a cohort writes (and must be searched for) under
+    # "evaluation_<tag>", not the shared "evaluation" directory.
+    if training_type == 'evaluation' and config.get('eval_cohort_tag'):
+        training_type = f"evaluation_{config['eval_cohort_tag']}"
     data_type = config.get('data-type', 'hypothesis_driven')
     source = config.get('source', 'pyrad')
     imp = config.get('imp', 'noimp')
@@ -129,10 +134,10 @@ def find_result_directories(path_info):
 
         print(f" Searching in: {base_path}")
 
-        # Find all seed_0 directories
+        # Find all seed_N directories
         for root, dirs, files in os.walk(base_path):
-            for dir_name in dirs:
-                if dir_name == 'seed_0':
+            for dir_name in sorted(dirs):
+                if dir_name.startswith('seed_') and dir_name[5:].isdigit():
                     seed_dir = os.path.join(root, dir_name)
                     result_dirs.append((outcome, seed_dir))
                     print(f"   Found: {seed_dir}")

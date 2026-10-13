@@ -72,6 +72,19 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
 
         print(f"best model checkpoint found: {best_checkpoint}")
 
+        # A distinct outcome/mods/seed combo evaluated against a different
+        # cohort still lands on the exact same results_path (nothing in the
+        # path encodes *which* cohort was evaluated), so eval output for one
+        # cohort would silently overwrite another's. eval_cohort_tag routes
+        # this run's OUTPUT only to a "evaluation_<tag>" sibling directory,
+        # while the checkpoint lookup above stays keyed off the untagged
+        # path so it still finds the real trained model.
+        eval_cohort_tag = config.get("eval_cohort_tag")
+        if eval_cohort_tag:
+            output_results_path = results_path.replace("/evaluation/", f"/evaluation_{eval_cohort_tag}/")
+        else:
+            output_results_path = results_path
+
         if config.get("masked_mods"):
             # --- MASKED BAG EVALUATION ---
             from .mask_modalities import build_output_dirname, ALL_MODALITIES
@@ -102,7 +115,7 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
                 print(f"  bags: {masked_bag_path}")
 
                 test_dataset = get_eval_dataset(P, config, outcome)
-                outdir = os.path.join(results_path, "eval_mask", subset_name)
+                outdir = os.path.join(output_results_path, "eval_mask", subset_name)
                 os.makedirs(outdir, exist_ok=True)
 
                 print(f"  outdir: {outdir}")
@@ -126,7 +139,7 @@ def train_val(P, config, mods, fold, seed, results_path, bag_path, folds, traini
             print(f" Evaluating on dataset split: {eval_split}")
 
             test_dataset = get_eval_dataset(P, config, outcome)
-            outdir = os.path.join(results_path, "eval")
+            outdir = os.path.join(output_results_path, "eval")
             os.makedirs(outdir, exist_ok=True)
 
             print(f"evaluation outputs will be saved to: {outdir}")

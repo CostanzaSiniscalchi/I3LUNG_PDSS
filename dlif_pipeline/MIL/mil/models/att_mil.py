@@ -128,9 +128,9 @@ class MultiModal_Mixed_Attention_MIL(nn.Module):
         self._neg_inf = torch.tensor(-torch.inf)
         self.temperature = temperature
 
-    def forward(self, *inputs, attention=False, decode=True):
+    def forward(self, *inputs, attention=False, decode=False):
         """Forward pass through the network.
-        
+
         Args:
             *inputs: Variable number of arguments where:
                 - The first N-1 arguments are tensors for each modality
@@ -138,27 +138,27 @@ class MultiModal_Mixed_Attention_MIL(nn.Module):
         """
         modalities = inputs[:-1]  # All but last input are modality tensors
         modality_mask = inputs[-1]  # Last input is the mask
-        
+
         # Encode each modality to means and variances
         mus, vars = self.encode_all(modalities)
 
         # Stack encoded vectors for attention
         # Shape: (batch_size, n_modalities, z_dim)
         stacked_embeddings = torch.stack(mus, dim=1)
-        
+
         # Calculate masked attention scores
         masked_attention = self._masked_attention_scores(
-            stacked_embeddings, 
+            stacked_embeddings,
             modality_mask,
             apply_softmax=True
         )
-        
+
         # Apply attention weights to embeddings
         weighted_embeddings = (masked_attention * stacked_embeddings)
-        
+
         # Sum across modalities
         pooled_embeddings = weighted_embeddings.sum(dim=1)  # Shape: (batch_size, z_dim)
-        
+
         # Final prediction
         predictions = self.head(pooled_embeddings)
 
@@ -167,13 +167,10 @@ class MultiModal_Mixed_Attention_MIL(nn.Module):
         else:
             res = predictions
 
-        if not self.training:
-            return res
-
-        if decode:
-            # Get latent representations through reparameterization
+        # Return reconstruction tuple during training (always) or when explicitly
+        # requested via decode=True (e.g. for eval-time loss computation).
+        if self.training or decode:
             zs = self.reparameterize(mus, vars)
-            # Decode latent representations back to modality space
             res = res, self.decode_all(zs), modalities, modality_mask
 
         return res
